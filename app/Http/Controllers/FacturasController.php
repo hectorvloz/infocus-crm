@@ -371,17 +371,31 @@ class FacturasController extends Controller
             ]);
         }
 
+        $mailSent = false;
+        $mailError = null;
+        $mailMessage = (($item['estado'] ?? '') === 'Pagada')
+            ? 'Pago registrado. Correo de factura pagada enviado.'
+            : 'Pago registrado. Correo de factura parcialmente pagada enviado.';
+
         try {
             if (($item['estado'] ?? '') === 'Pagada') {
                 $this->sendInvoicePaidConfirmation($item, $entry);
             } else {
                 $this->sendPaymentReceivedNotification($item, $entry, $saldo);
             }
+            $mailSent = true;
         } catch (\Throwable $e) {
-            // No interrumpir registro de pago por fallo de correo
+            $mailError = $e->getMessage();
+            $mailMessage = 'Pago registrado, pero no se pudo enviar el correo al cliente.';
         }
 
-        return response()->json(['ok'=>true,'item'=>$item]);
+        return response()->json([
+            'ok' => true,
+            'item' => $item,
+            'mail_sent' => $mailSent,
+            'mail_error' => $mailError,
+            'message' => $mailMessage,
+        ]);
     }
 
     public function saveDraft(Request $request, string $id)
@@ -1017,8 +1031,8 @@ class FacturasController extends Controller
             $settingsTpl,
             'template_payment_received_subject',
             'template_payment_received_body',
-            'Pago recibido - Factura {folio}',
-            "Hola {cliente},\n\nConfirmamos la recepcion de tu pago por {monto_pagado}.",
+            'Factura {folio} parcialmente pagada',
+            "Hola {cliente},\n\nConfirmamos la recepcion de tu pago por {monto_pagado}. La factura queda parcialmente pagada con un saldo pendiente de {saldo_restante}.",
             [
                 'cliente' => $invoice['cliente'] ?? ($cliente['nombre'] ?? 'Cliente'),
                 'folio' => $invoice['numero'] ?? '---',
@@ -1034,7 +1048,7 @@ class FacturasController extends Controller
             ]
         );
 
-        TemplateMail::send((string) $to, $subject, $body, $this->invoiceMailMeta('factura_payment_received'));
+        $this->sendInvoiceNotificationMail((string) $to, $subject, $body, 'factura_payment_received');
     }
 
     private function sendInvoicePaidConfirmation(array $invoice, array $paymentEntry = []): void
@@ -1125,7 +1139,22 @@ class FacturasController extends Controller
 
 <div style="text-align:center;margin-bottom:8px;">' . $botonesHtml . '</div>';
 
-        TemplateMail::send((string) $to, $subject, $body, $this->invoiceMailMeta('factura_paid_confirmation'));
+        $this->sendInvoiceNotificationMail((string) $to, $subject, $body, 'factura_paid_confirmation');
+    }
+
+    private function sendInvoiceNotificationMail(string $to, string $subject, string $body, string $source): void
+    {
+        try {
+            TemplateMail::send($to, $subject, $body, $this->invoiceMailMeta($source));
+            return;
+        } catch (\Throwable $invoiceError) {
+            try {
+                TemplateMail::send($to, $subject, $body, $this->companyMailMeta($source . '_empresa_fallback'));
+                return;
+            } catch (\Throwable) {
+                throw $invoiceError;
+            }
+        }
     }
 
     private function invoiceMailMeta(string $source): array
@@ -1162,20 +1191,70 @@ class FacturasController extends Controller
             'estado' => 'required|string',
         ]);
         $before = $this->store->find($data['id']) ?: [];
-        $item = $this->store->update($data['id'], ['estado'=>$data['estado']]);
+        $patch = ['estado' => $data['estado']];
+        $paymentEntry = [
+            'fecha' => date('Y-m-d'),
+            'metodo' => 'Cambio manual de estado',
+            'nota' => 'Factura marcada como pagada',
+        ];
+
+        if ($data['estado'] === 'Pagada') {
+            $settings = (new FileStore('settings.json'))->find('settings') ?: [];
+            $base = $settings['base_currency'] ?? 'USD';
+            $pagos = (array) ($before['pagos'] ?? []);
+            $invoiceTotal = (float) ($before['total'] ?? 0);
+            $baseTotal = (float) ($before['total_base'] ?? $invoiceTotal);
+            $isForeign = (($before['moneda'] ?? $base) !== $base) && $invoiceTotal > 0 && $baseTotal > 0;
+            $factor = $isForeign ? ($baseTotal / $invoiceTotal) : 1.0;
+            $paidBase = round(collect($pagos)->sum(function ($p) use ($isForeign, $factor, $invoiceTotal) {
+                if (isset($p['monto_base'])) {
+                    return (float) $p['monto_base'];
+                }
+
+                $monto = (float) ($p['monto'] ?? 0);
+                if (!$isForeign) {
+                    return $monto;
+                }
+
+                return $monto <= ($invoiceTotal * 1.2) ? ($monto * $factor) : $monto;
+            }), 2);
+            $pendingBase = max(0, round($baseTotal - $paidBase, 2));
+
+            if ($pendingBase > 0.01) {
+                $pendingClient = ($isForeign && $factor > 0) ? round($pendingBase / $factor, 2) : $pendingBase;
+                $paymentEntry['monto'] = $pendingClient;
+                $paymentEntry['monto_base'] = $pendingBase;
+                $pagos[] = $paymentEntry;
+                $patch['pagos'] = $pagos;
+            }
+
+            $patch['saldo'] = 0;
+            $patch['saldo_base'] = 0;
+        }
+
+        $item = $this->store->update($data['id'], $patch);
+        $mailSent = false;
+        $mailError = null;
+        $message = 'Estado actualizado.';
 
         if (($before['estado'] ?? '') !== 'Pagada' && ($item['estado'] ?? '') === 'Pagada') {
             try {
-                $this->sendInvoicePaidConfirmation($item, [
-                    'fecha' => date('Y-m-d'),
-                    'metodo' => 'Cambio manual de estado',
-                ]);
+                $this->sendInvoicePaidConfirmation($item, $paymentEntry);
+                $mailSent = true;
+                $message = 'Estado actualizado. Correo de factura pagada enviado.';
             } catch (\Throwable $e) {
-                // No interrumpir respuesta por fallo de correo
+                $mailError = $e->getMessage();
+                $message = 'Estado actualizado, pero no se pudo enviar el correo al cliente.';
             }
         }
 
-        return response()->json(['ok'=>true,'item'=>$item]);
+        return response()->json([
+            'ok' => true,
+            'item' => $item,
+            'mail_sent' => $mailSent,
+            'mail_error' => $mailError,
+            'message' => $message,
+        ]);
     }
 
     public function destroy(string $id)

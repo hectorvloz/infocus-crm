@@ -490,10 +490,22 @@
       const montoRaw = (document.getElementById('payAmount').value || '').replace(/\./g,'').replace(',','.');
       const body = { id: currentInvoice, monto: montoRaw, metodo: document.getElementById('payMethod').value, fecha_pago: payDate.value, nota: payNote.value };
       try {
-        await fetch('/api/facturas/pagar', { method:'POST', headers:{ 'Content-Type':'application/json','X-CSRF-TOKEN': window.csrfToken }, body: JSON.stringify(body) });
-        location.reload();
+        const res = await fetch('/api/facturas/pagar', { method:'POST', headers:{ 'Content-Type':'application/json','X-CSRF-TOKEN': window.csrfToken }, body: JSON.stringify(body) });
+        const json = await res.json().catch(()=>null);
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.message || 'No se pudo registrar el pago');
+        }
+        if (window.showNotification && json.message) {
+          window.showNotification(json.message, json.mail_sent ? 'success' : 'warning');
+          setTimeout(()=>location.reload(), 900);
+        } else {
+          location.reload();
+        }
       } catch(e) {
         saveBtn.disabled = false;
+        if (window.showNotification) {
+          window.showNotification(e?.message || 'No se pudo registrar el pago', 'error');
+        }
       }
     });
 
