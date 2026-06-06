@@ -1,0 +1,53 @@
+# ══════════════════════════════════════════════════════════════
+#  InFocus CRM — .htaccess para public_html (cPanel)
+#  Copia este archivo como .htaccess en tu public_html/
+# ══════════════════════════════════════════════════════════════
+
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Redirigir www → sin www (opcional, ajusta tu dominio)
+    # RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+    # RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+    # Redirigir HTTP → HTTPS (activa si tienes SSL)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Bloquear acceso directo a archivos sensibles
+    RewriteRule ^(\.env|\.git|composer\.(json|lock)|artisan|phpunit\.xml)$ - [F,L]
+
+    # Servir archivos y directorios existentes directamente
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+
+    # Todo lo demás pasa por index.php (Laravel routing)
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Bloquear listado de directorios
+Options -Indexes
+
+# Cache de assets estáticos (opcional, mejora rendimiento)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png  "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css  "access plus 6 months"
+    ExpiresByType application/javascript "access plus 6 months"
+    ExpiresByType application/x-font-woff "access plus 1 year"
+</IfModule>
+
+# Seguridad: ocultar información del servidor
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    ServerSignature Off
+</IfModule>

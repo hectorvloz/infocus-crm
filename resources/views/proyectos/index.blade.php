@@ -1,0 +1,7512 @@
+@extends('layouts.app')
+@section('title','Proyectos')
+@section('content')
+  <style>
+    #newProjectModal .ts-dropdown,
+    #projectModal .ts-dropdown,
+    #taskDetailModal .ts-dropdown,
+    #timerTaskModal .ts-dropdown,
+    #quickProjectActionModal .ts-dropdown {
+      z-index: 1200 !important;
+    }
+
+    #newProjectModal .flatpickr-calendar,
+    #projectModal .flatpickr-calendar,
+    #taskDetailModal .flatpickr-calendar,
+    #timerTaskModal .flatpickr-calendar,
+    #quickProjectActionModal .flatpickr-calendar {
+      z-index: 2147483000 !important;
+    }
+
+    #proyectos-kanban,
+    #kanbanScroll,
+    #kanban,
+    #kanban .stage-column,
+    #kanban .drag-container {
+      cursor: grab;
+    }
+
+    #proyectos-kanban.is-grabbing,
+    #kanbanScroll.is-grabbing {
+      cursor: grabbing;
+    }
+
+    #proyectos-kanban.is-grabbing *,
+    #kanbanScroll.is-grabbing * {
+      cursor: grabbing !important;
+      user-select: none;
+    }
+
+    .project-desc-shell {
+      position: relative;
+    }
+
+    .project-desc-shell textarea {
+      min-height: 9.5rem;
+      overflow: hidden;
+      transition: height .18s ease, box-shadow .18s ease;
+    }
+
+    .project-desc-shell.is-collapsed textarea {
+      resize: none;
+    }
+
+    .project-desc-shell.is-collapsed.has-overflow::after {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      bottom: 2.35rem;
+      height: 5.5rem;
+      border-radius: 0 0 .75rem .75rem;
+      background: linear-gradient(to bottom, rgba(248, 250, 252, 0), rgba(248, 250, 252, .92) 62%, rgba(255, 255, 255, 1));
+    }
+
+    .project-desc-toggle {
+      display: none;
+      margin-top: .45rem;
+      width: fit-content;
+      align-items: center;
+      gap: .45rem;
+      border-radius: .45rem;
+      background: #f1f5f9;
+      padding: .35rem .65rem;
+      font-size: .75rem;
+      font-weight: 800;
+      color: #475569;
+      transition: background-color .15s ease, color .15s ease;
+    }
+
+    .project-desc-toggle:hover {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+
+    .project-desc-toggle svg {
+      height: .95rem;
+      width: .95rem;
+      transition: transform .15s ease;
+    }
+
+    .project-desc-shell.has-overflow .project-desc-toggle {
+      display: inline-flex;
+    }
+
+    .project-desc-shell.toggle-dismissed .project-desc-toggle {
+      display: none;
+    }
+
+    .project-file-grid {
+      display: grid;
+      gap: .55rem;
+    }
+
+    .project-file-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 4.45rem minmax(0, 1fr) auto;
+      align-items: center;
+      gap: .9rem;
+      border-radius: .9rem;
+      padding: .45rem .55rem;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+      --file-color: #4f46e5;
+    }
+
+    .project-file-card:hover {
+      transform: translateY(-1px);
+      border-color: #d9ff66;
+      box-shadow: 0 14px 28px rgba(15,23,42,.08);
+    }
+
+    .project-file-actions {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+    }
+
+    .project-file-action {
+      width: 2.15rem;
+      height: 2.15rem;
+      border-radius: 999px;
+      border: 1px solid #e2e8f0;
+      background: rgba(255,255,255,.96);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+      box-shadow: 0 8px 18px rgba(15,23,42,.08);
+    }
+
+    .project-file-action.danger {
+      color: #e11d48;
+      border-color: #fecdd3;
+    }
+
+    .project-file-preview {
+      width: 4rem;
+      height: 3.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      border-radius: .55rem;
+      cursor: pointer;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .project-file-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: .5rem;
+      background: #f8fafc;
+    }
+
+    .project-file-figure {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: .5rem;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+
+    .project-file-figure::before {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 0 .45rem 0 .55rem;
+      background: linear-gradient(135deg, #dbe5f0 0%, #eef4fb 54%, #d7e1ec 55%);
+    }
+
+    .project-file-ext {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 2.9rem;
+      border-radius: .4rem;
+      padding: .34rem .45rem;
+      background: var(--file-color);
+      color: #fff;
+      font-size: .75rem;
+      line-height: 1;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .project-file-lines {
+      position: absolute;
+      left: 1.35rem;
+      right: 1.35rem;
+      bottom: .65rem;
+      display: grid;
+      gap: .22rem;
+    }
+
+    .project-file-lines span {
+      height: .22rem;
+      border-radius: 999px;
+      background: var(--file-color);
+      opacity: .42;
+    }
+
+    .project-file-lines span:nth-child(2) { width: 78%; }
+
+    .project-file-image-ext {
+      position: absolute;
+      left: .35rem;
+      bottom: .35rem;
+      min-width: 2.7rem;
+      border-radius: .45rem;
+      padding: .32rem .45rem;
+      background: var(--file-color);
+      color: #fff;
+      font-size: .68rem;
+      line-height: 1;
+      font-weight: 900;
+      text-align: center;
+      box-shadow: 0 8px 14px rgba(15,23,42,.16);
+    }
+
+    .project-file-title {
+      color: #172236;
+      font-size: .95rem;
+      line-height: 1.18;
+      font-weight: 800;
+      min-height: 0;
+      text-align: left;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .project-file-date {
+      margin-top: .25rem;
+      color: #60728b;
+      font-size: .78rem;
+      line-height: 1.2;
+      text-align: left;
+    }
+
+    .project-upload-progress {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 1700;
+      width: min(360px, calc(100vw - 2rem));
+      border: 1px solid #e2e8f0;
+      border-radius: 1.35rem;
+      background: rgba(255,255,255,.96);
+      box-shadow: 0 22px 54px rgba(15,23,42,.16);
+      backdrop-filter: blur(10px);
+      padding: .8rem;
+      display: grid;
+      gap: .65rem;
+    }
+
+    .project-upload-progress.hidden {
+      display: none !important;
+    }
+
+    .project-upload-row {
+      display: grid;
+      grid-template-columns: 2.4rem 1fr;
+      gap: .7rem;
+      align-items: center;
+      padding: .6rem;
+      border-radius: .85rem;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+    }
+
+    .project-upload-ghost {
+      width: 2.35rem;
+      height: 2.85rem;
+      border-radius: .55rem;
+      background: linear-gradient(180deg, #eef4fb, #e2e8f0);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .project-upload-ghost::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+      animation: projectFileShimmer 1.2s infinite;
+    }
+
+    @keyframes projectFileShimmer {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(100%); }
+    }
+
+    @media (max-width: 520px) {
+      .project-file-card {
+        grid-template-columns: 3.9rem minmax(0, 1fr);
+      }
+
+      .project-file-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+      }
+
+      .project-file-preview {
+        width: 3.55rem;
+        height: 3.55rem;
+      }
+    }
+
+    #modalDropzone.is-dragging {
+      border-color: #d9ff66;
+      background: #f8ffe8;
+      box-shadow: inset 0 0 0 1px rgba(132,204,22,.25), 0 18px 42px rgba(132,204,22,.10);
+    }
+
+    .project-modal-drop-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 80;
+      border-radius: 1rem;
+      background: rgba(248,250,252,.88);
+      backdrop-filter: blur(10px);
+      padding: 1rem;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .project-modal-drop-overlay.is-active {
+      display: flex;
+    }
+
+    .project-modal-drop-box {
+      width: min(640px, 92%);
+      min-height: min(420px, 72vh);
+      border: 3px dashed #d9ff66;
+      border-radius: 1.75rem;
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 24px 70px rgba(15,23,42,.16);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #334155;
+    }
+
+    .project-preview-shell {
+      height: min(62vh, 620px);
+      overflow: auto;
+      overscroll-behavior: contain;
+      touch-action: none;
+      background: #f1f5f9;
+    }
+
+    .project-file-preview-modal {
+      z-index: 2400;
+    }
+
+    .project-file-preview-dialog {
+      width: min(78vw, 880px);
+    }
+
+    @media (max-width: 768px) {
+      .project-file-preview-dialog {
+        width: calc(100vw - 1.5rem);
+      }
+    }
+
+    .project-preview-content {
+      transform-origin: center center;
+      transition: transform .08s ease-out;
+    }
+
+    .project-preview-frame {
+      width: 100%;
+      height: min(62vh, 620px);
+      border: 0;
+      background: #f8fafc;
+    }
+
+    .project-preview-image {
+      max-width: 100%;
+      max-height: min(62vh, 620px);
+      object-fit: contain;
+      margin: 0 auto;
+      transform-origin: center center;
+    }
+
+    .project-unsupported-card {
+      width: min(340px, 92vw);
+      border-radius: 1.35rem;
+      background: white;
+      border: 1px solid #dbe5f2;
+      box-shadow: 0 18px 42px rgba(15,23,42,.10);
+      padding: 1.5rem;
+      text-align: center;
+    }
+  </style>
+  <div id="stagesData" data-stages='{{ json_encode($stages) }}'></div>
+  <div class="mb-4 flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <div id="projectsSectionTitle" data-build-marker="calendar-fix-v3" class="text-2xl font-extrabold">Proyectos · FIX V3</div>
+      <div id="projectsSectionDescription" class="text-sm text-slate-500 mt-1">Organiza y mueve tus proyectos por columnas para ver su estado de un vistazo.</div>
+    </div>
+
+    <div class="flex w-full items-center gap-3 flex-wrap">
+      <div class="min-w-[240px] flex-1 lg:flex-none">
+        <select id="clientSelector" class="w-full" aria-label="Filtrar por cliente">
+          <option value="">Todos los Clientes</option>
+          @foreach($clientes as $c)
+            <option value="{{ $c['id'] }}">{{ $c['empresa'] }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      <div class="ml-auto flex items-center gap-3">
+        <button id="openArchivedProjectsBtn" type="button" onclick="openArchivedProjectsModal()" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50" title="Papelera de proyectos archivados" aria-label="Papelera de proyectos archivados">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12m-9 0V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0 1 12a2 2 0 002 2h4a2 2 0 002-2l1-12"/></svg>
+        </button>
+
+        <button id="addProjectBtn" onclick="openNewProjectModal()" class="primary-add-btn">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          Nuevo Proyecto
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="newProjectModal" class="fixed inset-0 z-50 hidden" aria-labelledby="new-project-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+      <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div class="relative transform overflow-visible rounded-2xl bg-white text-left shadow-2xl border border-slate-200 transition-all sm:my-8 sm:w-full sm:max-w-2xl flex flex-col">
+          <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
+            <div>
+              <div class="text-2xl font-extrabold text-slate-900 leading-none">Nuevo Proyecto</div>
+              <div class="text-sm text-slate-500 mt-1">Define fechas, prioridad y meta de tiempo.</div>
+            </div>
+            <button onclick="closeNewProjectModal()" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-full hover:bg-slate-200/50">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="p-5 space-y-3.5">
+            <div>
+              <label class="block text-xl font-extrabold text-slate-900 mb-2 leading-none">Título</label>
+              <input id="newProjectTitle" class="w-full h-12 rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-lg font-semibold text-slate-800 placeholder:text-slate-400" placeholder="Ej. Rediseño landing">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">Descripción</label>
+              <textarea id="newProjectDescription" rows="3" class="w-full rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-sm font-semibold text-slate-700 placeholder:text-slate-400" placeholder="Objetivo, alcance, entregables o contexto del proyecto"></textarea>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Cliente enlazado</label>
+                <select id="newProjectClient" class="w-full h-11 rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-base font-medium text-slate-700">
+                  <option value="">Sin cliente</option>
+                  @foreach($clientes as $c)
+                    <option value="{{ $c['id'] }}">{{ $c['empresa'] }}</option>
+                  @endforeach
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Tiempo previsto</label>
+                <div class="flex items-center gap-2">
+                  <div class="relative">
+                    <input id="newProjectPlannedDays" type="number" min="0" max="999" step="1" value="0" class="w-[86px] h-11 rounded-xl border-slate-200 bg-white text-slate-900 text-[18px] font-bold pr-8 pl-3 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">d</span>
+                  </div>
+                  <div class="relative">
+                    <input id="newProjectPlannedHours" type="number" min="0" max="99" step="1" value="0" class="w-[78px] h-11 rounded-xl border-slate-200 bg-white text-slate-900 text-[18px] font-bold pr-8 pl-3 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">h</span>
+                  </div>
+                  <div class="relative">
+                    <input id="newProjectPlannedMinutes" type="number" min="0" max="99" step="1" value="0" class="w-[78px] h-11 rounded-xl border-slate-200 bg-white text-slate-900 text-[18px] font-bold pr-8 pl-3 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">m</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Columna Kanban</label>
+                <select id="newProjectStage" class="w-full h-11 rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-base font-medium text-slate-700"></select>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Prioridad</label>
+                <select id="newProjectPriority" class="w-full h-11 rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-base font-medium text-slate-700">
+                  <option value="Con calma">Con calma</option>
+                  <option value="Atención">Atención</option>
+                  <option value="Urgente">Urgente</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de inicio</label>
+                <div class="relative" onclick="openNewProjectDatePicker('start')">
+                  <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </div>
+                  <input type="text" id="newProjectStart" readonly placeholder="dd/mm/aaaa" class="w-full h-11 rounded-xl border-slate-200 pl-11 text-base font-medium text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white cursor-pointer">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Fecha de entrega</label>
+                <div class="relative" onclick="openNewProjectDatePicker('due')">
+                  <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </div>
+                  <input type="text" id="newProjectDue" readonly placeholder="dd/mm/aaaa" class="w-full h-11 rounded-xl border-slate-200 pl-11 text-base font-medium text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white cursor-pointer">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50 rounded-b-2xl">
+            <button onclick="closeNewProjectModal()" class="px-5 py-2.5 rounded-full border text-base font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+            <button onclick="createProjectFromModal()" class="px-5 py-2.5 rounded-full bg-lime-400 hover:bg-lime-500 text-slate-900 text-base font-extrabold">Crear Proyecto</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="archivedProjectsModal" class="fixed inset-0 z-[95] hidden" aria-modal="true" role="dialog" aria-labelledby="archived-projects-title">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeArchivedProjectsModal()"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+      <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-6">
+        <div class="relative mx-auto w-[min(96vw,1200px)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-2xl">
+          <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4">
+            <div>
+              <div id="archived-projects-title" class="text-xl font-extrabold text-slate-900">Papelera de proyectos</div>
+              <div class="mt-1 text-xs text-slate-500">Consulta proyectos archivados, su fecha de creación, estado de avance y elimínalos permanentemente.</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="deleteAllArchivedBtn" type="button" onclick="deleteAllArchivedProjects()" class="hidden inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100">
+                Eliminar todos
+              </button>
+              <button type="button" onclick="closeArchivedProjectsModal()" class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600" aria-label="Cerrar papelera de proyectos">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="max-h-[72vh] overflow-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-white">
+                <tr>
+                  <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[16rem]">Proyecto</th>
+                  <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[10rem]">Cliente</th>
+                  <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[9rem]">Creación</th>
+                  <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[9rem]">Progreso</th>
+                  <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[10rem]">Completado</th>
+                  <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[7rem]">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="archivedProjectsModalBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="archivedProjectsModalEmpty" class="hidden px-6 py-12 text-center">
+              <div class="text-sm font-semibold text-slate-600">No hay proyectos archivados</div>
+              <div class="mt-1 text-xs text-slate-500">Cuando archives proyectos aparecerán aquí.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="proyectos-kanban" class="h-[calc(100vh-160px)] flex flex-col">
+    <div class="relative flex-1">
+      <div id="kanbanScroll" class="flex-1 overflow-x-auto overflow-y-hidden pb-2 custom-scroll">
+         <div id="kanban" class="flex h-full gap-6 min-w-max px-4 py-2">
+            <!-- Columns rendered via JS -->
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="projectFilePreviewModal" class="project-file-preview-modal fixed inset-0 hidden items-center justify-center bg-black/50 p-3 sm:p-5" aria-modal="true" role="dialog">
+    <div class="project-file-preview-dialog max-h-[92vh] overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col">
+      <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+        <div class="min-w-0">
+          <div id="projectFilePreviewTitle" class="text-lg font-black text-slate-900 truncate">Vista previa</div>
+          <div id="projectFilePreviewSubtitle" class="mt-1 text-xs font-semibold text-slate-500">Usa trackpad o rueda sobre la vista para acercar y alejar.</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <a id="projectFilePreviewDownload" href="#" target="_blank" class="w-10 h-10 rounded-full border border-emerald-200 bg-white flex items-center justify-center text-emerald-600 hover:bg-emerald-50" title="Descargar">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+          </a>
+          <button type="button" onclick="event.stopPropagation();closeProjectFilePreview()" class="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-50" title="Cerrar">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="projectFilePreviewShell" class="project-preview-shell p-3 sm:p-4">
+        <div id="projectFilePreviewContent" class="project-preview-content">
+          <iframe id="projectFilePreviewFrame" class="project-preview-frame hidden rounded-xl bg-white shadow" title="Vista previa del archivo"></iframe>
+          <div id="projectFilePreviewImageWrap" class="hidden min-h-[320px] rounded-xl bg-slate-100 flex items-center justify-center p-4">
+            <img id="projectFilePreviewImage" class="project-preview-image" alt="Vista previa">
+          </div>
+          <div id="projectFilePreviewUnsupported" class="hidden min-h-[320px] rounded-xl bg-slate-100 flex items-center justify-center p-4">
+            <div class="project-unsupported-card">
+              <div id="projectFilePreviewExt" class="mx-auto mb-4 inline-flex rounded-xl px-5 py-3 text-xl font-black text-white bg-slate-500">FILE</div>
+              <div class="text-lg font-black text-slate-900">Vista previa no disponible</div>
+              <div class="mt-1 text-sm text-slate-500">Este formato se puede descargar directamente.</div>
+              <a id="projectFilePreviewUnsupportedDownload" href="#" target="_blank" class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-lime-300 px-5 py-3 font-bold text-slate-900 hover:bg-lime-200">
+                Descargar archivo
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="projectFilePreviewFooter" class="border-t border-slate-100 px-5 py-3 text-sm font-bold text-slate-700 truncate"></div>
+    </div>
+  </div>
+
+  <!-- Project Detail Modal -->
+  <div id="projectModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+      <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div class="relative transform overflow-visible rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl h-[85vh] flex flex-col">
+           <div id="projectModalDropOverlay" class="project-modal-drop-overlay">
+             <div class="project-modal-drop-box">
+               <svg class="h-16 w-16 text-lime-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+               <div class="text-2xl font-black text-slate-900">Suelta para cargar archivos</div>
+               <div class="mt-2 text-sm font-semibold text-slate-500">Se guardarán en la carpeta del proyecto.</div>
+             </div>
+           </div>
+           <!-- Header -->
+           <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-none rounded-t-2xl">
+             <div class="flex items-center gap-3 w-full">
+                <div class="w-10 h-10 rounded-full bg-lime-100 flex items-center justify-center text-lime-700 font-bold" id="modalAvatar">HV</div>
+                <div class="flex-1 min-w-0">
+                    <input id="modalTitle" class="block w-full bg-transparent border-0 p-0 text-xl font-extrabold text-slate-900 focus:ring-0 placeholder-slate-400" placeholder="Título del Proyecto">
+                    <div class="mt-2 flex items-center gap-2 flex-wrap">
+                      <select id="modalClientSelect" class="w-44"></select>
+                      <div class="relative w-36">
+                        <select id="modalStage" class="w-full">
+                          <!-- Populated via JS -->
+                        </select>
+                      </div>
+                    </div>
+                </div>
+             </div>
+             <button onclick="closeProjectModal({ force: true })" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-full hover:bg-slate-200/50">
+               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+             </button>
+           </div>
+
+           <div class="bg-white px-6 py-3 border-b border-slate-100 flex-none">
+             <div class="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
+               <button type="button" data-project-tab="info" onclick="setProjectModalTab('info')" class="project-detail-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-600">Información</button>
+               <button type="button" data-project-tab="tasks" onclick="setProjectModalTab('tasks')" class="project-detail-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-600">Tareas</button>
+               <button type="button" data-project-tab="notes" onclick="setProjectModalTab('notes')" class="project-detail-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-600">Notas</button>
+             </div>
+           </div>
+           
+           <!-- Body -->
+           <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
+               <!-- Main Content -->
+               <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scroll">
+                  <div id="projectModalInfoTab" class="space-y-8">
+                   
+                   <!-- Description -->
+                   <div>
+                       <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                           Descripción
+                       </label>
+                       <div id="projectDescShell" class="project-desc-shell is-collapsed">
+                         <textarea id="modalDesc" rows="4" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-sm bg-slate-50/50 px-4 py-3 leading-relaxed" placeholder="Añade una descripción detallada..."></textarea>
+                         <button id="projectDescToggle" type="button" onclick="toggleProjectDescription()" class="project-desc-toggle">
+                           <svg id="projectDescToggleIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                           <span id="projectDescToggleText">Mostrar más</span>
+                         </button>
+                       </div>
+                         <div class="mt-2 text-right">
+                           <span id="modalDescAutosaveStatus" class="text-xs font-bold text-slate-400">Autoguardado</span>
+                       </div>
+                   </div>
+
+                   <div id="projectDetailSummary" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                     <div class="rounded-xl border border-slate-200 bg-white p-3">
+                       <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Asignados</div>
+                       <div id="modalAssignedSummary" class="mt-1 text-sm font-semibold text-slate-700">Sin asignados</div>
+                     </div>
+                     <div class="rounded-xl border border-slate-200 bg-white p-3">
+                       <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tiempo total invertido</div>
+                       <div id="modalInvestedSummary" class="mt-1 text-sm font-semibold text-slate-700">0d 0h 0m</div>
+                     </div>
+                   </div>
+
+                   <!-- Attachments -->
+                   <div>
+                       <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                           Archivos Adjuntos
+                       </label>
+                       <div id="modalFilesList" class="project-file-grid mb-4">
+                           <!-- Files injected here -->
+                       </div>
+                       
+                       <!-- Dropzone -->
+                       <div id="modalDropzone" class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:bg-slate-50 transition-colors cursor-pointer" onclick="document.getElementById('modalFileInput').click()">
+                           <input type="file" id="modalFileInput" class="hidden" multiple onchange="handleModalFileUpload(this.files)">
+                           <svg class="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                           <p class="mt-1 text-xs text-slate-500">Haz clic o arrastra archivos aquí</p>
+                       </div>
+                       <div id="projectUploadProgress" class="project-upload-progress hidden">
+                         <div class="flex items-center justify-between">
+                           <div class="text-xs font-black text-slate-800">Subiendo archivos</div>
+                           <div id="projectUploadSummary" class="text-[11px] font-bold text-slate-400">0%</div>
+                         </div>
+                         <div id="projectUploadProgressList" class="grid gap-2"></div>
+                       </div>
+                   </div>
+                  </div>
+
+                  <div id="projectModalTasksTab" class="hidden space-y-8">
+                   <!-- Tasks / Checklist -->
+                   <div>
+                       <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                           Tareas
+                       </label>
+                       
+                       <!-- Progress Bar -->
+                       <div class="mb-4">
+                         <div class="flex items-center justify-between mb-1">
+                           <span class="text-[11px] font-semibold text-slate-500">Progreso</span>
+                           <span id="modalTaskProgressLabel" class="text-[11px] font-bold text-lime-700">0%</span>
+                         </div>
+                         <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                             <div id="modalTaskProgress" class="progress-fill-anim h-2 rounded-full transition-all duration-500" style="width: 0%; background-color: #f43f5e"></div>
+                         </div>
+                       </div>
+                       
+                       <div id="modalTaskList" class="space-y-2 mb-3">
+                           <!-- Tasks injected here -->
+                       </div>
+                       
+                         <div id="modalTaskAddWrap" class="space-y-2">
+                           <div class="flex gap-2">
+                             <input id="newTaskInput" class="flex-1 rounded-lg border-slate-200 text-sm shadow-sm focus:border-lime-500 focus:ring-lime-500" placeholder="Añadir nueva tarea..." onkeydown="if(event.key==='Enter') addTask()">
+                               <button onclick="addTask()" class="px-3 py-2 text-slate-900 rounded-lg font-bold text-sm border border-lime-200" style="background-color:#dff8a7;">Añadir</button>
+                           </div>
+                         </div>
+                   </div>
+                  </div>
+
+                  <div id="projectModalNotesTab" class="hidden space-y-4">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <div class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Pipeline de notas</div>
+                          <div class="text-sm text-slate-500 mt-1">Ve primero el historial y abre el formulario solo cuando quieras crear una nueva nota.</div>
+                        </div>
+                        <button type="button" id="projectNoteToggleBtn" onclick="toggleProjectNoteComposer()" class="px-4 py-2 rounded-xl bg-lime-300 text-slate-900 font-bold hover:bg-lime-400 whitespace-nowrap">Agregar nota</button>
+                      </div>
+                      <div id="projectNotesList" class="space-y-4"></div>
+                    </div>
+
+                    <div id="projectNoteComposer" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <div class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Nueva nota</div>
+                          <div class="text-sm text-slate-500 mt-1">Selecciona la tarea vinculada y redacta la nota.</div>
+                        </div>
+                        <button type="button" onclick="toggleProjectNoteComposer(false)" class="w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 flex items-center justify-center" title="Cerrar formulario">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                      </div>
+                      <div class="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-4">
+                        <div class="space-y-2">
+                          <label class="block text-[11px] uppercase tracking-wider font-bold text-slate-500">Tarea vinculada</label>
+                          <div class="relative">
+                            <select id="projectNoteTaskSelect" class="w-full h-12 appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-11 text-base font-semibold text-slate-700 shadow-sm transition focus:border-lime-500 focus:ring-2 focus:ring-lime-200"></select>
+                            <span class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
+                              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </span>
+                          </div>
+                        </div>
+                        <div class="space-y-2">
+                          <label class="block text-[11px] uppercase tracking-wider font-bold text-slate-500">Nota</label>
+                          <textarea id="projectNoteInput" rows="5" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base leading-6 text-slate-900 shadow-sm transition focus:border-lime-500 focus:ring-2 focus:ring-lime-200 placeholder:text-slate-400" placeholder="Escribe una nota de seguimiento..."></textarea>
+                        </div>
+                      </div>
+                      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="text-sm text-slate-500">Cada nota mostrará la tarea vinculada, la fecha de subida y quién la creó.</div>
+                        <div class="flex items-center justify-end gap-2">
+                          <button type="button" onclick="toggleProjectNoteComposer(false)" class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+                          <button type="button" onclick="addProjectNote()" class="px-4 py-2 rounded-xl bg-lime-300 text-slate-900 font-bold hover:bg-lime-400">Guardar nota</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+               </div>
+               
+               <!-- Sidebar -->
+               <div id="projectModalSidebar" class="w-full md:w-80 bg-slate-50 border-l border-slate-100 p-6 space-y-6 overflow-y-auto">
+                   
+                   <!-- Timer Large -->
+                   <div class="group relative bg-[#111729] rounded-xl shadow-sm border border-[#1f2a47] p-4 text-center">
+                       <div class="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0">
+                         <button
+                           type="button"
+                           onclick="openTimerFullscreen()"
+                           class="w-8 h-8 rounded-full border border-slate-600 text-slate-300 hover:text-white hover:bg-[#1f2a47] flex items-center justify-center transition-colors"
+                           title="Pantalla completa"
+                           aria-label="Pantalla completa"
+                         >
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 9V5a1 1 0 011-1h4m10 5V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4m10-5v4a1 1 0 01-1 1h-4"/></svg>
+                         </button>
+                         <button
+                           type="button"
+                           id="timerMiniBtn"
+                           onclick="toggleTimerMiniPip()"
+                           class="w-8 h-8 rounded-full border border-slate-600 text-slate-300 hover:text-white hover:bg-[#1f2a47] flex items-center justify-center transition-colors"
+                           title="Modo PiP"
+                           aria-label="Modo PiP"
+                           aria-pressed="false"
+                         >
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
+                         </button>
+                       </div>
+                       <div class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Temporizador</div>
+                       <div id="modalTimerDisplay" class="text-4xl font-mono font-bold text-white bg-[#0a0f1a] rounded-xl px-4 py-3 mb-4 tracking-tighter">00:00:00</div>
+                       <div id="modalTimerTaskLabel" class="text-[11px] text-slate-400 mb-3 font-semibold">Sin tarea vinculada</div>
+                       <button id="modalTimerBtn" onclick="toggleModalTimer()" class="w-full py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 bg-lime-400 text-slate-900 hover:bg-lime-500">
+                           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                           <span>Iniciar</span>
+                       </button>
+                       <div class="mt-3 grid grid-cols-2 gap-2">
+                         <button type="button" onclick="saveCurrentTimerLog()" class="px-2 py-1.5 rounded-lg border border-lime-400 bg-lime-100/20 text-[11px] font-bold text-lime-300 hover:bg-lime-100/30 transition-colors">Guardar</button>
+                         <button type="button" onclick="resetCurrentTimer()" class="px-2 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 text-[11px] font-bold text-slate-200 hover:bg-slate-700 transition-colors">Reiniciar</button>
+                       </div>
+                   </div>
+
+                      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total invertido</div>
+                        <div id="modalTimerInvestedDisplay" class="text-3xl font-mono font-extrabold text-slate-800 tracking-tight">0d 0h 0m</div>
+                        <div class="mt-2 flex items-center justify-between">
+                          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta prevista</div>
+                          <div id="plannedGoalActions" class="flex items-center gap-2">
+                            <button type="button" id="plannedGoalEditBtn" onclick="enablePlannedGoalEdit()" class="w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50 flex items-center justify-center" title="Editar meta prevista" aria-label="Editar meta prevista">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2.5 2.5 0 013.536 3.536L12.536 14.536a4 4 0 01-1.414.944L8 16l.52-3.122A4 4 0 019 11z"/></svg>
+                            </button>
+                            <button type="button" id="plannedGoalSaveBtn" onclick="savePlannedGoalEdit()" class="hidden w-6 h-6 rounded-full border border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50 flex items-center justify-center" title="Guardar meta prevista" aria-label="Guardar meta prevista">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div id="modalTimerPlannedDisplay" class="text-sm font-mono font-bold text-slate-600 mt-1 tracking-tight">0d 0h 0m</div>
+                        <div id="modalTimerPlannedEditor" class="hidden mt-2 flex items-center gap-2">
+                          <div class="relative">
+                            <input id="plannedGoalDays" type="number" min="0" max="999" step="1" value="0" class="w-[72px] h-9 rounded-lg border-slate-200 bg-white text-slate-900 text-base font-bold pr-7 pl-2 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">d</span>
+                          </div>
+                          <div class="relative">
+                            <input id="plannedGoalHours" type="number" min="0" max="99" step="1" value="0" class="w-[66px] h-9 rounded-lg border-slate-200 bg-white text-slate-900 text-base font-bold pr-7 pl-2 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">h</span>
+                          </div>
+                          <div class="relative">
+                            <input id="plannedGoalMinutes" type="number" min="0" max="99" step="1" value="0" class="w-[66px] h-9 rounded-lg border-slate-200 bg-white text-slate-900 text-base font-bold pr-7 pl-2 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">m</span>
+                          </div>
+                        </div>
+                        <div id="modalTimerCompareDisplay" class="text-[11px] font-semibold text-slate-500 mt-1">Comparación: +0d 0h 0m</div>
+                      </div>
+
+                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                       <div class="flex items-center justify-between mb-3">
+                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Historial de Tiempo</div>
+                         <button type="button" onclick="openAddTimeModal()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-2.5 text-[10px] font-bold text-slate-900 hover:bg-lime-200 transition-colors">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                           <span>Agregar tiempo</span>
+                         </button>
+                       </div>
+                       <div id="modalTimeLogList" class="max-h-44 overflow-y-auto space-y-2 pr-1"></div>
+                   </div>
+                   
+                   <!-- Metadata -->
+                   <div class="space-y-4">
+                         <div>
+                           <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Responsables</div>
+                           <div id="modalResponsablesList" class="space-y-2 mb-3"></div>
+                             <div class="relative" id="responsibleSearchWrap">
+                               <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10">
+                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.8 18a7.2 7.2 0 100-14.4 7.2 7.2 0 000 14.4z"/></svg>
+                               </div>
+                               <input id="newResponsibleInput" class="block w-full h-12 rounded-xl border-slate-200 pl-11 text-base shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white" placeholder="Buscar usuario..." onfocus="searchResponsables(this.value, true)" oninput="searchResponsables(this.value)">
+                               <div id="responsibleSearchResults" class="hidden absolute z-20 mt-2 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl"></div>
+                           </div>
+                         </div>
+                       
+                       <div>
+                           <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Vencimiento</div>
+                           <div class="relative">
+                             <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                             </div>
+                             <input type="text" id="modalDueDate" readonly placeholder="Seleccionar fecha" class="block w-full h-12 rounded-xl border-slate-200 pl-11 text-base shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white cursor-pointer">
+                           </div>
+                       </div>
+
+                       <div>
+                           <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Prioridad</div>
+                           <input type="hidden" id="modalPriority" value="Atención">
+                           <div class="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3" id="modalPrioritySelector">
+                             <button type="button" data-priority="Con calma" class="priority-chip inline-flex min-h-12 items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-bold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                               <svg class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+                               <span class="whitespace-nowrap leading-tight text-center">Con calma</span>
+                             </button>
+                             <button type="button" data-priority="Atención" class="priority-chip inline-flex min-h-12 items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-bold border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                               <svg class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                               <span class="leading-tight text-center">Atención</span>
+                             </button>
+                             <button type="button" data-priority="Urgente" class="priority-chip inline-flex min-h-12 items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-bold border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors">
+                               <svg class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                               <span class="leading-tight text-center">Urgente</span>
+                             </button>
+                           </div>
+                       </div>
+                   </div>
+
+                   <!-- Actions -->
+                   <div class="pt-6 border-t border-slate-200 space-y-2">
+                       <button type="button" onclick="archiveProject()" class="w-full py-2 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 text-left flex items-center gap-2">
+                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0-12-4 4m4-4 4 4M4 14v3a3 3 0 003 3h10a3 3 0 003-3v-3"/></svg>
+                           Archivar Proyecto
+                       </button>
+                   </div>
+               </div>
+           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timerTaskModal" class="fixed inset-0 z-[85] hidden" aria-modal="true" role="dialog">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeTimerTaskModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-visible">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <div class="text-lg font-extrabold text-slate-900">¿Qué tarea vas a realizar?</div>
+          <div class="text-xs text-slate-500 mt-1">Vincula el temporizador para sumar tiempo a una tarea.</div>
+          <div class="mt-3">
+            <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              <span>Paso 2: Seleccionar tarea</span>
+              <span>2/2</span>
+            </div>
+            <div class="mt-1.5 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div class="h-full rounded-full bg-lime-400" style="width:100%"></div>
+            </div>
+            <div id="timerTaskProjectLabel" class="mt-1 text-[11px] text-slate-500"></div>
+          </div>
+        </div>
+        <div class="p-5 space-y-3">
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-400">Tarea</label>
+          <div id="timerTaskList" class="max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-2"></div>
+          <select id="timerTaskSelect" class="hidden"></select>
+          <div class="text-[11px] text-slate-400">Tip: puedes iniciar sin tarea y vincular después.</div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-2xl">
+          <button type="button" onclick="closeTimerTaskModal()" class="px-4 py-2 rounded-full border text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+          <button id="timerTaskConfirmBtn" type="button" onclick="confirmTimerTaskSelection()" class="px-4 py-2 rounded-full bg-lime-400 hover:bg-lime-500 text-slate-900 text-sm font-bold">Iniciar temporizador</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para agregar tiempo manualmente -->
+  <div id="addTimeModal" class="fixed inset-0 z-[85] hidden" aria-modal="true" role="dialog">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeAddTimeModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-visible">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <div class="text-lg font-extrabold text-slate-900">Agregar tiempo manualmente</div>
+          <div class="text-xs text-slate-500 mt-1">Si olvidaste iniciar el temporizador, puedes agregarlo aquí.</div>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Proyecto</label>
+            <select id="addTimeProjectSelect" class="w-full h-11 rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-base font-medium text-slate-700"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Tarea</label>
+            <select id="addTimeTaskSelect" class="w-full h-11 rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-base font-medium text-slate-700">
+              <option value="">Sin tarea vinculada</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Tiempo a agregar</label>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="relative">
+                <input id="addTimeHours" type="number" min="0" max="23" step="1" value="0" class="w-full h-11 rounded-xl border-slate-200 bg-white text-slate-900 text-lg font-bold pr-8 pl-3 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">h</span>
+              </div>
+              <div class="relative">
+                <input id="addTimeMinutes" type="number" min="0" max="59" step="1" value="0" class="w-full h-11 rounded-xl border-slate-200 bg-white text-slate-900 text-lg font-bold pr-8 pl-3 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">m</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-2xl">
+          <button type="button" onclick="closeAddTimeModal()" class="px-4 py-2 rounded-full border text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+          <button type="button" onclick="saveAddedTime()" class="px-4 py-2 rounded-full bg-lime-400 hover:bg-lime-500 text-slate-900 text-sm font-bold">Guardar tiempo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="quickProjectActionModal" class="fixed inset-0 z-[87] hidden" aria-modal="true" role="dialog">
+    <div class="fixed inset-0 bg-slate-900/45 backdrop-blur-sm" onclick="closeQuickProjectActionModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-visible">
+        <div class="px-5 py-4 border-b border-slate-100 rounded-t-2xl">
+          <div id="quickProjectActionTitle" class="text-lg font-extrabold text-slate-900">Selecciona un proyecto</div>
+          <div id="quickProjectActionDescription" class="text-xs text-slate-500 mt-1">Elige en qué proyecto quieres continuar.</div>
+          <div id="quickProjectTimerStepper" class="mt-3 hidden">
+            <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              <span>Paso 1: Seleccionar proyecto</span>
+              <span>1/2</span>
+            </div>
+            <div class="mt-1.5 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div id="quickProjectTimerProgress" class="h-full rounded-full bg-lime-400 transition-all duration-200" style="width:50%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="p-5 space-y-3">
+          <div class="relative">
+            <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.1-4.4a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <input id="quickProjectActionSearch" type="text" placeholder="Buscar proyecto..." class="w-full h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 text-sm font-medium text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500" oninput="renderQuickProjectActionList(this.value)">
+          </div>
+          <div id="quickProjectActionList" class="max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-2"></div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex justify-end rounded-b-2xl">
+          <button type="button" onclick="closeQuickProjectActionModal()" class="px-4 py-2 rounded-full border text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timerSwitchConfirmModal" class="fixed inset-0 z-[86] hidden" aria-modal="true" role="dialog">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeTimerSwitchConfirm(false)"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-visible">
+        <div class="px-5 py-4 border-b border-slate-100 rounded-t-2xl">
+          <div class="text-lg font-extrabold text-slate-900">¿Cambiar de tarea?</div>
+          <div class="text-sm text-slate-600 mt-1">¿Estás seguro de cambiar de tarea? Se eliminará el tiempo actual e iniciarás otra tarea.</div>
+        </div>
+        <div class="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2 rounded-b-2xl">
+          <button type="button" onclick="closeTimerSwitchConfirm(false)" class="px-4 py-2 rounded-full border text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+          <button type="button" onclick="closeTimerSwitchConfirm(true)" class="px-4 py-2 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold">Sí, cambiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="taskDetailModal" class="fixed inset-0 z-[90] hidden" aria-modal="true" role="dialog">
+    <div class="fixed inset-0 bg-slate-900/35 backdrop-blur-sm" onclick="closeTaskModal()"></div>
+    <div class="fixed inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-[760px] rounded-3xl border border-slate-200 bg-white text-slate-800 shadow-2xl overflow-visible">
+        <div class="px-5 py-3 border-b border-slate-200 bg-slate-900 rounded-t-3xl">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <div class="text-[11px] uppercase tracking-[0.2em] text-slate-300 font-bold">Detalle de tarea</div>
+              </div>
+              <input id="taskModalTitle" class="mt-1 w-full border-0 p-0 text-[24px] leading-tight font-extrabold text-white placeholder-slate-400 bg-transparent focus:ring-0" placeholder="Nombre de la tarea">
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="taskModalPrimaryBtn" type="button" onclick="toggleTaskModalEditMode()" class="w-10 h-10 rounded-full border border-white/35 bg-transparent text-white hover:bg-white/10 flex items-center justify-center" title="Editar tarea">
+                <svg id="taskModalPrimaryIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20h9"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+              </button>
+              <button type="button" onclick="deleteTask()" class="w-10 h-10 rounded-full border border-rose-400 bg-transparent text-rose-400 hover:bg-rose-500/15 flex items-center justify-center" title="Eliminar tarea">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+              </button>
+              <button type="button" onclick="closeTaskModal()" class="w-10 h-10 rounded-full border border-white/35 bg-transparent text-slate-300 hover:bg-white/10 flex items-center justify-center" title="Cerrar">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 md:p-5 max-h-[72vh] overflow-y-auto">
+          <div id="taskModalEditFields" class="space-y-3.5 mb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Fecha de inicio</label>
+                <div class="relative mt-1">
+                  <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </span>
+                  <input type="text" id="taskModalStart" readonly class="w-full h-11 rounded-xl border-slate-200 bg-slate-50 pl-9 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500 cursor-pointer" placeholder="Seleccionar inicio">
+                </div>
+              </div>
+              <div>
+                <label class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Fecha de finalización</label>
+                <div class="relative mt-1">
+                  <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </span>
+                  <input type="text" id="taskModalEnd" readonly class="w-full h-11 rounded-xl border-slate-200 bg-slate-50 pl-9 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500 cursor-pointer" placeholder="Seleccionar fin">
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Prioridad</label>
+                <div class="relative mt-1">
+                  <span id="taskModalPriorityIcon" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-amber-600">
+                    <svg class="w-4 h-4 shrink-0 self-center" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                  </span>
+                  <select id="taskModalPriority" class="w-48 max-w-full h-11 rounded-xl border-slate-200 bg-slate-50 pl-9 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500">
+                    <option value="Vencido" disabled>Vencido</option>
+                    <option value="Con calma">Con calma</option>
+                    <option value="Atención">Atención</option>
+                    <option value="Urgente">Urgente</option>
+                  </select>
+                </div>
+              </div>
+              <div></div>
+            </div>
+
+            <div>
+              <label class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Encargados</label>
+              <input type="hidden" id="taskModalOwnerIds" value="">
+              <div class="mt-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="relative" id="taskOwnerSearchWrap">
+                  <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.8 18a7.2 7.2 0 100-14.4 7.2 7.2 0 000 14.4z"/></svg>
+                  </div>
+                  <input id="taskOwnerSearchInput" class="block w-full h-11 rounded-xl border-slate-200 bg-slate-50 pl-11 text-base shadow-sm focus:border-lime-500 focus:ring-lime-500" placeholder="Buscar usuario..." onfocus="searchTaskOwners(this.value, true)" oninput="searchTaskOwners(this.value)">
+                  <div id="taskOwnerSearchResults" class="hidden absolute z-20 mt-2 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl"></div>
+                </div>
+                <div id="taskOwnersList" class="space-y-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3.5">
+            <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <div class="text-base uppercase tracking-wider font-extrabold text-slate-700">Sub tareas</div>
+                <div class="text-xs text-slate-500">Puedes agregar y marcar sub tareas en cualquier modo.</div>
+              </div>
+              <div id="taskSubtasksList" class="space-y-2"></div>
+              <div id="taskSubtaskComposer" class="mt-2.5 flex flex-col sm:flex-row gap-2">
+                <input id="newSubtaskInput" class="flex-1 h-10 rounded-lg border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500" placeholder="Añadir sub tarea" onkeydown="if(event.key==='Enter') addSubtask()">
+                <button type="button" onclick="addSubtask()" class="h-10 px-4 rounded-lg text-slate-900 font-bold text-sm border border-lime-200 sm:min-w-[96px]" style="background-color:#dff8a7;">Añadir</button>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
+              <div class="text-base uppercase tracking-wider font-extrabold text-slate-700 mb-2">Notas</div>
+              <div id="taskModalPipelineNotes" class="space-y-2"></div>
+              <div class="mt-3 flex flex-col gap-2">
+                <textarea id="taskModalNewNoteInput" rows="3" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-2 focus:ring-lime-200 placeholder:text-slate-400" placeholder="Añadir nota..."></textarea>
+                <div class="flex justify-end">
+                  <button type="button" onclick="addTaskModalNote()" class="h-10 px-4 rounded-lg border border-lime-200 bg-lime-200 text-sm font-bold text-slate-900 hover:bg-lime-300">Guardar nota</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div class="rounded-2xl border p-3.5" style="background-color:#101729;border-color:#233055;">
+                <div class="text-base uppercase tracking-wider font-extrabold text-lime-300 mb-2">Resumen</div>
+                <div id="taskModalMeta" class="text-sm"></div>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                <div class="text-base uppercase tracking-wider font-extrabold text-slate-700 mb-2">Historial de tiempo</div>
+                <div id="taskTimeHistoryList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timerFullscreenPanel" class="fixed inset-0 z-[80] hidden bg-slate-950/90 backdrop-blur-sm">
+    <div class="absolute top-4 right-4 flex items-center gap-2">
+      <button type="button" onclick="openTimerFullscreen()" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20 flex items-center justify-center" title="Pantalla completa" aria-label="Pantalla completa">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 9V5a1 1 0 011-1h4m10 5V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4m10-5v4a1 1 0 01-1 1h-4"/></svg>
+      </button>
+      <button type="button" data-advanced-control onclick="openPinnedTimerPip()" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20 flex items-center justify-center" title="Modo PiP" aria-label="Modo PiP">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
+      </button>
+      <button type="button" onclick="closeTimerFullscreen()" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20 flex items-center justify-center" title="Cerrar" aria-label="Cerrar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="h-full w-full flex flex-col items-center justify-center px-4 pb-6">
+      <div class="w-full max-w-6xl">
+        <div class="text-center mb-4">
+          <div id="timerFsProject" class="text-xl md:text-3xl font-extrabold text-white mb-1">Tarea</div>
+          <div id="timerFsClient" class="text-xs md:text-base text-slate-300 mb-2">Proyecto · Cliente</div>
+          <div class="flex flex-col md:flex-row items-center justify-center gap-3">
+            <div id="timerFsDisplay" class="text-4xl md:text-6xl leading-none font-mono font-extrabold text-lime-300 tracking-tight">00:00:00</div>
+            <div class="flex items-center justify-center gap-2">
+              <button id="timerFsPauseBtn" type="button" onclick="togglePinnedTimerRun()" class="w-11 h-11 rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20 flex items-center justify-center" title="Pausar temporizador" aria-label="Pausar temporizador">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+              </button>
+              <button id="timerFsSaveBtn" type="button" onclick="savePinnedTimerLog()" class="px-4 py-2 rounded-xl border border-white/20 bg-white/10 text-white text-sm font-bold hover:bg-white/20 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Guardar
+              </button>
+                <button id="timerFsDeleteBtn" type="button" onclick="deletePinnedTimerEntry()" class="px-4 py-2 rounded-xl border border-rose-300/40 bg-rose-500/10 text-rose-100 text-sm font-bold hover:bg-rose-500/20 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h8"/></svg>
+                  Eliminar
+                </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white/5 rounded-2xl p-4 text-left min-h-[320px]">
+            <div class="text-lg uppercase tracking-[0.2em] text-slate-100 font-extrabold mb-3">Sub tareas</div>
+            <div id="timerFsSubtasksList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+            <div class="mt-2 flex items-center gap-2">
+              <input id="timerFsNewSubtaskInput" class="flex-1 h-9 rounded-lg border border-white/20 bg-white/10 px-2.5 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-300/40" placeholder="Añadir sub tarea" onkeydown="if(event.key==='Enter') addTimerFullscreenSubtask()">
+              <button type="button" onclick="addTimerFullscreenSubtask()" class="h-9 px-3 rounded-lg bg-lime-300 text-slate-900 text-xs font-bold hover:bg-lime-200">Añadir</button>
+            </div>
+          </div>
+
+          <div class="bg-white/5 rounded-2xl p-4 text-left min-h-[320px]">
+            <div class="text-lg uppercase tracking-[0.2em] text-slate-100 font-extrabold mb-3">Notas</div>
+            <div id="timerFsNotesList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1"></div>
+            <div class="mt-2 space-y-2">
+              <textarea id="timerFsNewNoteInput" rows="2" class="w-full rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-300/40" placeholder="Escribe una nota de pipeline..."></textarea>
+              <div class="flex justify-end">
+                <button type="button" onclick="addTimerFullscreenNote()" class="h-9 px-3 rounded-lg bg-lime-300 text-slate-900 text-xs font-bold hover:bg-lime-200">Guardar nota</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timerMiniPip" class="fixed bottom-4 right-4 z-[75] hidden w-64 rounded-2xl border border-slate-700 bg-slate-900/95 text-white shadow-2xl">
+    <div class="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+      <div class="min-w-0">
+        <div id="timerPipProject" class="text-xs font-bold truncate">Proyecto</div>
+        <div id="timerPipClient" class="text-[10px] text-slate-300 truncate">Cliente</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="timerPipToggleBtn" type="button" onclick="toggleModalTimer()" class="w-7 h-7 rounded-full border border-slate-500 text-lime-300 hover:bg-slate-800 flex items-center justify-center" title="Iniciar/Pausar" aria-label="Iniciar/Pausar temporizador">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button type="button" onclick="toggleTimerMiniPip()" class="text-slate-300 hover:text-white" title="Cerrar PiP" aria-label="Cerrar PiP">✕</button>
+      </div>
+    </div>
+    <div id="timerPipDisplay" class="px-3 py-3 text-3xl font-mono font-extrabold text-lime-300 text-center">00:00:00</div>
+  </div>
+
+  <canvas id="timerPipCanvas" width="520" height="520" class="fixed -bottom-20 -right-20 w-1 h-1 opacity-0 pointer-events-none"></canvas>
+  <video id="timerPipVideo" playsinline muted autoplay></video>
+
+  <div id="proyectos-tareas" class="hidden bg-white rounded-2xl shadow border p-4 mt-4">
+    <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50/95 px-3 py-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="quickAddTaskFromCurrentView()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>Tarea</span>
+          </button>
+          <button type="button" onclick="quickStartTimerFromCurrentView()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Iniciar timer</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <span id="tasksQuickFiltersStatus" class="font-bold text-slate-600">Filtros activos: 0</span>
+          <button id="tasksQuickClearBtn" type="button" onclick="resetQuickFilters('tareas')" class="hidden h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Limpiar</button>
+          <span id="tasksQuickSimpleBadge" class="hidden rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">Modo simple activo</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <div class="filter-pill min-w-[220px]">
+        <svg class="h-4 w-4 filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input id="tasksSearchInput" type="text" placeholder="Buscar tarea o proyecto" class="w-full" oninput="setGlobalTaskSearch(this.value)">
+      </div>
+      <button type="button" data-task-filter="all" class="global-task-filter is-active inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 bg-slate-900 text-white">Todas</button>
+      <button type="button" data-task-filter="urgent" class="global-task-filter inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-rose-200 bg-rose-50 text-rose-700">
+        <svg class="h-4 w-4 shrink-0 self-center" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+        <span>Urgente</span>
+      </button>
+      <button type="button" data-task-filter="attention" class="global-task-filter inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 bg-amber-50 text-amber-700">
+        <svg class="h-4 w-4 shrink-0 self-center" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+        <span>Atención</span>
+      </button>
+      <button type="button" data-task-filter="calm" class="global-task-filter inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-emerald-200 bg-emerald-50 text-emerald-700">
+        <svg class="h-4 w-4 shrink-0 self-center" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
+        <span>Con calma</span>
+      </button>
+      <button type="button" data-task-filter="overdue" class="global-task-filter inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200 bg-slate-50 text-slate-600">Vencidas</button>
+      <button type="button" data-task-filter="completed" class="global-task-filter inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-violet-200 bg-violet-50 text-violet-700">Completadas</button>
+    </div>
+    <div id="globalTasksBoard" class="space-y-4"></div>
+  </div>
+
+  <div id="proyectos-lista" class="hidden bg-white rounded-2xl shadow border mt-4 overflow-visible">
+    <div class="px-4 py-3 border-b border-slate-200 bg-white">
+      <div class="sticky top-2 z-20 mb-3 rounded-2xl border border-slate-200 bg-slate-50/95 backdrop-blur px-3 py-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="quickAddTaskFromCurrentView()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>Tarea</span>
+            </button>
+            <button type="button" onclick="quickStartTimerFromCurrentView()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Iniciar timer</span>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span id="listQuickFiltersStatus" class="font-bold text-slate-600">Filtros activos: 0</span>
+            <button id="listQuickClearBtn" type="button" onclick="resetQuickFilters('lista')" class="hidden h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Limpiar</button>
+            <span id="listQuickSimpleBadge" class="hidden rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">Modo simple activo</span>
+          </div>
+        </div>
+      </div>
+      <div id="listFilterBar" class="flex flex-wrap items-center gap-2">
+        <div class="filter-pill min-w-[220px]">
+          <svg class="h-4 w-4 filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input id="listProjectSearchInput" type="text" placeholder="Buscar proyecto o cliente" class="w-full" oninput="setListProjectSearch(this.value)">
+        </div>
+        <div class="relative" data-list-filter-wrap="priority">
+          <button id="listFilterPriorityBtn" type="button" onclick="toggleListFilterDropdown('priority')" class="inline-flex h-9 min-w-[185px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M10.29 3.86l-7.55 13.08A2 2 0 004.47 20h15.06a2 2 0 001.73-3.06L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            <span id="listFilterPriorityLabel" class="flex-1 truncate text-left">Prioridad</span>
+            <svg class="h-4 w-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="listFilterPriorityMenu" class="hidden absolute left-0 top-11 z-30 w-[280px] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
+            <div class="border-b border-slate-100 p-2">
+              <div class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.1-4.4a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input id="listFilterPrioritySearch" type="text" placeholder="Buscar prioridad..." class="w-full border-0 bg-transparent p-0 text-sm leading-none text-slate-700 placeholder:text-slate-400 focus:ring-0" oninput="updateListFilterOptions('priority', this.value)">
+              </div>
+            </div>
+            <div id="listFilterPriorityOptions" class="max-h-64 overflow-y-auto p-1"></div>
+          </div>
+        </div>
+
+        <div class="relative" data-list-filter-wrap="date">
+          <button id="listFilterDateBtn" type="button" onclick="toggleListFilterDropdown('date')" class="inline-flex h-9 min-w-[185px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <span id="listFilterDateLabel" class="flex-1 truncate text-left">Fecha</span>
+            <svg class="h-4 w-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="listFilterDateMenu" class="hidden absolute left-0 top-11 z-30 w-[280px] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
+            <div class="border-b border-slate-100 p-2">
+              <div class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.1-4.4a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input id="listFilterDateSearch" type="text" placeholder="Buscar fecha..." class="w-full border-0 bg-transparent p-0 text-sm leading-none text-slate-700 placeholder:text-slate-400 focus:ring-0" oninput="updateListFilterOptions('date', this.value)">
+              </div>
+            </div>
+            <div id="listFilterDateOptions" class="max-h-64 overflow-y-auto p-1"></div>
+          </div>
+        </div>
+
+        <div class="relative" data-list-filter-wrap="sort">
+          <button id="listFilterSortBtn" type="button" onclick="toggleListFilterDropdown('sort')" class="inline-flex h-9 min-w-[185px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0-3 3m3-3 3 3"/></svg>
+            <span id="listFilterSortLabel" class="flex-1 truncate text-left">Orden</span>
+            <svg class="h-4 w-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="listFilterSortMenu" class="hidden absolute left-0 top-11 z-30 w-[280px] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl">
+            <div id="listFilterSortOptions" class="max-h-64 overflow-y-auto p-1"></div>
+          </div>
+        </div>
+
+        <button type="button" onclick="clearListFilters()" class="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3.5 text-[13px] font-bold text-slate-600 shadow-sm hover:bg-slate-50">Limpiar</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm table-auto">
+        <thead>
+          <tr>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium whitespace-nowrap">Proyecto</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium whitespace-nowrap">Cliente</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium">Prioridad</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[12rem]">Progreso</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[12rem]">Responsables</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[10rem]">Fecha límite</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[10rem]">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="projectListBody" class="divide-y"></tbody>
+      </table>
+    </div>
+    <div id="projectListPagination" class="hidden px-4 py-3 border-t border-slate-200 bg-white"></div>
+  </div>
+
+  <div id="proyectos-calendario" class="hidden bg-white rounded-2xl shadow border p-6 mt-4">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+      <div>
+        <div class="text-xs font-bold text-lime-700 bg-lime-100 px-2 py-0.5 rounded-full inline-block mb-1">Calendario</div>
+        <div id="calLabel" class="text-2xl font-extrabold text-slate-900"></div>
+        <div class="text-xs text-slate-500 mt-1">Vencimientos y entregas de proyectos</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="prevMonth" class="px-3 py-2 rounded-full border text-sm font-semibold text-slate-600 hover:bg-slate-50">‹</button>
+        <button id="nextMonth" class="px-3 py-2 rounded-full border text-sm font-semibold text-slate-600 hover:bg-slate-50">›</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <div class="grid grid-cols-7 gap-2 text-[10px] font-bold text-slate-400 mb-3">
+          <div class="text-center">L</div>
+          <div class="text-center">M</div>
+          <div class="text-center">X</div>
+          <div class="text-center">J</div>
+          <div class="text-center">V</div>
+          <div class="text-center">S</div>
+          <div class="text-center">D</div>
+        </div>
+        <div id="calendarGrid" class="grid grid-cols-7 gap-3 text-xs"></div>
+      </div>
+      <div class="space-y-4">
+        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm font-bold text-slate-900">Google Calendar</div>
+            <div class="text-[10px] font-semibold {{ !empty($settings['google_calendar_enabled']) ? 'text-emerald-600 bg-emerald-100' : 'text-slate-400 bg-slate-200' }} px-2 py-0.5 rounded-full">
+              {{ !empty($settings['google_calendar_enabled']) ? 'Conectado' : 'Desconectado' }}
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 mb-3">Sincroniza entregas y vencimientos con tu calendario.</p>
+          <div class="flex flex-wrap gap-2">
+            <a href="{{ route('settings.integrations') }}" class="px-3 py-2 rounded-full border text-xs font-semibold text-slate-600 hover:bg-white">Configurar</a>
+            @if(!empty($settings['google_calendar_id']))
+              <a href="https://calendar.google.com/calendar/u/0/r?cid={{ urlencode($settings['google_calendar_id']) }}" target="_blank" class="px-3 py-2 rounded-full bg-lime-400 text-slate-900 text-xs font-bold hover:bg-lime-500">Abrir</a>
+            @endif
+          </div>
+        </div>
+        @if(!empty($settings['google_calendar_enabled']) && !empty($settings['google_calendar_embed_url']))
+        <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+          <div class="px-4 py-3 border-b border-slate-100 text-xs font-bold text-slate-600">Vista Google</div>
+          <iframe class="w-full h-80" src="{{ $settings['google_calendar_embed_url'] }}" style="border:0" loading="lazy"></iframe>
+        </div>
+        @endif
+      </div>
+    </div>
+  </div>
+
+  <div id="proyectos-archivados" class="hidden bg-white rounded-2xl shadow border mt-4 overflow-visible">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm table-auto">
+        <thead>
+          <tr>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium whitespace-nowrap">Proyecto</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium whitespace-nowrap">Cliente</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium">Prioridad</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[12rem]">Progreso</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[12rem]">Responsables</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[10rem]">Fecha límite</th>
+            <th class="px-4 py-3 text-left text-slate-500 font-medium min-w-[10rem]">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="projectListBodyArchived" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <div id="archivedProjectsEmpty" class="px-4 py-8 text-center">
+      <svg class="w-16 h-16 mx-auto text-slate-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <div class="text-slate-500 font-semibold">No hay proyectos archivados</div>
+      <div class="text-sm text-slate-400 mt-1">Los proyectos que archives aparecerán aquí.</div>
+    </div>
+  </div>
+
+  <script>
+    window.addProjectTo = window.addProjectTo || function(){};
+    let stages = JSON.parse(document.getElementById('stagesData').dataset.stages || '[]');
+    const urlParams = new URLSearchParams(location.search);
+    let currentClienteId = urlParams.get('cliente_id') || '';
+    let openProjectFromQuery = urlParams.get('open_project') || '';
+    let openTaskFromQuery = urlParams.get('open_task') || '';
+    let openNewProjectFromQuery = urlParams.get('new_project') === '1';
+    let openHeaderTimerFromQuery = urlParams.get('header_timer') === '1';
+
+    function clearOpenProjectQueryParam() {
+      const nextUrl = new URL(window.location.href);
+      const hasOpenProject = nextUrl.searchParams.has('open_project');
+      const hasOpenTask = nextUrl.searchParams.has('open_task');
+      const hasNewProject = nextUrl.searchParams.has('new_project');
+      if (!hasOpenProject && !hasOpenTask && !hasNewProject) return;
+      nextUrl.searchParams.delete('open_project');
+      nextUrl.searchParams.delete('open_task');
+      nextUrl.searchParams.delete('new_project');
+      window.history.replaceState({}, '', nextUrl);
+    }
+    
+    // Set initial selector value
+    if (currentClienteId) {
+        document.getElementById('clientSelector').value = currentClienteId;
+    }
+    
+    document.getElementById('clientSelector').addEventListener('change', (e) => {
+        currentClienteId = e.target.value;
+        const url = new URL(window.location);
+        if (currentClienteId) {
+            url.searchParams.set('cliente_id', currentClienteId);
+        } else {
+            url.searchParams.delete('cliente_id');
+        }
+        window.history.pushState({}, '', url);
+        loadData();
+    });
+
+    let projects = [];
+    const PROJECT_LIST_PAGE_SIZE = 20;
+    let projectListCurrentPage = 1;
+    let archivedProjects = [];
+    let projectModalReadOnly = false;
+    let focusMode = false;
+    let currentProjectId = null; // For modal
+    let modalDescAutosaveTimer = null;
+    let projectDescriptionExpanded = false;
+    const pendingProjectDescriptions = {};
+    let currentTaskId = null; // For task detail modal
+    let timerInterval = null; // For modal timer
+    let headerTimerInterval = null;
+    let isDraggingCard = false;
+    let dragCardId = null;
+    let kanbanPanActive = false;
+    let kanbanPanStartX = 0;
+    let kanbanPanStartLeft = 0;
+    let kanbanPanMoved = false;
+    let kanbanPanSuppressClickUntil = 0;
+    let modalDuePicker = null;
+    let pipStreamReady = false;
+    let pipRenderInterval = null;
+    let pipVideoTrack = null;
+    let pipLastDisplayValue = '00:00:00';
+    let suppressPipPlaybackSync = false;
+    let responsibleSearchDebounce = null;
+    let responsibleSearchAbort = null;
+    let taskOwnerSearchDebounce = null;
+    let taskOwnerSearchAbort = null;
+    let taskStartPicker = null;
+    let taskEndPicker = null;
+    let currentProjectModalTab = 'info';
+    let currentProjectEditingNoteId = null;
+    let isProjectNoteComposerOpen = false;
+    let currentTaskModalEditing = false;
+    let currentTaskEditingNoteId = null;
+    let newProjectStartPicker = null;
+    let newProjectDuePicker = null;
+    let modalBackdropIgnoreUntil = 0;
+    let pendingTimerProjectId = null;
+    let pendingTimerTaskId = '';
+    let pendingTimerResolver = null;
+    let quickProjectActionMode = '';
+    let pendingTimerSwitchResolver = null;
+    let pinnedTimerProjectId = null;
+    let pinnedTimerTaskId = null;
+    let timerFsShowAllSubtasks = false;
+    let timerFsShowAllNotes = false;
+    let headerTimerLastProjectId = null;
+    let headerTimerLastSeconds = 0;
+    let kanbanDragPreviewEl = null;
+    let currentTaskView = ['kanban', 'tareas', 'lista', 'archivados'].includes(urlParams.get('view')) ? urlParams.get('view') : 'kanban';
+    let globalTaskFilter = 'all';
+    let globalTasksClientPage = 1;
+    const GLOBAL_TASKS_CLIENTS_PER_PAGE = 3;
+    const GLOBAL_TASKS_PER_PROJECT_PAGE = 5;
+    const GLOBAL_TASKS_COLLAPSED_KEY = 'infocus_global_tasks_collapsed_projects_v1';
+    const globalTasksProjectPages = {};
+    const globalTasksCollapsedProjects = new Set();
+    let globalTaskSearchQuery = '';
+    let listProjectSearchQuery = '';
+    let listFilterPriority = '';
+    let listFilterDate = 'all';
+    let listFilterSort = 'newest';
+    let listFilterOpenMenu = null;
+    const listFilterSearch = { priority: '', date: '', sort: '' };
+    const responsibleCatalogById = {};
+
+    function markCalendarInteraction(cooldownMs = 800) {
+      modalBackdropIgnoreUntil = Date.now() + cooldownMs;
+    }
+
+    document.addEventListener('pointerdown', (event) => {
+      if (event.target?.closest?.('.flatpickr-calendar, .flatpickr-input')) {
+        markCalendarInteraction();
+      }
+    }, true);
+    document.addEventListener('mousedown', (event) => {
+      if (event.target?.closest?.('.flatpickr-calendar, .flatpickr-input')) {
+        markCalendarInteraction();
+      }
+    }, true);
+    document.addEventListener('touchstart', (event) => {
+      if (event.target?.closest?.('.flatpickr-calendar, .flatpickr-input')) {
+        markCalendarInteraction(1000);
+      }
+    }, true);
+    document.addEventListener('click', (event) => {
+      if (event.target?.closest?.('.flatpickr-calendar, .flatpickr-input')) {
+        markCalendarInteraction();
+      }
+    }, true);
+    const responsibleCatalogByName = {};
+    const LIST_PRIORITY_OPTIONS = [
+      { value: '', label: 'Todas' },
+      { value: 'Urgente', label: 'Urgente' },
+      { value: 'Atención', label: 'Atención' },
+      { value: 'Con calma', label: 'Con calma' },
+    ];
+    const LIST_DATE_OPTIONS = [
+      { value: 'all', label: 'Todas' },
+      { value: 'overdue', label: 'Vencidas' },
+      { value: 'today', label: 'Vencen hoy' },
+      { value: 'next7', label: 'Próximos 7 días' },
+      { value: 'next30', label: 'Próximos 30 días' },
+      { value: 'no-date', label: 'Sin fecha' },
+    ];
+    const LIST_SORT_OPTIONS = [
+      { value: 'newest', label: 'Más recientes' },
+      { value: 'oldest', label: 'Más antiguos' },
+    ];
+    const currentUserDisplayName = @json(optional(auth()->user())->name ?: session('user.name'));
+    const TIMER_HISTORY_PREFIX = 'project_timer_history_v2_';
+    const TIMER_RESET_PREFIX = 'project_timer_reset_v1_';
+    const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v1';
+    const POMODORO_STATE_KEY = 'tdah_pomodoro_state_v2';
+    const clientesData = @json($clientes);
+    let isProjectsSimpleMode = true;
+
+    const kanban = document.getElementById('kanban');
+    const globalTasksBoard = document.getElementById('globalTasksBoard');
+
+    // --- Dynamic Stages Logic ---
+    function stageColumn(title, count) {
+      return `
+      <div class="flex flex-col w-96 h-full max-h-full rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100/50 border border-slate-200/60 shadow-sm hover:shadow-md transition-all stage-column" data-stage="${title}">
+        <!-- Header -->
+        <div class="flex-none p-4 flex items-center justify-between group border-b border-slate-200/50">
+          <div class="flex items-center gap-3 flex-1">
+            <div class="font-bold text-slate-900 text-sm uppercase tracking-widest cursor-text outline-none bg-gradient-to-r from-lime-300 to-lime-200 px-3 py-1.5 rounded-lg shadow-sm border border-lime-300/50 hover:shadow-md transition-all" contenteditable="true" onblur="renameStage('${title}', this.innerText)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${title}</div>
+            <span class="bg-white px-2.5 py-1 rounded-lg text-xs font-extrabold text-slate-600 shadow-sm border border-slate-100">${count}</span>
+          </div>
+          <div data-advanced-control class="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
+              <button class="p-1.5 rounded-lg hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors" title="Mover left" onclick="moveStage('${title}', -1)">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+              </button>
+              <button class="p-1.5 rounded-lg hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors" title="Mover right" onclick="moveStage('${title}', 1)">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              </button>
+              <button class="p-1.5 rounded-lg hover:bg-lime-100/70 text-slate-400 hover:text-lime-700 transition-colors" title="Añadir columna al lado" onclick="addStageAdjacent('${title}')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              </button>
+              <button class="p-1.5 rounded-lg hover:bg-rose-100/60 text-slate-400 hover:text-rose-600 transition-colors" title="Eliminar columna" onclick="deleteStage('${title}')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+          </div>
+        </div>
+        
+        <!-- Cards Container -->
+        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scroll drag-container min-h-0" data-stage="${title}">
+          <!-- Cards go here -->
+        </div>
+        
+      </div>`;
+    }
+
+    async function manageStageColumns() {
+      const action = prompt('Escribe "agregar" para crear una columna nueva o "eliminar" para borrar una columna existente.');
+      if (!action) return;
+
+      const normalized = String(action).trim().toLowerCase();
+      if (normalized === 'agregar') {
+        const name = prompt('Nombre de la nueva columna:');
+        const cleanName = String(name || '').trim();
+        if (!cleanName) return;
+        if (stages.includes(cleanName)) {
+          if (window.showNotification) window.showNotification('Esa columna ya existe', 'error');
+          return;
+        }
+        stages.push(cleanName);
+        await saveStages();
+        return;
+      }
+
+      if (normalized === 'eliminar') {
+        const name = prompt('Escribe el nombre exacto de la columna que quieres eliminar:');
+        const cleanName = String(name || '').trim();
+        if (!cleanName || !stages.includes(cleanName)) return;
+        await deleteStage(cleanName);
+      }
+    }
+
+    async function addStageAdjacent(currentName) {
+      const baseName = 'NUEVA';
+      let cleanName = baseName;
+      let counter = 2;
+      while (stages.includes(cleanName)) {
+        cleanName = `${baseName} ${counter}`;
+        counter += 1;
+      }
+
+      const idx = stages.findIndex((stage) => stage === currentName);
+      if (idx === -1) {
+        stages.push(cleanName);
+      } else {
+        stages.splice(idx + 1, 0, cleanName);
+      }
+      await saveStages();
+    }
+
+    async function deleteStage(name) {
+      if (!name || !stages.includes(name)) return;
+      if (stages.length <= 1) {
+        if (window.showNotification) window.showNotification('Debe quedar al menos una columna en el Kanban', 'error');
+        return;
+      }
+
+      const confirmed = confirm(`Si eliminas el kanban "${name}" se archivarán todos los proyectos dentro, ¿estás seguro?`);
+      if (!confirmed) return;
+
+      stages = stages.filter((stage) => stage !== name);
+      await saveStages(null, null, { deletedName: name, archiveProjects: true });
+    }
+
+    async function renameStage(oldName, newName) {
+        newName = newName.trim();
+        if (!newName || newName === oldName) {
+            loadData(); // Revert visual change
+            return;
+        }
+        const idx = stages.indexOf(oldName);
+        if (idx !== -1) {
+            stages[idx] = newName;
+            await saveStages(oldName, newName);
+        }
+    }
+
+    async function moveStage(name, direction) {
+        const idx = stages.indexOf(name);
+        if (idx === -1) return;
+        const newIdx = idx + direction;
+        if (newIdx >= 0 && newIdx < stages.length) {
+            const temp = stages[idx];
+            stages[idx] = stages[newIdx];
+            stages[newIdx] = temp;
+            await saveStages();
+        }
+    }
+
+    async function saveStages(oldName, newName, options = {}) {
+        let body = { stages: stages };
+        if (oldName && newName) {
+            body['old_name'] = oldName;
+            body['new_name'] = newName;
+        }
+      if (options.deletedName) {
+        body['deleted_name'] = options.deletedName;
+        body['archive_projects'] = !!options.archiveProjects;
+      }
+        await fetch('/api/proyectos/stages', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+            body: JSON.stringify(body)
+        });
+        loadData();
+    }
+
+
+    function normalizePriority(value) {
+      const v = String(value || '').trim().toLowerCase();
+      if (v === 'urgente' || v === 'alta') return 'Urgente';
+      if (v === 'atención' || v === 'atencion' || v === 'media' || v === 'importante') return 'Atención';
+      if (v === 'con calma' || v === 'baja') return 'Con calma';
+      return 'Atención';
+    }
+
+    function getProjectTaskStats(project) {
+      const tasks = Array.isArray(project?.tareas) ? project.tareas : [];
+      const total = tasks.length;
+      const done = tasks.filter((task) => !!task?.done).length;
+      const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+      return { total, done, pending: Math.max(total - done, 0), pct };
+    }
+
+    function progressBarColor(pct) {
+      if (pct >= 100) return '#10b981'; // emerald — completado
+      if (pct >= 70)  return '#84cc16'; // lime — va bien
+      if (pct >= 31)  return '#f59e0b'; // amber — en proceso
+      return '#f43f5e';                 // rose — atrasado
+    }
+
+    function projectCard(p) {
+      const taskStats = getProjectTaskStats(p);
+      const prog = taskStats.pct;
+      const normalizedPriority = getEffectiveProjectPriority(p);
+      const stripColorMap = { 'Vencido': '#334155', 'Urgente': '#ef4444', 'Atención': '#f59e0b', 'Con calma': '#16a34a' };
+      const stripColor = stripColorMap[normalizedPriority] || '#94a3b8';
+
+      const logs = Array.isArray(p.time_logs) ? p.time_logs : [];
+      const isRunning = logs.length > 0 && !logs[logs.length - 1].end;
+      const nowTs = Math.floor(Date.now() / 1000);
+      const totalSeconds = logs.reduce((acc, log) => {
+        const start = Number(log?.start || 0);
+        if (start <= 0) return acc;
+        const end = Number(log?.end || (isRunning ? nowTs : start));
+        return acc + Math.max(0, end - start);
+      }, 0);
+      const hours = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
+      const investedDisplay = `${hours}h ${mins}m`;
+
+      const formatDate = (raw) => {
+        if (!raw) return null;
+        const normalized = /^\d{4}-\d{2}-\d{2}$/.test(String(raw)) ? `${raw}T12:00:00` : raw;
+        const dt = new Date(normalized);
+        if (Number.isNaN(dt.getTime())) return null;
+        return dt.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+      };
+
+      const startLabel = formatDate(p.inicio || p.created_at) || '—';
+      const dueLabel = formatDate(p.vencimiento) || '—';
+
+      const today = new Date();
+      const dueDate = p.vencimiento ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(p.vencimiento)) ? `${p.vencimiento}T12:00:00` : p.vencimiento) : null;
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+      const startOfDue = dueDate ? new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()).getTime() : null;
+      const diffDays = startOfDue !== null ? Math.floor((startOfDue - startOfToday) / 86400000) : null;
+
+      let badgeText = 'Sin fecha';
+      let badgeBg = '#94a3b8';
+      let progressColor = '#94a3b8';
+      if (diffDays !== null) {
+        if (diffDays < 0) {
+          badgeText = 'Vencido';
+          badgeBg = '#ef4444';
+          progressColor = '#ef4444';
+        } else if (diffDays <= 7) {
+          badgeText = `${diffDays} día${diffDays !== 1 ? 's' : ''} restante${diffDays !== 1 ? 's' : ''}`;
+          badgeBg = '#ef4444';
+          progressColor = '#ef4444';
+        } else if (diffDays <= 30) {
+          const weeks = Math.ceil(diffDays / 7);
+          badgeText = `${weeks} semana${weeks !== 1 ? 's' : ''}`;
+          badgeBg = '#f59e0b';
+          progressColor = '#f59e0b';
+        } else if (diffDays <= 365) {
+          const months = Math.ceil(diffDays / 30);
+          badgeText = `${months} mes${months !== 1 ? 'es' : ''}`;
+          badgeBg = '#0d9488';
+          progressColor = '#0d9488';
+        } else {
+          const years = Math.ceil(diffDays / 365);
+          badgeText = `${years} año${years !== 1 ? 's' : ''}`;
+          badgeBg = '#16a34a';
+          progressColor = '#16a34a';
+        }
+      }
+
+      const projectResponsible = getProjectResponsibleSources(p);
+      const projectBadge = renderResponsibleBadges(projectResponsible.names, projectResponsible.ids, {
+        limit: 2,
+        bubbleClass: 'w-7 h-7 rounded-full border-2 border-white bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center overflow-hidden',
+        wrapperClass: 'flex -space-x-2',
+        emptyHtml: '<div class="w-7 h-7 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[9px] font-bold text-slate-500">SR</div>'
+      });
+      const isProjectOverdue = diffDays !== null && diffDays < 0;
+      const projectStatusBadges = isProjectOverdue
+        ? `<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-extrabold" style="background:${badgeBg};color:#fff;">Vencido</span>`
+        : `${getTaskPriorityBadge(normalizedPriority)}<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-extrabold" style="background:${badgeBg};color:#fff;">${badgeText}</span>`;
+
+      return `
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 cursor-move hover:shadow-md transition-all group relative overflow-hidden" draggable="true" data-id="${p.id}" onclick="handleCardClick(event, '${p.id}')">
+        <div class="absolute inset-x-0 top-0 h-1" style="background:${stripColor};"></div>
+        <div class="p-4 pt-5">
+          <div class="flex items-start justify-between gap-2 mb-2">
+             <div class="text-[11px] font-semibold text-slate-400">${startLabel} &ndash; ${dueLabel}</div>
+             <div data-advanced-control class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+               <button class="text-slate-300 hover:text-slate-500" onclick="event.stopPropagation(); openProject('${p.id}')">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+               </button>
+             </div>
+          </div>
+
+          <div class="font-extrabold text-slate-900 text-lg leading-tight mb-0.5 hover:text-blue-600 transition-colors cursor-pointer outline-none focus:bg-slate-50 focus:ring-2 focus:ring-lime-300 rounded px-1 -mx-1 project-title" data-project-id="${p.id}" ondblclick="event.stopPropagation(); editProjectTitle(this, '${p.id}')" onclick="event.stopPropagation(); handleCardClick(event, '${p.id}')">${escapeHtml(p.titulo || 'Proyecto')}</div>
+          <div class="text-sm text-slate-500 mb-3">${escapeHtml(p.etapa || 'Sin etapa')}</div>
+
+          <div>
+            <div class="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
+              <span>Progreso</span><span>${prog}%</span>
+            </div>
+            <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+              <div class="h-full rounded-full transition-all" style="width:${prog}%;background:${progressColor};"></div>
+            </div>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between text-[11px] text-slate-500 font-semibold">
+            <span>${taskStats.total} tarea${taskStats.total === 1 ? '' : 's'}</span>
+            <span>${investedDisplay} invertidas</span>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between">
+            <div class="flex items-center">${projectBadge}</div>
+            <div class="flex flex-wrap items-center justify-end gap-2">${projectStatusBadges}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function renderKanban(list) {
+      kanban.innerHTML = stages.map(s => stageColumn(s, 0)).join('');
+      
+      const counts = {};
+      
+      list.forEach(p => {
+        // Map old stages to new ones
+        if(p.etapa === 'Entregado') p.etapa = 'Revisión';
+        if(p.etapa === 'Cerrado') p.etapa = 'Completado';
+        
+        const container = kanban.querySelector(`.drag-container[data-stage="${p.etapa}"]`);
+        if (container) {
+            container.insertAdjacentHTML('beforeend', projectCard(p));
+            counts[p.etapa] = (counts[p.etapa] || 0) + 1;
+        }
+      });
+      
+      // Update Headers
+      stages.forEach(s => {
+        const col = kanban.querySelector(`div[data-stage="${s}"]`); // Outer div
+        if(col) {
+            const countBadge = col.querySelector('span.bg-white');
+            if (countBadge) countBadge.textContent = counts[s] || 0;
+            const container = col.querySelector(`.drag-container[data-stage="${s}"]`);
+            if (container && !container.querySelector('[draggable="true"]')) {
+              container.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white/80 px-3 py-4 text-center">
+                <div class="text-xs font-semibold text-slate-500">No hay proyectos en esta etapa</div>
+              </div>`;
+            }
+        }
+      });
+
+      enableDnD();
+      if (focusMode) applyFocus(true);
+      refreshProjectsSimpleModeUI();
+    }
+
+    function hasProjectRealActivity(list = projects) {
+      return (Array.isArray(list) ? list : []).some((project) => {
+        const logs = Array.isArray(project?.time_logs) ? project.time_logs : [];
+        const hasLoggedTime = logs.some((log) => {
+          const start = Number(log?.start || 0);
+          const end = Number(log?.end || 0);
+          return start > 0 && end > start;
+        });
+
+        const tasks = Array.isArray(project?.tareas) ? project.tareas : [];
+        const hasTaskProgress = tasks.some((task) => !!task?.done || Number(task?.total_seconds || 0) > 0);
+
+        return hasLoggedTime || hasTaskProgress;
+      });
+    }
+
+    function refreshProjectsSimpleModeUI() {
+      isProjectsSimpleMode = !hasProjectRealActivity(projects);
+      document.querySelectorAll('[data-advanced-control]').forEach((node) => {
+        node.classList.toggle('hidden', isProjectsSimpleMode);
+      });
+
+      const taskBadge = document.getElementById('tasksQuickSimpleBadge');
+      const listBadge = document.getElementById('listQuickSimpleBadge');
+      if (taskBadge) taskBadge.classList.toggle('hidden', !isProjectsSimpleMode);
+      if (listBadge) listBadge.classList.toggle('hidden', !isProjectsSimpleMode);
+    }
+
+    function countActiveFiltersForView(view = currentTaskView) {
+      if (view === 'tareas') {
+        let count = 0;
+        if (globalTaskFilter !== 'all') count += 1;
+        if (globalTaskSearchQuery.trim()) count += 1;
+        return count;
+      }
+      if (view === 'lista') {
+        let count = 0;
+        if (listFilterPriority) count += 1;
+        if (listFilterDate !== 'all') count += 1;
+        if (listFilterSort !== 'newest') count += 1;
+        if (listProjectSearchQuery.trim()) count += 1;
+        return count;
+      }
+      return 0;
+    }
+
+    function renderQuickActionsStatus(view = currentTaskView) {
+      const activeCount = countActiveFiltersForView(view);
+      if (view === 'tareas') {
+        const status = document.getElementById('tasksQuickFiltersStatus');
+        const clearBtn = document.getElementById('tasksQuickClearBtn');
+        if (status) status.textContent = `Filtros activos: ${activeCount}`;
+        if (clearBtn) clearBtn.classList.toggle('hidden', activeCount === 0);
+      }
+      if (view === 'lista') {
+        const status = document.getElementById('listQuickFiltersStatus');
+        const clearBtn = document.getElementById('listQuickClearBtn');
+        if (status) status.textContent = `Filtros activos: ${activeCount}`;
+        if (clearBtn) clearBtn.classList.toggle('hidden', activeCount === 0);
+      }
+    }
+
+    function getAvailableProjectsForQuickAction() {
+      const baseList = Array.isArray(projects) ? projects : [];
+      if (!currentClienteId) return baseList;
+      const byClient = baseList.filter((project) => String(project?.cliente_id || '') === String(currentClienteId));
+      return byClient.length ? byClient : baseList;
+    }
+
+    function openQuickProjectActionModal(mode) {
+      const availableProjects = getAvailableProjectsForQuickAction();
+      if (!availableProjects.length) {
+        if (window.showNotification) window.showNotification('Primero crea un proyecto para continuar.', 'error');
+        openNewProjectModal();
+        return;
+      }
+
+      quickProjectActionMode = String(mode || '');
+      const modal = document.getElementById('quickProjectActionModal');
+      const title = document.getElementById('quickProjectActionTitle');
+      const description = document.getElementById('quickProjectActionDescription');
+      const search = document.getElementById('quickProjectActionSearch');
+      const timerStepper = document.getElementById('quickProjectTimerStepper');
+      const timerProgress = document.getElementById('quickProjectTimerProgress');
+
+      if (!modal || !title || !description || !search) return;
+
+      if (quickProjectActionMode === 'add-task') {
+        title.textContent = '¿En qué proyecto crearás la tarea?';
+        description.textContent = 'Selecciona el proyecto para abrir su modal y añadir la nueva tarea.';
+        if (timerStepper) timerStepper.classList.add('hidden');
+      } else {
+        title.textContent = '¿En qué proyecto iniciarás el temporizador?';
+        description.textContent = 'Primero elige proyecto y luego la tarea para comenzar a contar tiempo.';
+        if (timerStepper) timerStepper.classList.remove('hidden');
+        if (timerProgress) timerProgress.style.width = '50%';
+      }
+
+      search.value = '';
+      renderQuickProjectActionList('');
+      modal.classList.remove('hidden');
+      setTimeout(() => search.focus(), 80);
+    }
+
+    function closeQuickProjectActionModal() {
+      const modal = document.getElementById('quickProjectActionModal');
+      if (modal) modal.classList.add('hidden');
+      quickProjectActionMode = '';
+    }
+
+    function renderQuickProjectActionList(query = '') {
+      const list = document.getElementById('quickProjectActionList');
+      if (!list) return;
+      const search = String(query || '').trim().toLowerCase();
+      const availableProjects = getAvailableProjectsForQuickAction();
+
+      const filtered = availableProjects.filter((project) => {
+        const title = String(project?.titulo || '').toLowerCase();
+        const client = String(project?.cliente || '').toLowerCase();
+        const stage = String(project?.etapa || '').toLowerCase();
+        return !search || title.includes(search) || client.includes(search) || stage.includes(search);
+      });
+
+      if (!filtered.length) {
+        list.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-4 text-center">
+          <div class="text-xs font-semibold text-slate-500">No hay proyectos que coincidan con la búsqueda.</div>
+          <button type="button" onclick="openNewProjectModal(); closeQuickProjectActionModal();" class="mt-2 inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>Crear proyecto</span>
+          </button>
+        </div>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map((project) => {
+        const safeId = String(project?.id || '').replace(/'/g, "\\'");
+        const title = escapeHtml(project?.titulo || 'Proyecto');
+        const client = escapeHtml(project?.cliente || 'Sin cliente');
+        const stage = escapeHtml(project?.etapa || 'Sin etapa');
+        const tasksTotal = Array.isArray(project?.tareas) ? project.tareas.length : 0;
+        return `<button type="button" onclick="confirmQuickProjectAction('${safeId}')" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:bg-slate-100 transition-colors">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="truncate text-sm font-bold text-slate-800">${title}</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">${client} · ${stage}</div>
+            </div>
+            <span class="text-[10px] font-bold text-slate-500 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 whitespace-nowrap">${tasksTotal} tareas</span>
+          </div>
+        </button>`;
+      }).join('');
+    }
+
+    async function confirmQuickProjectAction(projectId) {
+      const selectedProjectId = String(projectId || '').trim();
+      if (!selectedProjectId) return;
+      const mode = quickProjectActionMode;
+      closeQuickProjectActionModal();
+
+      if (mode === 'add-task') {
+        openProject(selectedProjectId);
+        setTimeout(() => {
+          const input = document.getElementById('newTaskInput');
+          if (input) input.focus();
+        }, 160);
+        return;
+      }
+
+      if (mode === 'start-timer') {
+        const taskId = await openTimerTaskModal(selectedProjectId);
+        if (taskId === undefined) return;
+        await toggleTaskTimer(selectedProjectId, taskId || '');
+      }
+    }
+
+    function quickAddTaskFromCurrentView() {
+      openQuickProjectActionModal('add-task');
+    }
+
+    function quickStartTimerFromCurrentView() {
+      openQuickProjectActionModal('start-timer');
+    }
+
+    function resetQuickFilters(view = currentTaskView) {
+      if (view === 'tareas') {
+        globalTaskFilter = 'all';
+        globalTaskSearchQuery = '';
+        globalTasksClientPage = 1;
+        const tasksSearchInput = document.getElementById('tasksSearchInput');
+        if (tasksSearchInput) tasksSearchInput.value = '';
+        document.querySelectorAll('.global-task-filter').forEach((btn) => {
+          const active = (btn.getAttribute('data-task-filter') || 'all') === 'all';
+          btn.classList.toggle('is-active', active);
+          btn.classList.toggle('bg-slate-900', active);
+          btn.classList.toggle('text-white', active);
+        });
+        renderGlobalTasksView(projects);
+        renderQuickActionsStatus('tareas');
+        return;
+      }
+
+      if (view === 'lista') {
+        clearListFilters();
+      }
+    }
+    
+    function enableDnD() {
+      const cards = kanban.querySelectorAll('[draggable="true"]');
+      const zones = kanban.querySelectorAll('.drag-container');
+
+      const clearKanbanDragPreview = () => {
+        if (kanbanDragPreviewEl) {
+          kanbanDragPreviewEl.remove();
+          kanbanDragPreviewEl = null;
+        }
+      };
+
+      const setFullKanbanDragImage = (event, card) => {
+        clearKanbanDragPreview();
+        const rect = card.getBoundingClientRect();
+        const clone = card.cloneNode(true);
+        clone.removeAttribute('draggable');
+        clone.style.position = 'fixed';
+        clone.style.top = '-10000px';
+        clone.style.left = '-10000px';
+        clone.style.width = `${rect.width}px`;
+        clone.style.height = `${rect.height}px`;
+        clone.style.pointerEvents = 'none';
+        clone.style.opacity = '1';
+        clone.style.transform = 'none';
+        clone.style.zIndex = '2147483647';
+        clone.classList.remove('opacity-50', 'rotate-2');
+        clone.classList.add('shadow-2xl');
+        document.body.appendChild(clone);
+        kanbanDragPreviewEl = clone;
+        try {
+          event.dataTransfer.setDragImage(clone, Math.min(rect.width / 2, 180), Math.min(rect.height / 2, 120));
+        } catch (_) {}
+      };
+
+      const resetDndState = () => {
+        isDraggingCard = false;
+        dragCardId = null;
+        kanbanPanActive = false;
+        kanbanPanMoved = false;
+        clearKanbanDragPreview();
+        document.getElementById('kanbanScroll')?.classList.remove('is-grabbing');
+        document.getElementById('proyectos-kanban')?.classList.remove('is-grabbing');
+      };
+
+      cards.forEach(card => {
+        card.addEventListener('dragstart', e => {
+           resetDndState();
+           dragCardId = card.getAttribute('data-id');
+           e.dataTransfer.setData('text/plain', dragCardId);
+           e.dataTransfer.setData('text', dragCardId);
+           e.dataTransfer.effectAllowed = 'move';
+           setFullKanbanDragImage(e, card);
+           isDraggingCard = true;
+           card.classList.add('opacity-50', 'rotate-2');
+        });
+        card.addEventListener('dragend', () => {
+           card.classList.remove('opacity-50', 'rotate-2');
+           resetDndState();
+        });
+      });
+
+      zones.forEach(zone => {
+        zone.addEventListener('dragenter', e => {
+           e.preventDefault();
+           zone.classList.add('bg-slate-200/50');
+        });
+        zone.addEventListener('dragover', e => {
+           e.preventDefault();
+           e.dataTransfer.dropEffect = 'move';
+           zone.classList.add('bg-slate-200/50');
+        });
+        zone.addEventListener('dragleave', () => {
+           zone.classList.remove('bg-slate-200/50');
+        });
+        zone.addEventListener('drop', async e => {
+           e.preventDefault();
+           e.stopPropagation();
+           zone.classList.remove('bg-slate-200/50');
+           
+           // Obtener el id del proyecto
+           let id = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text') || dragCardId;
+           const newStage = zone.getAttribute('data-stage');
+           
+           if (!id || !newStage) {
+               console.warn('Drop failed:', {id, newStage, dragCardId});
+               return;
+           }
+           
+           // Actualizar localmente
+           const p = projects.find(x => String(x.id) === String(id));
+           if (p && p.etapa !== newStage) {
+               const oldStage = p.etapa;
+               p.etapa = newStage;
+               renderKanban(projects);
+               
+               // Guardar en server
+               try {
+                   const response = await fetch('/api/proyectos/mover', {
+                       method: 'POST',
+                       headers: {
+                           'Content-Type': 'application/json',
+                           'X-CSRF-TOKEN': window.csrfToken
+                       },
+                       body: JSON.stringify({id, etapa: newStage})
+                   });
+                   
+                   if (!response.ok) {
+                       console.error('Server error:', response.status);
+                       p.etapa = oldStage; // Revertir cambio
+                       renderKanban(projects);
+                   }
+               } catch (err) {
+                   console.error('Network error:', err);
+                   p.etapa = oldStage; // Revertir cambio
+                   renderKanban(projects);
+               }
+           }
+
+           resetDndState();
+        });
+      });
+
+      if (!window.__kanbanDndWindowBound) {
+        window.addEventListener('dragend', resetDndState);
+        window.addEventListener('drop', resetDndState);
+        window.addEventListener('blur', resetDndState);
+        window.__kanbanDndWindowBound = true;
+      }
+    }
+
+    function handleCardClick(event, id) {
+        if (Date.now() < kanbanPanSuppressClickUntil) return;
+        if (isDraggingCard) return;
+        openProject(id);
+    }
+
+    function editProjectTitle(element, id) {
+        const originalText = element.innerText;
+        element.contentEditable = true;
+        element.focus();
+        element.selectAll?.() || element.select?.();
+        
+        const saveTitle = async () => {
+            element.contentEditable = false;
+            const newTitle = element.innerText.trim();
+            if (newTitle && newTitle !== originalText) {
+                await updateTitle(id, newTitle);
+            } else {
+                element.innerText = originalText;
+            }
+        };
+        
+        element.onblur = saveTitle;
+        element.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveTitle();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                element.innerText = originalText;
+                element.contentEditable = false;
+            }
+        };
+    }
+
+    function initKanbanDragScroll() {
+      const scroller = document.getElementById('kanbanScroll');
+      const panSurface = document.getElementById('proyectos-kanban') || scroller;
+      if (!scroller || scroller.dataset.panReady === '1') return;
+      scroller.dataset.panReady = '1';
+
+      const isInteractiveTarget = (target) => {
+        if (!target) return false;
+        return !!target.closest('button,a,input,select,textarea,[contenteditable="true"],.ts-dropdown,[data-no-pan],[draggable="true"]');
+      };
+
+      let kanbanPanStartY = 0;
+
+      panSurface.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (isInteractiveTarget(e.target)) return;
+
+        kanbanPanActive = true;
+        kanbanPanMoved = false;
+        kanbanPanStartX = e.clientX;
+        kanbanPanStartY = e.clientY;
+        kanbanPanStartLeft = scroller.scrollLeft;
+        scroller.classList.add('is-grabbing');
+        panSurface.classList.add('is-grabbing');
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!kanbanPanActive) return;
+        const deltaX = e.clientX - kanbanPanStartX;
+        const deltaY = e.clientY - kanbanPanStartY;
+        
+        // Solo activar pan si el movimiento es principalmente horizontal
+        if (Math.abs(deltaX) > 3 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+          kanbanPanMoved = true;
+        }
+        
+        if (kanbanPanMoved) {
+          e.preventDefault();
+          scroller.scrollLeft = kanbanPanStartLeft - deltaX;
+        }
+      }, { passive: false });
+
+      const stopPan = () => {
+        if (!kanbanPanActive) return;
+        if (kanbanPanMoved) {
+          kanbanPanSuppressClickUntil = Date.now() + 180;
+        }
+        kanbanPanActive = false;
+        kanbanPanMoved = false;
+        scroller.classList.remove('is-grabbing');
+        panSurface.classList.remove('is-grabbing');
+      };
+
+      window.addEventListener('mouseup', stopPan);
+      panSurface.addEventListener('mouseleave', stopPan);
+      scroller.addEventListener('dragstart', (e) => {
+        if (kanbanPanActive || kanbanPanMoved) {
+          e.preventDefault();
+        }
+        stopPan();
+      });
+
+      window.addEventListener('blur', stopPan);
+    }
+
+    async function toggleTimer(id, action) {
+        try {
+            if (action === 'start') {
+              const taskId = await openTimerTaskModal(id);
+              if (typeof taskId === 'undefined') return;
+              await sendTimerAction(id, 'start', taskId || null);
+            } else {
+              await sendTimerAction(id, 'stop', null);
+            }
+            loadData();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function selectTimerTask(taskId) {
+      pendingTimerTaskId = String(taskId || '');
+      const select = document.getElementById('timerTaskSelect');
+      if (select) select.value = pendingTimerTaskId;
+
+      document.querySelectorAll('[data-timer-task-option]').forEach((node) => {
+        const nodeValue = String(node.getAttribute('data-task-id') || '');
+        const selected = nodeValue === pendingTimerTaskId;
+        node.classList.toggle('bg-lime-100', selected);
+        node.classList.toggle('border-lime-300', selected);
+        node.classList.toggle('text-slate-900', selected);
+        node.classList.toggle('bg-white', !selected);
+        node.classList.toggle('border-slate-200', !selected);
+      });
+    }
+
+    function renderTimerTaskList(tasks) {
+      const list = document.getElementById('timerTaskList');
+      if (!list) return;
+
+      const base = `<button type="button" data-timer-task-option data-task-id="" onclick="selectTimerTask('')" class="w-full text-left rounded-xl border px-3 py-2 text-sm font-semibold bg-white border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors">Sin tarea vinculada</button>`;
+      const items = tasks.map((t) => {
+        const safeId = String(t.id ?? '').replace(/'/g, "\\'");
+        const safeText = escapeHtml(String(t.texto || 'Tarea sin nombre'));
+        const status = t.done ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold">Completada</span>' : '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-bold">Pendiente</span>';
+        return `<button type="button" data-timer-task-option data-task-id="${safeId}" onclick="selectTimerTask('${safeId}')" class="w-full text-left rounded-xl border px-3 py-2 bg-white border-slate-200 hover:bg-slate-100 transition-colors">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-sm font-semibold text-slate-700 truncate">${safeText}</span>
+            ${status}
+          </div>
+        </button>`;
+      });
+
+      list.innerHTML = [base].concat(items).join('');
+      selectTimerTask('');
+    }
+
+    function openTimerTaskModal(projectId) {
+      const p = projects.find(x => x.id === projectId);
+      const modal = document.getElementById('timerTaskModal');
+      const select = document.getElementById('timerTaskSelect');
+      const projectLabel = document.getElementById('timerTaskProjectLabel');
+      if (!modal || !select) return Promise.resolve(undefined);
+
+      const tasks = Array.isArray(p?.tareas) ? p.tareas : [];
+      select.innerHTML = ['<option value="">Sin tarea vinculada</option>']
+        .concat(tasks.map(t => `<option value="${t.id}">${t.texto}</option>`))
+        .join('');
+      renderTimerTaskList(tasks);
+      pendingTimerTaskId = '';
+      if (projectLabel) projectLabel.textContent = `Proyecto: ${String(p?.titulo || 'Proyecto')}`;
+
+      pendingTimerProjectId = projectId;
+      modal.classList.remove('hidden');
+
+      return new Promise(resolve => {
+        pendingTimerResolver = resolve;
+      });
+    }
+
+    function closeTimerTaskModal() {
+      const modal = document.getElementById('timerTaskModal');
+      if (modal) modal.classList.add('hidden');
+      if (pendingTimerResolver) pendingTimerResolver(undefined);
+      pendingTimerResolver = null;
+      pendingTimerProjectId = null;
+      pendingTimerTaskId = '';
+    }
+
+    function confirmTimerTaskSelection() {
+      const modal = document.getElementById('timerTaskModal');
+      const select = document.getElementById('timerTaskSelect');
+      if (modal) modal.classList.add('hidden');
+      if (pendingTimerResolver) pendingTimerResolver(pendingTimerTaskId || select?.value || '');
+      pendingTimerResolver = null;
+      pendingTimerProjectId = null;
+      pendingTimerTaskId = '';
+    }
+
+    function setAddTimeTaskOptions(projectId) {
+      const taskSelect = document.getElementById('addTimeTaskSelect');
+      if (!taskSelect) return;
+
+      const selectedProject = projects.find(p => String(p.id) === String(projectId));
+      const tasks = Array.isArray(selectedProject?.tareas) ? selectedProject.tareas : [];
+      const options = `<option value="">Sin tarea vinculada</option>` + tasks.map(t =>
+        `<option value="${t.id || ''}">${escapeHtml(t.texto || 'Tarea sin nombre')}</option>`
+      ).join('');
+      taskSelect.innerHTML = options;
+    }
+
+    function openAddTimeModal(preselectedProjectId = currentProjectId) {
+      const modal = document.getElementById('addTimeModal');
+      if (!modal) return;
+
+      modal.classList.remove('hidden');
+
+      const projectSelect = document.getElementById('addTimeProjectSelect');
+      if (projectSelect) {
+        projectSelect.innerHTML = projects
+          .map(p => `<option value="${p.id || ''}">${escapeHtml(p.titulo || 'Proyecto')}</option>`)
+          .join('');
+
+        const selectedProjectId = String(preselectedProjectId || (projects[0]?.id || ''));
+        projectSelect.value = selectedProjectId;
+        setAddTimeTaskOptions(selectedProjectId);
+        projectSelect.onchange = (e) => setAddTimeTaskOptions(e.target.value);
+      }
+      
+      // Reset inputs
+      document.getElementById('addTimeHours').value = '0';
+      document.getElementById('addTimeMinutes').value = '0';
+    }
+
+    function closeAddTimeModal() {
+      const modal = document.getElementById('addTimeModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function saveAddedTime() {
+      const projectId = document.getElementById('addTimeProjectSelect').value || currentProjectId;
+      const hours = parseInt(document.getElementById('addTimeHours').value || 0);
+      const minutes = parseInt(document.getElementById('addTimeMinutes').value || 0);
+      const taskId = document.getElementById('addTimeTaskSelect').value || null;
+
+      if (!projectId) {
+        alert('Por favor selecciona un proyecto');
+        return;
+      }
+
+      if (hours === 0 && minutes === 0) {
+        alert('Por favor ingresa un tiempo válido');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/proyectos/tiempo/manual', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.csrfToken
+          },
+          body: JSON.stringify({
+            id: projectId,
+            tarea_id: taskId,
+            horas: hours,
+            minutos: minutes
+          })
+        });
+
+        if (response.ok) {
+          closeAddTimeModal();
+          loadData(); // Recargar datos para mostrar el tiempo agregado
+        } else {
+          alert('Error al guardar el tiempo');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Error al guardar el tiempo');
+      }
+    }
+
+    function isProjectCompleted(project) {
+      const taskPct = Number(getProjectTaskStats(project || {}).pct || 0);
+      const projectPct = Number(project?.progreso || 0);
+      return taskPct >= 100 || projectPct >= 100;
+    }
+
+    function formatArchivedCreatedAt(project) {
+      const raw = project?.created_at || project?.inicio || null;
+      if (!raw) return 'Sin fecha';
+      const normalized = /^\d{4}-\d{2}-\d{2}$/.test(String(raw)) ? `${raw}T12:00:00` : raw;
+      const date = new Date(normalized);
+      if (Number.isNaN(date.getTime())) return 'Sin fecha';
+      return date.toLocaleDateString('es-ES');
+    }
+
+    function renderArchivedProjectsModalList(list) {
+      const body = document.getElementById('archivedProjectsModalBody');
+      const empty = document.getElementById('archivedProjectsModalEmpty');
+      const deleteAllBtn = document.getElementById('deleteAllArchivedBtn');
+      if (!body || !empty) return;
+
+      const rows = Array.isArray(list) ? list : [];
+      if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('hidden');
+        if (deleteAllBtn) {
+          deleteAllBtn.classList.add('hidden');
+          deleteAllBtn.disabled = true;
+        }
+        return;
+      }
+
+      empty.classList.add('hidden');
+      if (deleteAllBtn) {
+        deleteAllBtn.classList.remove('hidden');
+        deleteAllBtn.disabled = false;
+      }
+      body.innerHTML = rows.map((p) => {
+        const safeId = String(p.id || '').replace(/'/g, "\\'");
+        const title = escapeHtml(p.titulo || 'Proyecto sin título');
+        const client = escapeHtml(p.cliente || 'Sin cliente');
+        const createdAt = formatArchivedCreatedAt(p);
+        const progress = Number(getProjectTaskStats(p).pct || 0);
+        const completed = isProjectCompleted(p);
+
+        return `<tr class="hover:bg-slate-50 transition-colors">
+          <td class="px-4 py-3 font-semibold text-slate-900">
+            <button type="button" onclick="openArchivedProjectDetails('${safeId}')" class="text-left hover:underline">${title}</button>
+          </td>
+          <td class="px-4 py-3 text-slate-700">${client}</td>
+          <td class="px-4 py-3 text-slate-700">${createdAt}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <div class="h-2 w-24 overflow-hidden rounded-full bg-slate-200">
+                <div class="h-2 rounded-full bg-slate-900" style="width:${progress}%"></div>
+              </div>
+              <span class="text-xs font-bold text-slate-700">${progress}%</span>
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold ${completed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}">${completed ? 'Si, 100%' : 'No'}</span>
+          </td>
+          <td class="px-4 py-3">
+            <div class="inline-flex items-center gap-1">
+              <button type="button" onclick="restoreProject('${safeId}')" class="inline-grid place-content-center w-9 h-9 rounded-full border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-1 shadow-sm" title="Restaurar">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+              <button type="button" onclick="permanentlyDeleteProject('${safeId}')" class="inline-grid place-content-center w-9 h-9 rounded-full border border-rose-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-all focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-1 shadow-sm" title="Eliminar permanente">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function deleteAllArchivedProjects() {
+      const rows = Array.isArray(archivedProjects) ? archivedProjects.filter((p) => p && p.id) : [];
+      if (!rows.length) {
+        alert('No hay proyectos archivados para eliminar.');
+        return;
+      }
+
+      const confirmed = confirm(`Se eliminarán ${rows.length} proyecto(s) de forma permanente. Esta acción no se puede deshacer. ¿Deseas continuar?`);
+      if (!confirmed) return;
+
+      const deleteAllBtn = document.getElementById('deleteAllArchivedBtn');
+      if (deleteAllBtn) {
+        deleteAllBtn.disabled = true;
+        deleteAllBtn.textContent = 'Eliminando...';
+      }
+
+      try {
+        for (const project of rows) {
+          const response = await fetch('/api/proyectos/eliminar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': window.csrfToken
+            },
+            body: JSON.stringify({ id: project.id })
+          });
+
+          if (!response.ok) {
+            throw new Error('delete_archived_failed');
+          }
+        }
+
+        await loadData();
+      } catch (err) {
+        console.error('Error:', err);
+        alert('No se pudieron eliminar todos los proyectos archivados.');
+      } finally {
+        if (deleteAllBtn) {
+          deleteAllBtn.disabled = false;
+          deleteAllBtn.textContent = 'Eliminar todos';
+        }
+      }
+    }
+
+    async function loadArchivedProjects() {
+      const qs = currentClienteId ? ('?cliente_id=' + encodeURIComponent(currentClienteId)) : '';
+      const res = await fetch('/api/proyectos/archivados' + qs);
+      const json = await res.json().catch(() => ({}));
+      archivedProjects = Array.isArray(json.data) ? json.data : [];
+      renderArchivedProjectsView(archivedProjects);
+      renderArchivedProjectsModalList(archivedProjects);
+      return archivedProjects;
+    }
+
+    function openArchivedProjectsModal() {
+      const modal = document.getElementById('archivedProjectsModal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      loadArchivedProjects();
+    }
+
+    function closeArchivedProjectsModal() {
+      const modal = document.getElementById('archivedProjectsModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function openArchivedProjectDetails(projectId) {
+      if (!projectId) return;
+      closeArchivedProjectsModal();
+      openProject(projectId, { readOnly: true, useArchivedData: true });
+    }
+
+    async function restoreProject(projectId) {
+      try {
+        const response = await fetch('/api/proyectos/actualizar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.csrfToken
+          },
+          body: JSON.stringify({
+            id: projectId,
+            archived: false
+          })
+        });
+
+        if (response.ok) {
+          await loadData();
+        } else {
+          alert('Error al restaurar el proyecto');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Error al restaurar el proyecto');
+      }
+    }
+
+    async function archiveProjectById(projectId, options = {}) {
+      if (!projectId) return;
+      const confirmed = confirm('¿Estás seguro de que quieres archivar este proyecto? Puedes restaurarlo desde la pestaña "Archivados".');
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch('/api/proyectos/actualizar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.csrfToken
+          },
+          body: JSON.stringify({
+            id: projectId,
+            archived: true,
+            archived_at: new Date().toISOString()
+          })
+        });
+
+        if (response.ok) {
+          if (options?.closeProjectModal) {
+            closeProjectModal();
+            return;
+          }
+          await loadData();
+        } else {
+          alert('Error al archivar el proyecto');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('Error al archivar el proyecto');
+      }
+    }
+
+    async function archiveProject() {
+      if (!currentProjectId) return;
+      await archiveProjectById(currentProjectId, { closeProjectModal: true });
+    }
+
+    async function permanentlyDeleteProject(projectId) {
+      if (!projectId) return;
+      const confirmed = confirm('Esta acción eliminará el proyecto permanentemente. ¿Deseas continuar?');
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch('/api/proyectos/eliminar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.csrfToken
+          },
+          body: JSON.stringify({ id: projectId })
+        });
+
+        if (response.ok) {
+          await loadData();
+        } else {
+          alert('No se pudo eliminar el proyecto');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('No se pudo eliminar el proyecto');
+      }
+    }
+
+    async function sendTimerAction(projectId, action, taskId = null) {
+      const res = await fetch('/api/proyectos/timer', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: projectId, action, tarea_id: taskId || null})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error('timer_action_failed');
+      }
+      return data.item;
+    }
+
+    function addProjectTo(stage) {
+        const titulo = prompt('Nuevo proyecto:');
+        let etapa = stage || stages[0];
+        if (!etapa) {
+            etapa = 'Prospecto';
+            stages = ['Prospecto'];
+            saveStages();
+        }
+        if (titulo) {
+            fetch('/api/proyectos/crear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+                body: JSON.stringify({
+                    cliente_id: (currentClienteId || 'general'),
+                    titulo,
+                    prioridad: 'Media',
+                    etapa
+                })
+            }).then(() => loadData());
+        }
+    }
+    window.addProjectTo = addProjectTo;
+
+    function openNewProjectModal() {
+        const modal = document.getElementById('newProjectModal');
+        const stageSelect = document.getElementById('newProjectStage');
+        stageSelect.innerHTML = (stages && stages.length ? stages : ['Prospecto']).map(s => `<option value="${s}">${s}</option>`).join('');
+        document.getElementById('newProjectTitle').value = '';
+        document.getElementById('newProjectDescription').value = '';
+        document.getElementById('newProjectPriority').value = 'Atención';
+        document.getElementById('newProjectClient').value = currentClienteId || '';
+      document.getElementById('newProjectPlannedDays').value = '0';
+      document.getElementById('newProjectPlannedHours').value = '0';
+      document.getElementById('newProjectPlannedMinutes').value = '0';
+      initNewProjectDatePickers();
+      if (newProjectStartPicker) newProjectStartPicker.clear();
+      if (newProjectDuePicker) newProjectDuePicker.clear();
+        modal.classList.remove('hidden');
+    }
+
+    function closeNewProjectModal() {
+      if (newProjectStartPicker) newProjectStartPicker.close();
+      if (newProjectDuePicker) newProjectDuePicker.close();
+        document.getElementById('newProjectModal').classList.add('hidden');
+    }
+
+    function handleNewProjectModalBackdropClick() {}
+
+    function createProjectFromModal() {
+        const titulo = document.getElementById('newProjectTitle').value.trim();
+        const descripcion = document.getElementById('newProjectDescription').value.trim();
+        const etapa = document.getElementById('newProjectStage').value || (stages[0] || 'Prospecto');
+        const prioridad = normalizePriority(document.getElementById('newProjectPriority').value || 'Atención');
+        const cliente = document.getElementById('newProjectClient').value || (currentClienteId || 'general');
+        const inicio = document.getElementById('newProjectStart').value || null;
+        const vencimiento = document.getElementById('newProjectDue').value || null;
+      const plannedDays = Math.max(0, Number(document.getElementById('newProjectPlannedDays').value || 0));
+      const plannedHours = Math.max(0, Number(document.getElementById('newProjectPlannedHours').value || 0));
+      const plannedMinutes = Math.max(0, Number(document.getElementById('newProjectPlannedMinutes').value || 0));
+      const plannedSeconds = Math.floor((plannedDays * 86400) + (plannedHours * 3600) + (plannedMinutes * 60));
+        if (!titulo) return;
+        fetch('/api/proyectos/crear', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+            body: JSON.stringify({
+                cliente_id: cliente,
+                titulo,
+                prioridad,
+                etapa,
+                descripcion,
+                inicio,
+                vencimiento,
+                planned_seconds: plannedSeconds
+            })
+        }).then(() => {
+            closeNewProjectModal();
+            loadData();
+        });
+    }
+
+    function setProjectModalReadOnly(readOnly = false) {
+      projectModalReadOnly = !!readOnly;
+
+      const titleInput = document.getElementById('modalTitle');
+      const clientSelect = document.getElementById('modalClientSelect');
+      const stageSelect = document.getElementById('modalStage');
+      const desc = document.getElementById('modalDesc');
+      const descAutosaveStatus = document.getElementById('modalDescAutosaveStatus');
+      const taskInput = document.getElementById('newTaskInput');
+      const taskAddWrap = document.getElementById('modalTaskAddWrap');
+      const dropzone = document.getElementById('modalDropzone');
+      const noteToggleBtn = document.getElementById('projectNoteToggleBtn');
+      const noteComposer = document.getElementById('projectNoteComposer');
+      const notesTabBtn = document.querySelector('[data-project-tab="notes"]');
+      const sidebar = document.getElementById('projectModalSidebar');
+      const prioritySelector = document.getElementById('modalPrioritySelector');
+      const responsablesInput = document.getElementById('newResponsibleInput');
+      const dueDateInput = document.getElementById('modalDueDate');
+
+      if (titleInput) {
+        titleInput.readOnly = projectModalReadOnly;
+        titleInput.classList.toggle('pointer-events-none', projectModalReadOnly);
+      }
+      if (clientSelect) clientSelect.disabled = projectModalReadOnly;
+      if (stageSelect) stageSelect.disabled = projectModalReadOnly;
+      if (desc) desc.readOnly = projectModalReadOnly;
+      if (descAutosaveStatus) descAutosaveStatus.classList.toggle('hidden', projectModalReadOnly);
+      if (taskInput) taskInput.disabled = projectModalReadOnly;
+      if (taskAddWrap) taskAddWrap.classList.toggle('hidden', projectModalReadOnly);
+      if (dropzone) dropzone.classList.toggle('hidden', projectModalReadOnly);
+      if (noteToggleBtn) noteToggleBtn.classList.toggle('hidden', projectModalReadOnly);
+      if (noteComposer && projectModalReadOnly) noteComposer.classList.add('hidden');
+      if (notesTabBtn) notesTabBtn.classList.toggle('hidden', projectModalReadOnly);
+      if (sidebar) sidebar.classList.toggle('hidden', projectModalReadOnly);
+      if (prioritySelector) prioritySelector.classList.toggle('pointer-events-none', projectModalReadOnly);
+      if (prioritySelector) prioritySelector.classList.toggle('opacity-70', projectModalReadOnly);
+      if (responsablesInput) responsablesInput.disabled = projectModalReadOnly;
+      if (dueDateInput) dueDateInput.disabled = projectModalReadOnly;
+
+      if (projectModalReadOnly) {
+        setProjectModalTab('info');
+      }
+    }
+
+    // --- Modal Functions ---
+    async function openProject(id, options = {}) {
+        currentProjectId = id;
+      currentTaskId = null;
+      currentProjectModalTab = 'info';
+      currentProjectEditingNoteId = null;
+      isProjectNoteComposerOpen = false;
+      const useArchivedData = !!options?.useArchivedData;
+      const sourceList = useArchivedData ? archivedProjects : projects;
+      let p = sourceList.find(x => String(x.id) === String(id));
+      if (!p && useArchivedData) {
+        const res = await fetch(`/api/proyectos/${encodeURIComponent(String(id))}`);
+        const json = await res.json().catch(() => ({}));
+        p = json?.data || null;
+      }
+        if (!p) return;
+
+      window.__infocusAiCurrentProject = {
+        id: String(p.id || id || ''),
+        title: String(p.titulo || 'Proyecto'),
+      };
+
+      setProjectModalReadOnly(!!options?.readOnly);
+
+        // Header
+        setModalHeaderAvatar(p);
+        document.getElementById('modalTitle').value = p.titulo;
+        document.getElementById('modalTitle').onblur = (e) => updateTitle(id, e.target.value);
+
+        const clientSelect = document.getElementById('modalClientSelect');
+        clientSelect.innerHTML = [`<option value="">Sin Cliente</option>`]
+          .concat((clientesData || []).map(c => `<option value="${c.id}">${c.empresa}</option>`))
+          .join('');
+        clientSelect.value = p.cliente_id || '';
+        clientSelect.onchange = (e) => updateProjectClient(e.target.value, e.target.options[e.target.selectedIndex]?.text || 'Sin Cliente');
+        
+        // Stage Select
+        const stageSelect = document.getElementById('modalStage');
+        stageSelect.innerHTML = stages.map(s => `<option value="${s}" ${p.etapa === s ? 'selected' : ''}>${s}</option>`).join('');
+        stageSelect.onchange = (e) => {
+          refreshProjectStageUI();
+          updateProjectField('etapa', e.target.value);
+        };
+        refreshProjectStageUI();
+
+        // Description
+        const descInput = document.getElementById('modalDesc');
+        const hasPendingDesc = Object.prototype.hasOwnProperty.call(pendingProjectDescriptions, String(id));
+        const nextDescription = hasPendingDesc ? pendingProjectDescriptions[String(id)] : (p.descripcion || '');
+        if (descInput && document.activeElement !== descInput) {
+          descInput.value = nextDescription;
+          projectDescriptionExpanded = false;
+          document.getElementById('projectDescShell')?.classList.remove('toggle-dismissed');
+        }
+        if (descInput) {
+          descInput.oninput = queueDescriptionAutosave;
+          setDescriptionAutosaveStatus(hasPendingDesc ? 'pending' : 'idle');
+          requestAnimationFrame(refreshProjectDescriptionClamp);
+        }
+        
+        // Tasks
+        renderModalTasks(p.tareas || []);
+        renderProjectNotesPanel(p);
+
+        // Files
+        renderModalFiles(p.files || []);
+        
+        // Metadata
+        initModalDuePicker();
+        setModalDueDate(p.vencimiento || '');
+        setModalPriority(normalizePriority(p.prioridad), false);
+        renderModalResponsables(p.responsables || (p.miembro ? [p.miembro] : []), p.responsable_ids || []);
+        updateProjectDetailSummary(p);
+        renderModalTimeLogs();
+        syncTimerPanelsMeta(p);
+        document.getElementById('responsibleSearchResults').classList.add('hidden');
+        ensureNativePipSource().catch(() => {});
+        
+        // Timer
+        updateModalTimer(p);
+        setProjectModalTab(currentProjectModalTab);
+        
+        // Show
+        document.getElementById('projectModal').classList.remove('hidden');
+        requestAnimationFrame(refreshProjectDescriptionClamp);
+    }
+
+    function handleProjectModalBackdropClick() {}
+
+    async function closeProjectModal() {
+      const forceClose = !!(arguments[0] && typeof arguments[0] === 'object' && arguments[0].force);
+      if (!forceClose && Date.now() < modalBackdropIgnoreUntil) {
+        return;
+      }
+      const closingProjectId = String(currentProjectId || '');
+      if (closingProjectId && typeof pendingProjectDescriptions[closingProjectId] === 'string') {
+        clearTimeout(modalDescAutosaveTimer);
+        try {
+          await saveDescriptionAutosave(closingProjectId, pendingProjectDescriptions[closingProjectId]);
+        } catch (_) {}
+      }
+        document.getElementById('projectModal').classList.add('hidden');
+      window.__infocusAiCurrentProject = null;
+      if (typeof hideProjectDropOverlay === 'function') hideProjectDropOverlay();
+      closeTaskModal();
+        if (pipRenderInterval) clearInterval(pipRenderInterval);
+      setPipSourceVisible(false);
+      closeTimerFullscreen();
+        setProjectModalReadOnly(false);
+        currentProjectId = null;
+        currentProjectModalTab = 'info';
+        currentProjectEditingNoteId = null;
+        isProjectNoteComposerOpen = false;
+        loadData(); // Refresh board to reflect changes
+    }
+    
+    async function updateProjectField(field, value, projectId = currentProjectId) {
+        if (projectModalReadOnly) return;
+        if (!projectId) return;
+        const localProject = projects.find(x => String(x.id) === String(projectId));
+        if (localProject) localProject[field] = value;
+        const response = await fetch('/api/proyectos/actualizar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+            body: JSON.stringify({id: projectId, [field]: value})
+        });
+        if (!response.ok) throw new Error('project_update_failed');
+        const payload = await response.json().catch(() => ({}));
+        if (payload.item) {
+          const idx = projects.findIndex(x => String(x.id) === String(projectId));
+          if (idx >= 0) projects[idx] = {...projects[idx], ...payload.item};
+        }
+        return payload.item;
+    }
+
+    async function updateProjectClient(clienteId, clienteName) {
+      if (projectModalReadOnly) return;
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (p) {
+        p.cliente_id = clienteId || '';
+        p.cliente = clienteName || 'Sin Cliente';
+        syncTimerPanelsMeta(p);
+      }
+      await updateProjectField('cliente_id', clienteId || null);
+    }
+
+    function setModalPriority(priority, persist = true) {
+      const normalized = normalizePriority(priority);
+      const hidden = document.getElementById('modalPriority');
+      hidden.value = normalized;
+      document.querySelectorAll('#modalPrioritySelector .priority-chip').forEach(btn => {
+        const isActive = btn.getAttribute('data-priority') === normalized;
+        const baseClass = 'priority-chip inline-flex min-h-12 items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-bold border transition-all';
+        btn.className = `${baseClass} grayscale text-slate-500 border-slate-200 bg-slate-100 hover:grayscale-0`;
+        if (isActive) {
+          if (normalized === 'Con calma') {
+            btn.className = `${baseClass} ring-2 ring-emerald-200 text-emerald-700 border-emerald-200 bg-emerald-50`;
+          } else if (normalized === 'Atención') {
+            btn.className = `${baseClass} ring-2 ring-amber-200 text-amber-700 border-amber-200 bg-amber-50`;
+          } else {
+            btn.className = `${baseClass} ring-2 ring-rose-200 text-rose-700 border-rose-200 bg-rose-50`;
+          }
+        }
+      });
+      if (persist) updateProjectField('prioridad', normalized);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function normalizeProfilePhotoPath(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (/^https?:\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+      return raw.startsWith('/') ? raw : `/${raw}`;
+    }
+
+    function getInitials(name, fallback = 'SR') {
+      const clean = String(name || '').trim();
+      if (!clean) return fallback;
+      const parts = clean.split(/\s+/).filter(Boolean).slice(0, 2);
+      const letters = parts.map((part) => part.charAt(0)).join('');
+      if (letters) return letters.toUpperCase();
+      return clean.substring(0, 2).toUpperCase() || fallback;
+    }
+
+    function rememberResponsibleProfile(entry) {
+      if (!entry || typeof entry !== 'object') return;
+      const id = String(entry.id || '').trim();
+      const name = String(entry.name || '').trim();
+      const avatar = normalizeProfilePhotoPath(entry.profile_photo || entry.profile_photo_path || entry.avatar || entry.avatar_url || entry.photo || entry.photo_url || entry.foto || '');
+      const payload = { id, name, avatar };
+
+      if (id) {
+        const previous = responsibleCatalogById[id] || {};
+        responsibleCatalogById[id] = {
+          id,
+          name: payload.name || previous.name || '',
+          avatar: payload.avatar || previous.avatar || '',
+        };
+      }
+
+      if (name) {
+        const key = name.toLowerCase();
+        const previous = responsibleCatalogByName[key] || {};
+        responsibleCatalogByName[key] = {
+          id: payload.id || previous.id || '',
+          name,
+          avatar: payload.avatar || previous.avatar || '',
+        };
+      }
+    }
+
+    function getProjectResponsibleSources(project) {
+      const names = Array.isArray(project?.responsables) && project.responsables.length
+        ? project.responsables.filter(Boolean)
+        : (project?.miembro ? [project.miembro] : []);
+      const ids = Array.isArray(project?.responsable_ids) ? project.responsable_ids.filter(Boolean) : [];
+      return { names, ids };
+    }
+
+    function getTaskOwnerSources(task, project = null) {
+      const names = Array.isArray(task?.owners) ? task.owners.filter(Boolean) : [];
+      const ids = Array.isArray(task?.owner_ids) ? task.owner_ids.filter(Boolean) : [];
+      if (names.length || ids.length) return { names, ids };
+      return getProjectResponsibleSources(project || null);
+    }
+
+    function getResponsibleProfiles(names = [], ids = []) {
+      const safeNames = Array.isArray(names) ? names : [];
+      const safeIds = Array.isArray(ids) ? ids : [];
+      const length = Math.max(safeNames.length, safeIds.length);
+      const items = [];
+
+      for (let idx = 0; idx < length; idx += 1) {
+        const id = String(safeIds[idx] || '').trim();
+        const incomingName = String(safeNames[idx] || '').trim();
+        const byId = id ? responsibleCatalogById[id] : null;
+        const byName = incomingName ? responsibleCatalogByName[incomingName.toLowerCase()] : null;
+        const name = incomingName || byId?.name || byName?.name || '';
+        if (!name && !id) continue;
+        const avatar = normalizeProfilePhotoPath(byId?.avatar || byName?.avatar || '');
+        items.push({ id: id || byName?.id || '', name, avatar });
+      }
+
+      return items.filter((profile, idx, arr) => {
+        const key = profile.id || profile.name.toLowerCase();
+        return arr.findIndex((item) => (item.id || item.name.toLowerCase()) === key) === idx;
+      });
+    }
+
+    function renderResponsibleBadges(names = [], ids = [], options = {}) {
+      const profiles = getResponsibleProfiles(names, ids);
+      if (!profiles.length) {
+        return options.emptyHtml || '<span class="text-slate-500">Sin encargados</span>';
+      }
+
+      const limit = Math.max(1, Number(options.limit) || 3);
+      const visible = profiles.slice(0, limit);
+      const bubbleClass = options.bubbleClass || 'w-7 h-7 rounded-full border border-slate-200 bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center overflow-hidden';
+      const wrapperClass = options.wrapperClass || 'flex items-center gap-1.5';
+      const extraClass = options.extraClass || 'text-[10px] text-slate-500 font-semibold';
+      const extra = profiles.length > limit ? `<span class="${extraClass}">+${profiles.length - limit}</span>` : '';
+      const title = escapeHtml(profiles.map((profile) => profile.name).join(', '));
+
+      const bubbles = visible.map((profile) => {
+        if (profile.avatar) {
+          return `<span class="${bubbleClass}"><img src="${escapeHtml(profile.avatar)}" alt="${escapeHtml(profile.name)}" class="h-full w-full object-cover" loading="lazy"></span>`;
+        }
+        return `<span class="${bubbleClass}">${escapeHtml(getInitials(profile.name))}</span>`;
+      }).join('');
+
+      return `<div class="${wrapperClass}" title="${title}">${bubbles}${extra}</div>`;
+    }
+
+    function setModalHeaderAvatar(project) {
+      const avatarNode = document.getElementById('modalAvatar');
+      if (!avatarNode) return;
+      const source = getProjectResponsibleSources(project);
+      const profile = getResponsibleProfiles(source.names, source.ids)[0] || null;
+      if (profile && profile.avatar) {
+        avatarNode.innerHTML = `<img src="${escapeHtml(profile.avatar)}" alt="${escapeHtml(profile.name)}" class="h-full w-full object-cover">`;
+        avatarNode.classList.add('overflow-hidden');
+        return;
+      }
+      const fallback = profile?.name || project?.miembro || 'HV';
+      avatarNode.textContent = getInitials(fallback, 'HV');
+      avatarNode.classList.remove('overflow-hidden');
+    }
+
+    function renderModalResponsables(responsables, responsableIds = []) {
+      const list = document.getElementById('modalResponsablesList');
+      if (!list) return;
+      const profiles = getResponsibleProfiles(responsables, responsableIds);
+      if (!profiles.length) {
+        list.innerHTML = '<div class="text-xs text-slate-400 bg-white border border-dashed border-slate-200 rounded-xl px-3 py-2">Sin responsables asignados</div>';
+        const project = projects.find(x => String(x.id) === String(currentProjectId))
+          || archivedProjects.find(x => String(x.id) === String(currentProjectId))
+          || null;
+        if (project) updateProjectDetailSummary(project);
+        return;
+      }
+      list.innerHTML = profiles.map((profile, idx) => `
+        <div class="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-3 py-2">
+          <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center overflow-hidden">${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="${escapeHtml(profile.name)}" class="h-full w-full object-cover" loading="lazy">` : escapeHtml(getInitials(profile.name))}</div>
+          <span class="text-sm font-semibold text-slate-700 flex-1 truncate" title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</span>
+          <button type="button" class="text-slate-300 hover:text-rose-500 text-xl leading-none" onclick="removeResponsible(${idx})">×</button>
+        </div>
+      `).join('');
+
+      const project = projects.find(x => String(x.id) === String(currentProjectId))
+        || archivedProjects.find(x => String(x.id) === String(currentProjectId))
+        || null;
+      if (project) updateProjectDetailSummary(project);
+    }
+
+    function updateProjectDetailSummary(project) {
+      const assignedNode = document.getElementById('modalAssignedSummary');
+      const investedNode = document.getElementById('modalInvestedSummary');
+      if (!assignedNode || !investedNode) return;
+
+      const source = getProjectResponsibleSources(project || {});
+      const profiles = getResponsibleProfiles(source.names, source.ids);
+      assignedNode.innerText = profiles.length
+        ? profiles.map((profile) => profile.name).join(', ')
+        : 'Sin asignados';
+
+      investedNode.innerText = formatInvestedDh(getProjectGrossSeconds(project || {}));
+    }
+
+    async function searchResponsables(query = '', immediate = false) {
+      const box = document.getElementById('responsibleSearchResults');
+      const q = String(query || '').trim();
+      if (responsibleSearchDebounce) clearTimeout(responsibleSearchDebounce);
+
+      const run = async () => {
+        if (responsibleSearchAbort) responsibleSearchAbort.abort();
+        responsibleSearchAbort = new AbortController();
+        box.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">Buscando usuarios...</div>';
+        box.classList.remove('hidden');
+
+        try {
+          const res = await fetch('/api/proyectos/responsables/search?q=' + encodeURIComponent(q), {
+            signal: responsibleSearchAbort.signal,
+          });
+          const json = await res.json().catch(() => ({data: []}));
+          const list = Array.isArray(json.data) ? json.data : [];
+
+          if (!list.length) {
+            box.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">No se encontraron usuarios</div>';
+            box.classList.remove('hidden');
+            return;
+          }
+
+          box.innerHTML = list.map(u => {
+            rememberResponsibleProfile(u);
+            const safeId = String(u.id).replace(/'/g, "\\'");
+            const safeName = String(u.name).replace(/'/g, "\\'");
+            const avatar = normalizeProfilePhotoPath(u.profile_photo || '');
+            const safeAvatar = String(avatar || '').replace(/'/g, "\\'");
+            const initials = escapeHtml(getInitials(u.name || 'US', 'US'));
+            const name = escapeHtml(u.name || 'Usuario');
+            const email = escapeHtml(u.email || '');
+            const role = escapeHtml(u.role || 'equipo');
+            const avatarHtml = avatar
+              ? `<img src="${escapeHtml(avatar)}" alt="${name}" class="h-full w-full object-cover" loading="lazy">`
+              : initials;
+
+            return `<button type="button" class="w-full text-left px-3 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-b-0" onclick="addResponsibleFromCatalog('${safeId}', '${safeName}', '${safeAvatar}')">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center overflow-hidden">${avatarHtml}</div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-slate-700 truncate">${name}</div>
+                  <div class="text-[11px] text-slate-400 truncate">${email} ${role ? '• ' + role : ''}</div>
+                </div>
+              </div>
+            </button>`;
+          }).join('');
+          box.classList.remove('hidden');
+        } catch (error) {
+          if (error.name === 'AbortError') return;
+          box.innerHTML = '<div class="px-3 py-2 text-xs text-rose-500">No se pudo buscar usuarios</div>';
+          box.classList.remove('hidden');
+        }
+      };
+
+      if (immediate) {
+        run();
+        return;
+      }
+
+      responsibleSearchDebounce = setTimeout(run, 220);
+    }
+
+    function renderModalTimeLogs(logs) {
+      const list = document.getElementById('modalTimeLogList');
+      const entries = getSavedTimerHistory();
+      if (!entries.length) {
+        list.innerHTML = '<div class="text-xs text-slate-400">Aun no has guardado tiempos</div>';
+        return;
+      }
+      list.innerHTML = entries.slice().reverse().map((log, i) => {
+        let actor = String(log.saved_by || '').trim();
+        if (actor === '' || actor.toLowerCase() === 'equipo') {
+          actor = resolveCurrentUserName(projects.find(x => x.id === currentProjectId));
+        }
+        return `<div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-bold text-slate-500">${entries.length - i}.</span>
+            <span class="text-sm font-extrabold text-lime-600 tracking-tight">${log.time}</span>
+            <span class="text-xs font-semibold text-slate-500">${log.day}</span>
+          </div>
+          ${log.task_name ? `<div class="mt-1 text-[11px] text-slate-500">Tarea: <span class="font-semibold">${escapeHtml(log.task_name)}</span></div>` : ''}
+          <div class="mt-1 text-[11px] text-slate-400">Guardado por: <span class="font-semibold text-slate-500">${escapeHtml(actor)}</span></div>
+        </div>`;
+      }).join('');
+    }
+
+    function getSavedTimerHistory(projectId = currentProjectId) {
+      if (!projectId) return [];
+      try {
+        const raw = localStorage.getItem(TIMER_HISTORY_PREFIX + projectId);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function setSavedTimerHistory(items, projectId = currentProjectId) {
+      if (!projectId) return;
+      localStorage.setItem(TIMER_HISTORY_PREFIX + projectId, JSON.stringify(Array.isArray(items) ? items : []));
+    }
+
+    function getTimerResetBase(projectId = currentProjectId) {
+      if (!projectId) return 0;
+      const val = Number(localStorage.getItem(TIMER_RESET_PREFIX + projectId) || 0);
+      return Number.isFinite(val) ? Math.max(0, val) : 0;
+    }
+
+    function setTimerResetBase(totalSeconds, projectId = currentProjectId) {
+      if (!projectId) return;
+      localStorage.setItem(TIMER_RESET_PREFIX + projectId, String(Math.max(0, Number(totalSeconds) || 0)));
+    }
+
+    function persistGlobalTimerState(project, task, currentSeconds, isRunning) {
+      if (!project?.id) return;
+      const payload = {
+        projectId: String(project.id),
+        projectTitle: String(project.titulo || 'Proyecto'),
+        clientName: String(project.cliente || 'Sin Cliente'),
+        taskId: String(task?.id || task?.task_id || pinnedTimerTaskId || ''),
+        taskName: String(task?.texto || task?.task_name || 'Temporizador activo'),
+        currentSeconds: Math.max(0, Number(currentSeconds || 0)),
+        isRunning: !!isRunning,
+        syncedAt: Date.now(),
+      };
+      localStorage.setItem(GLOBAL_TIMER_STATE_KEY, JSON.stringify(payload));
+    }
+
+    function getGlobalTimerState() {
+      try {
+        const raw = localStorage.getItem(GLOBAL_TIMER_STATE_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function clearGlobalTimerState() {
+      try {
+        localStorage.removeItem(GLOBAL_TIMER_STATE_KEY);
+      } catch (_) {}
+    }
+
+    function getHeaderPomodoroState() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(POMODORO_STATE_KEY) || 'null');
+        if (!parsed || typeof parsed !== 'object') return null;
+        if (!parsed.isRunning && !parsed.activeTaskId && !parsed.activeProjectId && !(Number(parsed.loggedWorkLogs || 0) > 0)) return null;
+        return parsed;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function getHeaderPomodoroRemainingSeconds(state) {
+      if (!state) return 0;
+      if (!state.isRunning || !state.endsAt) return Math.max(0, Number(state.remainingSeconds || 0));
+      return Math.max(0, Math.ceil((Number(state.endsAt) - Date.now()) / 1000));
+    }
+
+    function formatPomodoroHeaderTimer(totalSeconds) {
+      const safeSeconds = Math.max(0, Number(totalSeconds || 0));
+      const minutes = Math.floor(safeSeconds / 60).toString().padStart(2, '0');
+      const seconds = (safeSeconds % 60).toString().padStart(2, '0');
+      return `${minutes}:${seconds}`;
+    }
+
+    function renderProjectPomodoroHeader(host, state) {
+      if (!host || !state) return;
+      host.classList.remove('hidden');
+
+      if (!host.querySelector('#headerPomodoroCard')) {
+        host.innerHTML = `<div id="headerPomodoroCard" role="button" tabindex="0" class="group relative cursor-pointer rounded-2xl border border-[#c8e17e] bg-[#dff8a7] px-2 py-1.5 shadow-[0_10px_22px_rgba(140,166,71,0.28)] min-w-0 w-full text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(140,166,71,0.32)] focus:outline-none focus:ring-2 focus:ring-[#111729]/20">
+          <div class="absolute top-1.5 right-1.5 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0">
+            <button type="button" id="headerPomodoroPipBtn" class="w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 flex items-center justify-center" title="Modo PiP" aria-label="Modo PiP">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 min-w-0 text-[#111729]">
+            <button id="headerPomodoroToggleBtn" type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#111729] text-[#dff8a7]" title="Pausar Pomodoro"></button>
+            <div class="min-w-0 flex-1">
+              <div class="text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#111729]/70">Pomodoro TDAH</div>
+              <div id="headerPomodoroTask" class="truncate text-left text-xs lg:text-sm font-extrabold text-[#111729]">Pomodoro activo</div>
+              <div id="headerPomodoroMeta" class="truncate text-[10px] lg:text-[11px] font-semibold text-[#111729]/65">Trabajo</div>
+            </div>
+            <div class="shrink-0 text-right min-w-[86px] lg:min-w-[98px]">
+              <div id="headerPomodoroValue" class="text-2xl lg:text-[30px] font-mono font-extrabold tracking-tight text-[#111729] leading-none">25:00</div>
+              <div class="mt-1 flex items-center justify-end gap-1.5">
+                <button id="headerPomodoroSaveBtn" type="button" class="text-[10px] lg:text-[11px] font-bold text-[#111729]/70 hover:text-[#111729]">Guardar</button>
+                <button id="headerPomodoroDeleteBtn" type="button" class="text-[10px] lg:text-[11px] font-bold text-rose-700/85 hover:text-rose-800">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+        host.querySelector('#headerPomodoroCard')?.addEventListener('click', () => {
+          window.openTdahPomodoroFullscreen?.();
+        });
+        host.querySelector('#headerPomodoroCard')?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            window.openTdahPomodoroFullscreen?.();
+          }
+        });
+        host.querySelector('#headerPomodoroToggleBtn')?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          window.toggleTdahPomodoroFromHeader?.();
+        });
+        host.querySelector('#headerPomodoroSaveBtn')?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          window.saveTdahPomodoroSession?.();
+        });
+        host.querySelector('#headerPomodoroDeleteBtn')?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          window.deleteTdahPomodoroSession?.();
+        });
+        host.querySelector('#headerPomodoroPipBtn')?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          window.openTdahPomodoroPip?.();
+        });
+      }
+
+      const taskNode = host.querySelector('#headerPomodoroTask');
+      const metaNode = host.querySelector('#headerPomodoroMeta');
+      const valueNode = host.querySelector('#headerPomodoroValue');
+      const toggleNode = host.querySelector('#headerPomodoroToggleBtn');
+      const taskName = String(state.activeTaskName || 'Pomodoro activo');
+      const meta = state.phase === 'break'
+        ? `Descanso · ${state.breakMinutes || 15}m`
+        : `${state.activeProjectTitle || 'En foco'} · ${state.workMinutes || 25}m`;
+
+      if (taskNode) taskNode.innerText = taskName;
+      if (metaNode) metaNode.innerText = meta;
+      if (valueNode) valueNode.innerText = formatPomodoroHeaderTimer(getHeaderPomodoroRemainingSeconds(state));
+      if (toggleNode) {
+        toggleNode.title = state.isRunning ? 'Pausar Pomodoro' : 'Continuar Pomodoro';
+        toggleNode.innerHTML = state.isRunning
+          ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
+          : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+      }
+    }
+
+    function formatTimer(totalSeconds) {
+      const sec = Math.max(0, Number(totalSeconds) || 0);
+      const h = Math.floor(sec / 3600).toString().padStart(2,'0');
+      const m = Math.floor((sec % 3600) / 60).toString().padStart(2,'0');
+      const s = (sec % 60).toString().padStart(2,'0');
+      return `${h}:${m}:${s}`;
+    }
+
+    function compactTimerTaskTitle(value) {
+      const raw = String(value || 'Temporizador activo').trim();
+      if (raw.length <= 18) return raw;
+      return `${raw.slice(0, 12).trim()} .....`;
+    }
+
+    function formatInvestedDh(totalSeconds) {
+      const sec = Math.max(0, Number(totalSeconds) || 0);
+      const days = Math.floor(sec / 86400);
+      const hours = Math.floor((sec % 86400) / 3600);
+      const minutes = Math.floor((sec % 3600) / 60);
+      return `${days}d ${hours}h ${minutes}m`;
+    }
+
+    function formatDeltaInvested(totalSeconds) {
+      const sec = Number(totalSeconds) || 0;
+      const sign = sec >= 0 ? '+' : '-';
+      return `${sign}${formatInvestedDh(Math.abs(sec))}`;
+    }
+
+    function parseDurationToSeconds(value) {
+      const input = String(value || '').trim().toLowerCase();
+      if (!input) return 0;
+
+      const dMatch = input.match(/(\d+)\s*d/);
+      const hMatch = input.match(/(\d+)\s*h/);
+      const mMatch = input.match(/(\d+)\s*m/);
+
+      if (dMatch || hMatch || mMatch) {
+        const d = Math.max(0, Number(dMatch?.[1] || 0));
+        const h = Math.max(0, Math.min(23, Number(hMatch?.[1] || 0)));
+        const m = Math.max(0, Math.min(59, Number(mMatch?.[1] || 0)));
+        return Math.floor((d * 86400) + (h * 3600) + (m * 60));
+      }
+
+      const plain = input.match(/\d+/g) || [];
+      const d = Math.max(0, Number(plain[0] || 0));
+      const h = Math.max(0, Math.min(23, Number(plain[1] || 0)));
+      const m = Math.max(0, Math.min(59, Number(plain[2] || 0)));
+      return Math.floor((d * 86400) + (h * 3600) + (m * 60));
+    }
+
+    function fillPlannedGoalEditor(seconds) {
+      const total = Math.max(0, Number(seconds) || 0);
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const d = document.getElementById('plannedGoalDays');
+      const h = document.getElementById('plannedGoalHours');
+      const m = document.getElementById('plannedGoalMinutes');
+      if (d) d.value = String(days);
+      if (h) h.value = String(hours);
+      if (m) m.value = String(minutes);
+    }
+
+    function enablePlannedGoalEdit() {
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+      fillPlannedGoalEditor(p.planned_seconds || 0);
+      document.getElementById('modalTimerPlannedDisplay')?.classList.add('hidden');
+      document.getElementById('modalTimerPlannedEditor')?.classList.remove('hidden');
+      document.getElementById('plannedGoalEditBtn')?.classList.add('hidden');
+      document.getElementById('plannedGoalSaveBtn')?.classList.remove('hidden');
+      document.getElementById('plannedGoalDays')?.focus();
+    }
+
+    async function savePlannedGoalEdit() {
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+
+      const days = Math.max(0, Math.min(999, Number(document.getElementById('plannedGoalDays')?.value || 0)));
+      const hours = Math.max(0, Math.min(99, Number(document.getElementById('plannedGoalHours')?.value || 0)));
+      const minutes = Math.max(0, Math.min(99, Number(document.getElementById('plannedGoalMinutes')?.value || 0)));
+      const seconds = Math.floor((days * 86400) + (hours * 3600) + (minutes * 60));
+
+      p.planned_seconds = seconds;
+      await updateProjectField('planned_seconds', seconds);
+      updateInvestedDisplays(p);
+      document.getElementById('modalTimerPlannedDisplay')?.classList.remove('hidden');
+      document.getElementById('modalTimerPlannedEditor')?.classList.add('hidden');
+      document.getElementById('plannedGoalEditBtn')?.classList.remove('hidden');
+      document.getElementById('plannedGoalSaveBtn')?.classList.add('hidden');
+      if (window.showNotification) window.showNotification('Meta prevista actualizada', 'success');
+    }
+
+    function getProjectGrossSeconds(p) {
+      const logs = p?.time_logs || [];
+      return logs.reduce((acc, log) => {
+        const end = log.end || Math.floor(Date.now()/1000);
+        return acc + (end - log.start);
+      }, 0);
+    }
+
+    function getCurrentProjectTotalSeconds(p) {
+      const gross = getProjectGrossSeconds(p);
+      const base = getTimerResetBase(p?.id || currentProjectId);
+      return Math.max(0, gross - base);
+    }
+
+    function updateInvestedDisplays(p) {
+      const gross = getProjectGrossSeconds(p);
+      const value = formatInvestedDh(gross);
+      const plannedSeconds = Math.max(0, Number(p?.planned_seconds || 0));
+      const plannedValue = formatInvestedDh(plannedSeconds);
+      const diffSeconds = gross - plannedSeconds;
+      const diffValue = formatDeltaInvested(diffSeconds);
+      const modalInvested = document.getElementById('modalTimerInvestedDisplay');
+      const modalPlanned = document.getElementById('modalTimerPlannedDisplay');
+      const modalCompare = document.getElementById('modalTimerCompareDisplay');
+      if (modalInvested) modalInvested.innerText = value;
+      if (modalPlanned) modalPlanned.innerText = plannedValue;
+      if (modalCompare) {
+        modalCompare.innerText = `Comparación: ${diffValue}`;
+        modalCompare.classList.remove('text-slate-500', 'text-rose-600', 'text-emerald-600');
+        if (diffSeconds > 0) {
+          modalCompare.classList.add('text-rose-600');
+        } else if (diffSeconds < 0) {
+          modalCompare.classList.add('text-emerald-600');
+        } else {
+          modalCompare.classList.add('text-slate-500');
+        }
+      }
+
+      updateProjectDetailSummary(p);
+    }
+
+    function resolveCurrentUserName(project = null) {
+      const fromAuth = String(currentUserDisplayName || '').trim();
+      if (fromAuth !== '') return fromAuth;
+
+      const logs = project?.time_logs || [];
+      const current = logs.length ? logs[logs.length - 1] : null;
+      const fromLog = String(current?.user || '').trim();
+      if (fromLog !== '') return fromLog;
+
+      return 'Usuario';
+    }
+
+    async function saveCurrentTimerLog() {
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+
+      const logs = p.time_logs || [];
+      const isRunning = logs.length > 0 && !logs[logs.length - 1].end;
+      if (isRunning) {
+        await toggleModalTimer();
+      }
+
+      const refreshed = projects.find(x => x.id === currentProjectId) || p;
+      const latestLogs = refreshed.time_logs || [];
+      const lastLog = latestLogs.length ? latestLogs[latestLogs.length - 1] : null;
+      const display = formatTimer(getCurrentProjectTotalSeconds(refreshed));
+      const day = new Date().toLocaleDateString('es-ES');
+      const entries = getSavedTimerHistory();
+      entries.push({
+        time: display,
+        day,
+        saved_by: resolveCurrentUserName(refreshed),
+        task_name: String(lastLog?.task_name || ''),
+      });
+      setSavedTimerHistory(entries);
+      renderModalTimeLogs();
+      if (window.showNotification) window.showNotification('Tiempo guardado en historial', 'success');
+    }
+
+    function resetCurrentTimer() {
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+      const logs = p.time_logs || [];
+      const isRunning = logs.length > 0 && !logs[logs.length - 1].end;
+
+      const applyReset = () => {
+        const grossNow = logs.reduce((acc, log) => {
+          const end = log.end || Math.floor(Date.now()/1000);
+          return acc + (end - log.start);
+        }, 0);
+        setTimerResetBase(grossNow);
+        const display = document.getElementById('modalTimerDisplay');
+        if (display) display.innerText = '00:00:00';
+        syncTimerPanelsDisplay('00:00:00');
+      };
+
+      if (isRunning) {
+        toggleModalTimer().finally(applyReset);
+      } else {
+        applyReset();
+      }
+    }
+
+    async function addResponsibleFromCatalog(userId, userName, profilePhoto = '') {
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+
+      rememberResponsibleProfile({ id: userId, name: userName, profile_photo: profilePhoto });
+
+      const names = Array.isArray(p.responsables) ? [...p.responsables] : (p.miembro ? [p.miembro] : []);
+      const ids = Array.isArray(p.responsable_ids) ? [...p.responsable_ids] : [];
+
+      if (!ids.includes(userId) && !names.includes(userName)) {
+        ids.push(userId);
+        names.push(userName);
+      }
+
+      p.responsables = names;
+      p.responsable_ids = ids;
+      p.miembro = names[0] || null;
+
+      await updateProjectField('responsables', names);
+      await updateProjectField('responsable_ids', ids);
+      await updateProjectField('miembro', p.miembro);
+
+      renderModalResponsables(names, ids);
+      setModalHeaderAvatar(p);
+      syncTimerPanelsMeta(p);
+      document.getElementById('newResponsibleInput').value = '';
+      document.getElementById('responsibleSearchResults').classList.add('hidden');
+    }
+
+    async function removeResponsible(index) {
+      if (!currentProjectId) return;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+      const list = Array.isArray(p.responsables) ? [...p.responsables] : (p.miembro ? [p.miembro] : []);
+      const ids = Array.isArray(p.responsable_ids) ? [...p.responsable_ids] : [];
+      list.splice(index, 1);
+      if (ids.length > index) ids.splice(index, 1);
+      p.responsables = list;
+      p.responsable_ids = ids;
+      p.miembro = list[0] || null;
+      await updateProjectField('responsables', list);
+      await updateProjectField('responsable_ids', ids);
+      await updateProjectField('miembro', p.miembro);
+      renderModalResponsables(list, ids);
+      setModalHeaderAvatar(p);
+      syncTimerPanelsMeta(p);
+    }
+
+    function syncTimerPanelsMeta(p, task = null) {
+      const taskLabel = task?.texto || task?.task_name || getActiveTimerTaskLabel(p) || 'Sin tarea vinculada';
+      document.getElementById('timerFsProject').innerText = taskLabel;
+      document.getElementById('timerFsClient').innerText = `${p?.titulo || 'Proyecto'} · ${p?.cliente || 'Sin Cliente'}`;
+      document.getElementById('timerPipProject').innerText = p?.titulo || 'Proyecto';
+      document.getElementById('timerPipClient').innerText = p?.cliente || 'Sin Cliente';
+    }
+
+    function syncTimerPanelsDisplay(value) {
+      document.getElementById('timerFsDisplay').innerText = value;
+      document.getElementById('timerPipDisplay').innerText = value;
+      drawTimerPipCanvas(value);
+    }
+
+    function getActiveTimerTaskLabel(p) {
+      const logs = p?.time_logs || [];
+      const running = logs.length ? logs[logs.length - 1] : null;
+      if (running && !running.end) {
+        return running.task_name || 'Sin tarea vinculada';
+      }
+      return 'Sin tarea vinculada';
+    }
+
+    function updateModalTimerTaskLabel(p) {
+      const el = document.getElementById('modalTimerTaskLabel');
+      if (!el) return;
+      el.innerText = getActiveTimerTaskLabel(p);
+    }
+
+    function getRunningLog(project) {
+      const logs = project?.time_logs || [];
+      const current = logs.length ? logs[logs.length - 1] : null;
+      return current && !current.end ? current : null;
+    }
+
+    function findRunningProject() {
+      return projects.find((project) => !!getRunningLog(project)) || null;
+    }
+
+    function getTaskFromProject(project, taskId) {
+      if (!project || !taskId) return null;
+      return (project.tareas || []).find((task) => String(task.id || '') === String(taskId || '')) || null;
+    }
+
+    function patchProjectInState(item) {
+      if (!item?.id) return;
+      projects = projects.map((project) => String(project.id) === String(item.id) ? item : project);
+    }
+
+    function setPinnedTimerContext(projectId = null, taskId = null) {
+      pinnedTimerProjectId = projectId ? String(projectId) : null;
+      pinnedTimerTaskId = taskId ? String(taskId) : null;
+    }
+
+    function getPinnedTimerProject() {
+      const runningProject = findRunningProject();
+      if (runningProject) return runningProject;
+      if (!pinnedTimerProjectId) return null;
+      return projects.find((project) => String(project.id) === String(pinnedTimerProjectId)) || null;
+    }
+
+    function getPinnedTimerTask(project = null) {
+      const targetProject = project || getPinnedTimerProject();
+      if (!targetProject) return null;
+      const running = getRunningLog(targetProject);
+      const taskId = String(running?.task_id || pinnedTimerTaskId || '');
+      return getTaskFromProject(targetProject, taskId);
+    }
+
+    function updateHeaderTaskTimer(project, task) {
+      const host = document.getElementById('headerTaskTimerHost');
+      if (!host) return;
+
+      const pomodoroHeaderState = getHeaderPomodoroState();
+      if (pomodoroHeaderState) {
+        renderProjectPomodoroHeader(host, pomodoroHeaderState);
+        return;
+      }
+
+      if (!project) {
+        host.classList.add('hidden');
+        host.innerHTML = '';
+        clearGlobalTimerState();
+        window.updateHeaderTimerButtonVisibility?.(true);
+        return;
+      }
+
+      const running = getRunningLog(project);
+      const taskName = task?.texto || running?.task_name || 'Temporizador activo';
+      const compactTaskName = compactTimerTaskTitle(taskName);
+      const projectName = project.titulo || 'Proyecto';
+      const isRunning = !!running;
+      const currentSecondsRaw = getCurrentProjectTotalSeconds(project);
+      const projectId = String(project.id || '');
+      let stableSeconds = currentSecondsRaw;
+      if (isRunning) {
+        if (headerTimerLastProjectId === projectId) {
+          stableSeconds = Math.max(currentSecondsRaw, headerTimerLastSeconds);
+        }
+        headerTimerLastProjectId = projectId;
+        headerTimerLastSeconds = stableSeconds;
+      } else {
+        headerTimerLastProjectId = projectId;
+        headerTimerLastSeconds = currentSecondsRaw;
+      }
+      const timeValue = formatTimer(stableSeconds);
+
+      // Keep fullscreen/PiP panels synced even when timer is controlled from header.
+      syncTimerPanelsMeta(project, task || running);
+      syncTimerPanelsDisplay(timeValue);
+
+      host.classList.remove('hidden');
+      window.updateHeaderTimerButtonVisibility?.(false);
+
+      // Render once; update text/icons only to avoid hover flicker every second.
+      if (!host.querySelector('#headerTimerCard')) {
+        host.innerHTML = `<div id="headerTimerCard" role="button" tabindex="0" onclick="openPinnedTimerDetailPanel(event)" onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); openPinnedTimerDetailPanel(event);}" class="group cursor-pointer relative rounded-2xl border border-[#2b3658] bg-[#101729] px-2 py-1.5 shadow-[0_10px_22px_rgba(16,23,41,0.32)] min-w-0 w-full text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(16,23,41,0.36)] focus:outline-none focus:ring-2 focus:ring-[#dff47f]/55">
+          <div class="absolute top-1.5 right-1.5 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0">
+            <button type="button" data-advanced-control onclick="event.stopPropagation(); openPinnedTimerPip();" class="w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 flex items-center justify-center" title="Modo PiP" aria-label="Modo PiP">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
+            </button>
+          </div>
+          <div class="flex items-center gap-2 min-w-0">
+            <button id="headerTimerToggleBtn" type="button" onclick="event.stopPropagation(); togglePinnedTimerRun()" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f0fe97] text-[#101729]" title="${isRunning ? 'Pausar temporizador' : 'Continuar temporizador'}">${isRunning ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>'}</button>
+            <div class="min-w-0 flex-1">
+              <div class="text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#f0fe97]/70">En foco</div>
+              <div id="headerTimerTask" class="truncate text-left text-xs lg:text-sm font-extrabold text-[#f0fe97]">${compactTaskName}</div>
+              <div id="headerTimerProject" class="truncate text-[10px] lg:text-[11px] font-semibold text-[#f0fe97]/60">${projectName}</div>
+            </div>
+            <div class="shrink-0 text-right min-w-[86px] lg:min-w-[98px]">
+              <div id="headerPinnedTimerValue" class="text-2xl lg:text-[30px] font-mono font-extrabold tracking-tight text-[#f0fe97] leading-none">${timeValue}</div>
+              <div class="mt-1 flex items-center justify-end gap-1.5">
+                <button type="button" onclick="event.stopPropagation(); savePinnedTimerLog()" class="text-[10px] lg:text-[11px] font-bold text-[#f0fe97]/75 hover:text-[#f0fe97]">Guardar</button>
+                <button type="button" onclick="event.stopPropagation(); deletePinnedTimerEntry()" class="text-[10px] lg:text-[11px] font-bold text-rose-300/90 hover:text-rose-200">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      const headerCard = host.querySelector('#headerTimerCard');
+      if (headerCard) {
+        headerCard.dataset.projectId = String(project.id || '');
+      }
+
+      const headerTask = host.querySelector('#headerTimerTask');
+      if (headerTask) headerTask.innerText = compactTaskName;
+
+      const headerProject = host.querySelector('#headerTimerProject');
+      if (headerProject) headerProject.innerText = `${projectName}`;
+
+      const headerValue = host.querySelector('#headerPinnedTimerValue');
+      if (headerValue) headerValue.innerText = timeValue;
+
+      const headerToggleBtn = host.querySelector('#headerTimerToggleBtn');
+      if (headerToggleBtn) {
+        headerToggleBtn.title = isRunning ? 'Pausar temporizador' : 'Continuar temporizador';
+        headerToggleBtn.innerHTML = isRunning
+          ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
+          : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
+      }
+
+      persistGlobalTimerState(project, task || running, stableSeconds, isRunning);
+
+      syncTimerFullscreenActionButtons(isRunning);
+    }
+
+    function syncPinnedTimerHud() {
+      if (headerTimerInterval) {
+        clearInterval(headerTimerInterval);
+        headerTimerInterval = null;
+      }
+
+      const runningProject = findRunningProject();
+      let project = runningProject;
+
+      if (runningProject) {
+        const running = getRunningLog(runningProject);
+        setPinnedTimerContext(runningProject.id, running?.task_id || null);
+      } else if (!pinnedTimerProjectId) {
+        const stored = getGlobalTimerState();
+        if (stored?.projectId) {
+          setPinnedTimerContext(stored.projectId, stored.taskId || null);
+          project = projects.find((entry) => String(entry.id) === String(stored.projectId)) || null;
+        }
+      } else if (pinnedTimerProjectId) {
+        project = projects.find((entry) => String(entry.id) === String(pinnedTimerProjectId)) || null;
+      }
+
+      if (!project) {
+        setPinnedTimerContext(null, null);
+        updateHeaderTaskTimer(null, null);
+        refreshProjectsSimpleModeUI();
+        const pomodoroHeaderState = getHeaderPomodoroState();
+        if (pomodoroHeaderState?.isRunning) {
+          headerTimerInterval = setInterval(() => {
+            if (findRunningProject()) {
+              syncPinnedTimerHud();
+              return;
+            }
+            updateHeaderTaskTimer(null, null);
+          }, 1000);
+        }
+        return;
+      }
+
+      const task = getPinnedTimerTask(project);
+      updateHeaderTaskTimer(project, task);
+      refreshProjectsSimpleModeUI();
+
+      if (!runningProject) return;
+
+      headerTimerInterval = setInterval(() => {
+        const liveProject = getPinnedTimerProject();
+        const liveTask = getPinnedTimerTask(liveProject);
+        if (!liveProject || !getRunningLog(liveProject)) {
+          syncPinnedTimerHud();
+          return;
+        }
+        updateHeaderTaskTimer(liveProject, liveTask);
+      }, 1000);
+    }
+
+    function openActiveTaskFromFocus() {
+      const project = getPinnedTimerProject();
+      const task = getPinnedTimerTask(project);
+      if (!project) return;
+      if (task?.id) {
+        openProjectTask(project.id, task.id);
+        return;
+      }
+      openProject(project.id);
+    }
+
+    function openPinnedTimerDetailPanel() {
+      openTimerExpandedPanel();
+    }
+
+    function openTimerExpandedPanel() {
+      const project = getPinnedTimerProject();
+      const task = getPinnedTimerTask(project);
+      if (!project) return;
+      timerFsShowAllSubtasks = false;
+      timerFsShowAllNotes = false;
+      currentProjectId = project.id;
+      if (task?.id) currentTaskId = task.id;
+      syncTimerPanelsMeta(project, task || getRunningLog(project));
+      syncTimerPanelsDisplay(formatTimer(getCurrentProjectTotalSeconds(project)));
+      refreshTimerFullscreenColumns(project, task);
+      syncTimerFullscreenActionButtons(!!getRunningLog(project));
+      const panel = document.getElementById('timerFullscreenPanel');
+      if (panel) panel.classList.remove('hidden');
+    }
+
+    function openPinnedTimerFullscreen() {
+      openTimerExpandedPanel();
+      openTimerFullscreen();
+    }
+
+    async function openPinnedTimerPip() {
+      const project = getPinnedTimerProject();
+      if (!project) return;
+      currentProjectId = project.id;
+      syncTimerPanelsMeta(project, getPinnedTimerTask(project));
+      syncTimerPanelsDisplay(formatTimer(getCurrentProjectTotalSeconds(project)));
+      await toggleTimerMiniPip();
+    }
+
+    function refreshTimerFullscreenColumns(project = null, task = null) {
+      const resolvedProject = project || getPinnedTimerProject();
+      const resolvedTask = task || getPinnedTimerTask(resolvedProject);
+      renderTimerFullscreenSubtasks(resolvedProject, resolvedTask);
+      renderTimerFullscreenNotes(resolvedTask);
+    }
+
+    function syncTimerFullscreenActionButtons(isRunning) {
+      const btn = document.getElementById('timerFsPauseBtn');
+      if (!btn) return;
+      btn.title = isRunning ? 'Pausar temporizador' : 'Reanudar temporizador';
+      btn.setAttribute('aria-label', isRunning ? 'Pausar temporizador' : 'Reanudar temporizador');
+      btn.innerHTML = isRunning
+        ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
+        : '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>';
+    }
+
+    function toggleTimerFsShowAllSubtasks() {
+      timerFsShowAllSubtasks = !timerFsShowAllSubtasks;
+      refreshTimerFullscreenColumns();
+    }
+
+    function toggleTimerFsShowAllNotes() {
+      timerFsShowAllNotes = !timerFsShowAllNotes;
+      refreshTimerFullscreenColumns();
+    }
+
+    function renderTimerFullscreenSubtasks(project, task) {
+      const list = document.getElementById('timerFsSubtasksList');
+      if (!list) return;
+      if (!project || !task?.id) {
+        list.innerHTML = '<div class="text-sm text-slate-300">Sin tarea vinculada para este temporizador.</div>';
+        return;
+      }
+
+      const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+      if (!subtasks.length) {
+        list.innerHTML = '<div class="text-sm text-slate-300">No hay sub tareas todavía.</div>';
+        return;
+      }
+
+      const hasMore = subtasks.length > 6;
+      const visibleSubtasks = timerFsShowAllSubtasks ? subtasks : subtasks.slice(0, 6);
+
+      list.innerHTML = visibleSubtasks.map((subtask) => `
+        <button type="button" onclick="toggleTimerFullscreenSubtask('${String(subtask.id || '').replace(/'/g, "\\'")}")" class="w-full flex items-center gap-2 bg-white/10 px-3 py-2 text-left hover:bg-white/20 transition-colors">
+          <span class="w-5 h-5 rounded border ${subtask.done ? 'bg-lime-400 border-lime-400 text-slate-900' : 'border-slate-400 text-transparent'} flex items-center justify-center shrink-0">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+          </span>
+          <span class="text-base ${subtask.done ? 'line-through text-slate-400' : 'text-white'}">${escapeHtml(String(subtask.texto || ''))}</span>
+        </button>
+      `).join('');
+
+      if (hasMore) {
+        list.innerHTML += `<button type="button" onclick="toggleTimerFsShowAllSubtasks()" class="mt-1 text-xs font-bold text-lime-300 hover:text-lime-200">${timerFsShowAllSubtasks ? 'Ver menos' : 'Ver todas'}</button>`;
+      }
+    }
+
+    function renderTimerFullscreenNotes(task) {
+      const list = document.getElementById('timerFsNotesList');
+      if (!list) return;
+      if (!task?.id) {
+        list.innerHTML = '<div class="text-sm text-slate-300">Sin tarea vinculada para este temporizador.</div>';
+        return;
+      }
+
+      const notes = (Array.isArray(task.notes) ? task.notes : [])
+        .slice()
+        .sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+
+      if (!notes.length) {
+        list.innerHTML = '<div class="text-sm text-slate-300">No hay notas de pipeline todavía.</div>';
+        return;
+      }
+
+      const hasMore = notes.length > 4;
+      const visibleNotes = timerFsShowAllNotes ? notes : notes.slice(0, 4);
+
+      list.innerHTML = visibleNotes.map((note) => {
+        const author = escapeHtml(String(note.author_name || note.user || 'Usuario'));
+        const created = escapeHtml(formatTaskNoteDate(note.created_at));
+        const text = escapeHtml(String(note.texto || ''));
+        return `<div class="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-[11px] font-bold text-slate-100">${author}</div>
+            <div class="text-[10px] text-slate-300">${created}</div>
+          </div>
+          <div class="mt-1 text-xs leading-5 text-slate-100 whitespace-pre-wrap">${text}</div>
+        </div>`;
+      }).join('');
+
+      if (hasMore) {
+        list.innerHTML += `<button type="button" onclick="toggleTimerFsShowAllNotes()" class="mt-1 text-xs font-bold text-lime-300 hover:text-lime-200">${timerFsShowAllNotes ? 'Ver menos' : 'Ver todas'}</button>`;
+      }
+    }
+
+    async function addTimerFullscreenSubtask() {
+      const project = getPinnedTimerProject();
+      const task = getPinnedTimerTask(project);
+      const input = document.getElementById('timerFsNewSubtaskInput');
+      const texto = String(input?.value || '').trim();
+      if (!project?.id || !task?.id || !texto) return;
+
+      const res = await fetch('/api/proyectos/tareas/subtareas/agregar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: project.id, tarea_id: task.id, texto})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+
+      if (input) input.value = '';
+      patchProjectInState(data.item);
+      const refreshedProject = projects.find((entry) => String(entry.id) === String(project.id));
+      const refreshedTask = getTaskFromProject(refreshedProject, task.id);
+      refreshTimerFullscreenColumns(refreshedProject, refreshedTask);
+      if (currentTaskId && String(currentTaskId) === String(task.id) && refreshedTask) {
+        renderTaskDetail(refreshedTask, { preserveState: true });
+      }
+      syncPinnedTimerHud();
+    }
+
+    async function addTimerFullscreenNote() {
+      const project = getPinnedTimerProject();
+      const task = getPinnedTimerTask(project);
+      const input = document.getElementById('timerFsNewNoteInput');
+      const texto = String(input?.value || '').trim();
+      if (!project?.id || !task?.id || !texto) return;
+
+      const res = await fetch('/api/proyectos/tareas/notas/agregar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: project.id, tarea_id: task.id, texto})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+
+      if (input) input.value = '';
+      patchProjectInState(data.item);
+      const refreshedProject = projects.find((entry) => String(entry.id) === String(project.id));
+      const refreshedTask = getTaskFromProject(refreshedProject, task.id);
+      refreshTimerFullscreenColumns(refreshedProject, refreshedTask);
+      if (currentTaskId && String(currentTaskId) === String(task.id) && refreshedTask) {
+        renderTaskDetail(refreshedTask, { preserveState: true });
+      }
+      syncPinnedTimerHud();
+    }
+
+    async function toggleTimerFullscreenSubtask(subtaskId) {
+      const project = getPinnedTimerProject();
+      const task = getPinnedTimerTask(project);
+      if (!project?.id || !task?.id || !subtaskId) return;
+
+      const res = await fetch('/api/proyectos/tareas/subtareas/toggle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: project.id, tarea_id: task.id, subtarea_id: subtaskId})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+
+      patchProjectInState(data.item);
+      const refreshedProject = projects.find((entry) => String(entry.id) === String(project.id));
+      const refreshedTask = getTaskFromProject(refreshedProject, task.id);
+      refreshTimerFullscreenColumns(refreshedProject, refreshedTask);
+      if (currentTaskId && String(currentTaskId) === String(task.id) && refreshedTask) {
+        renderTaskDetail(refreshedTask, { preserveState: true });
+      }
+      syncPinnedTimerHud();
+    }
+
+    async function pausePinnedTimer() {
+      const project = findRunningProject() || getPinnedTimerProject();
+      const running = project ? getRunningLog(project) : null;
+      if (!project || !running) return;
+      try {
+        const keepTaskId = String(running?.task_id || pinnedTimerTaskId || '');
+        const item = await sendTimerAction(project.id, 'stop', null);
+        patchProjectInState(item);
+        setPinnedTimerContext(project.id, keepTaskId || null);
+        await loadData();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    async function resumePinnedTimer() {
+      const project = getPinnedTimerProject();
+      if (!project) return;
+      try {
+        const taskId = pinnedTimerTaskId || null;
+        const item = await sendTimerAction(project.id, 'start', taskId);
+        patchProjectInState(item);
+        setPinnedTimerContext(project.id, taskId);
+        await loadData();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    async function togglePinnedTimerRun() {
+      const project = getPinnedTimerProject();
+      if (!project) return;
+      if (getRunningLog(project)) {
+        await pausePinnedTimer();
+      } else {
+        await resumePinnedTimer();
+      }
+      // Keep mediaSession playback state in sync for PiP controls
+      if ('mediaSession' in navigator) {
+        try {
+          const _lp = getPinnedTimerProject();
+          navigator.mediaSession.playbackState = _lp && getRunningLog(_lp) ? 'playing' : 'paused';
+        } catch (_) {}
+      }
+    }
+
+    async function savePinnedTimerLog() {
+      const project = getPinnedTimerProject();
+      if (!project) return;
+      const task = getPinnedTimerTask(project);
+      const display = formatTimer(getCurrentProjectTotalSeconds(project));
+      // Stop timer on server first if running
+      const running = getRunningLog(project);
+      if (running) {
+        try {
+          const stopped = await sendTimerAction(project.id, 'stop', null);
+          patchProjectInState(stopped);
+        } catch (_) {}
+      }
+      const day = new Date().toLocaleDateString('es-ES');
+      const entries = getSavedTimerHistory(project.id);
+      entries.push({
+        time: display,
+        day,
+        saved_by: resolveCurrentUserName(project),
+        task_name: String(task?.texto || ''),
+      });
+      setSavedTimerHistory(entries, project.id);
+      setPinnedTimerContext(null, null);
+      clearGlobalTimerState();
+      await loadData();
+      syncPinnedTimerHud();
+      if (window.showNotification) window.showNotification('Tiempo guardado', 'success');
+    }
+
+    async function deletePinnedTimerEntry() {
+      const project = getPinnedTimerProject();
+      if (!project?.id) return;
+      try {
+        const response = await fetch('/api/proyectos/timer/eliminar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({ id: String(project.id) }),
+        });
+        const json = await response.json().catch(() => ({}));
+        if (json.item) {
+          patchProjectInState(json.item);
+          setTimerResetBase(getProjectGrossSeconds(json.item), project.id);
+        }
+        closeTimerFullscreen();
+        setPinnedTimerContext(null, null);
+        clearGlobalTimerState();
+        await loadData();
+        syncPinnedTimerHud();
+        if (window.showNotification) window.showNotification('Registro de tiempo eliminado', 'success');
+      } catch (error) {
+        console.error(error);
+        if (window.showNotification) window.showNotification('No se pudo eliminar el registro', 'error');
+      }
+    }
+
+    async function toggleTaskTimer(projectId, taskId) {
+      const runningProject = findRunningProject();
+      const runningLog = runningProject ? getRunningLog(runningProject) : null;
+      const sameTaskRunning = !!runningProject
+        && String(runningProject.id) === String(projectId)
+        && String(runningLog?.task_id || '') === String(taskId || '');
+      const switchingTask = !!runningProject && !!runningLog && !sameTaskRunning;
+
+      if (switchingTask) {
+        const accepted = await askConfirmTimerSwitch();
+        if (!accepted) return;
+      }
+
+      try {
+        if (switchingTask) {
+          const removed = await removeTimerLogEntry(runningProject.id);
+          patchProjectInState(removed);
+          setTimerResetBase(getProjectGrossSeconds(removed), runningProject.id);
+        } else if (runningProject && runningLog) {
+          const stopped = await sendTimerAction(runningProject.id, 'stop', null);
+          patchProjectInState(stopped);
+        }
+
+        if (!sameTaskRunning) {
+          const started = await sendTimerAction(projectId, 'start', taskId || null);
+          patchProjectInState(started);
+          setTimerResetBase(getProjectGrossSeconds(started), projectId);
+          setPinnedTimerContext(projectId, taskId || null);
+        } else {
+          setPinnedTimerContext(projectId, taskId || null);
+        }
+
+        await loadData();
+        if (currentProjectId) {
+          const modalProject = projects.find((entry) => String(entry.id) === String(currentProjectId));
+          if (modalProject) {
+            renderModalTasks(modalProject.tareas || []);
+            updateModalTimer(modalProject);
+            if (currentTaskId) {
+              const freshTask = (modalProject.tareas || []).find((entry) => String(entry.id) === String(currentTaskId));
+              if (freshTask) renderTaskDetail(freshTask, { preserveState: true });
+            }
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    function askConfirmTimerSwitch() {
+      const modal = document.getElementById('timerSwitchConfirmModal');
+      if (!modal) {
+        return Promise.resolve(confirm('¿Estás seguro de cambiar de tarea? Se eliminará el tiempo actual e iniciarás otra tarea.'));
+      }
+      modal.classList.remove('hidden');
+      return new Promise((resolve) => {
+        pendingTimerSwitchResolver = resolve;
+      });
+    }
+
+    function closeTimerSwitchConfirm(accepted) {
+      const modal = document.getElementById('timerSwitchConfirmModal');
+      if (modal) modal.classList.add('hidden');
+      if (pendingTimerSwitchResolver) pendingTimerSwitchResolver(!!accepted);
+      pendingTimerSwitchResolver = null;
+    }
+
+    async function removeTimerLogEntry(projectId) {
+      const response = await fetch('/api/proyectos/timer/eliminar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': window.csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ id: String(projectId) }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!json?.item) throw new Error('timer_delete_failed');
+      return json.item;
+    }
+
+    function openTimerFullscreen() {
+      const panel = document.getElementById('timerFullscreenPanel');
+      if (!panel) return;
+      if (panel.requestFullscreen) {
+        panel.requestFullscreen().catch(() => {});
+      }
+    }
+
+    function closeTimerFullscreen() {
+      const panel = document.getElementById('timerFullscreenPanel');
+      panel.classList.add('hidden');
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    async function ensureNativePipSource() {
+      if (pipStreamReady) return true;
+      const canvas = document.getElementById('timerPipCanvas');
+      const video = document.getElementById('timerPipVideo');
+      if (!canvas || !video || !canvas.captureStream) return false;
+      const stream = canvas.captureStream(30);
+      pipVideoTrack = stream.getVideoTracks ? (stream.getVideoTracks()[0] || null) : null;
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute('webkit-playsinline', 'true');
+      video.autoplay = true;
+      drawTimerPipCanvas(getPipLiveDisplayValue());
+      try {
+        await video.play();
+      } catch (e) {}
+      pipStreamReady = true;
+      return true;
+    }
+
+    function getPipLiveDisplayValue() {
+      const pinnedProject = getPinnedTimerProject();
+      const fallbackProject = currentProjectId
+        ? projects.find((x) => String(x.id) === String(currentProjectId))
+        : null;
+      const project = pinnedProject || fallbackProject;
+      if (!project) return pipLastDisplayValue;
+      const value = formatTimer(getCurrentProjectTotalSeconds(project));
+      pipLastDisplayValue = value;
+      return value;
+    }
+
+    function startPipRenderLoop() {
+      if (pipRenderInterval) clearInterval(pipRenderInterval);
+      pipRenderInterval = setInterval(() => {
+        const val = getPipLiveDisplayValue();
+        drawTimerPipCanvas(val);
+      }, 250);
+    }
+
+    function setPipSourceVisible(show) {
+      const video = document.getElementById('timerPipVideo');
+      if (!video) return;
+      if (show) {
+        // Safari suele devolver negro si el video fuente está totalmente oculto.
+        video.style.position = 'fixed';
+        video.style.top = '0';
+        video.style.left = '0';
+        video.style.width = '2px';
+        video.style.height = '2px';
+        video.style.opacity = '0.01';
+        video.style.pointerEvents = 'none';
+        video.style.zIndex = '1';
+        video.style.transform = 'translateZ(0)';
+        video.style.background = '#000';
+      } else {
+        video.style.position = 'fixed';
+        video.style.top = '-9999px';
+        video.style.left = '-9999px';
+        video.style.width = '1px';
+        video.style.height = '1px';
+        video.style.opacity = '0';
+        video.style.pointerEvents = 'none';
+        video.style.zIndex = '-1';
+        video.style.transform = '';
+        video.style.background = 'transparent';
+      }
+    }
+
+    function drawTimerPipCanvas(timeValue) {
+      const canvas = document.getElementById('timerPipCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const p = getPinnedTimerProject() || projects.find((x) => String(x.id) === String(currentProjectId)) || {};
+      const title = p.titulo || 'Proyecto';
+      const client = p.cliente || 'Sin Cliente';
+      const safeTimeValue = String(timeValue || pipLastDisplayValue || '00:00:00');
+      const left = 34;
+      const maxTextWidth = canvas.width - (left * 2);
+      const fitText = (text, maxWidth, font) => {
+        ctx.font = font;
+        if (ctx.measureText(text).width <= maxWidth) return text;
+        let safe = String(text || '');
+        while (safe.length > 1 && ctx.measureText(`${safe}…`).width > maxWidth) {
+          safe = safe.slice(0, -1);
+        }
+        return `${safe}…`;
+      };
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 24px system-ui';
+      ctx.fillText(fitText(title, maxTextWidth, 'bold 24px system-ui'), left, 142);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '18px system-ui';
+      ctx.fillText(fitText(client, maxTextWidth, '18px system-ui'), left, 172);
+      ctx.fillStyle = '#bef264';
+      ctx.font = 'bold 86px monospace';
+      ctx.fillText(safeTimeValue, left, 330);
+      if (pipVideoTrack && typeof pipVideoTrack.requestFrame === 'function') {
+        pipVideoTrack.requestFrame();
+      }
+    }
+
+    function setPipButtonState(active) {
+      const btn = document.getElementById('timerMiniBtn');
+      if (!btn) return;
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.classList.toggle('border-lime-300', active);
+      btn.classList.toggle('text-lime-600', active);
+      btn.classList.toggle('bg-lime-50', active);
+      btn.classList.toggle('border-slate-200', !active);
+      btn.classList.toggle('text-slate-500', !active);
+      btn.classList.toggle('bg-transparent', !active);
+    }
+
+    function syncPipTimerActionButton(isRunning) {
+      const pipToggleBtn = document.getElementById('timerPipToggleBtn');
+      if (!pipToggleBtn) return;
+      if (isRunning) {
+        pipToggleBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+        pipToggleBtn.classList.add('text-rose-300');
+        pipToggleBtn.classList.remove('text-lime-300');
+      } else {
+        pipToggleBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+        pipToggleBtn.classList.add('text-lime-300');
+        pipToggleBtn.classList.remove('text-rose-300');
+      }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.playbackState = isRunning ? 'playing' : 'paused';
+        } catch (_) {}
+      }
+    }
+
+    async function setCurrentProjectTimerRunning(shouldRun) {
+      const resolvedProject = getPinnedTimerProject()
+        || (currentProjectId ? projects.find((x) => String(x.id) === String(currentProjectId)) : null);
+      if (!resolvedProject?.id) return;
+      currentProjectId = resolvedProject.id;
+      const p = resolvedProject;
+      if (!p) return;
+      const logs = p.time_logs || [];
+      const isRunning = logs.length > 0 && !logs[logs.length - 1].end;
+      if (isRunning === shouldRun) return;
+
+      if (shouldRun) {
+        const resumeTaskId = pinnedTimerTaskId || String(logs[logs.length - 1]?.task_id || '') || null;
+        const taskId = resumeTaskId || await openTimerTaskModal(currentProjectId);
+        if (typeof taskId === 'undefined') return;
+        const item = await sendTimerAction(currentProjectId, 'start', taskId || null);
+        p.time_logs = item.time_logs || [];
+        p.tareas = item.tareas || p.tareas || [];
+        setPinnedTimerContext(currentProjectId, taskId || null);
+        updateModalTimer(p);
+        renderModalTasks(p.tareas || []);
+        syncPinnedTimerHud();
+        return;
+      }
+
+      const item = await sendTimerAction(currentProjectId, 'stop', null);
+      p.time_logs = item.time_logs || [];
+      p.tareas = item.tareas || p.tareas || [];
+      setPinnedTimerContext(currentProjectId, null);
+      updateModalTimer(p);
+      renderModalTasks(p.tareas || []);
+      syncPinnedTimerHud();
+    }
+
+    async function toggleTimerMiniPip() {
+      const video = document.getElementById('timerPipVideo');
+
+      if (video && document.pictureInPictureElement === video && document.exitPictureInPicture) {
+        suppressPipPlaybackSync = true;
+        await document.exitPictureInPicture();
+        setTimeout(() => { suppressPipPlaybackSync = false; }, 250);
+        setPipButtonState(false);
+        return;
+      }
+
+      if (video && video.webkitPresentationMode === 'picture-in-picture') {
+        suppressPipPlaybackSync = true;
+        video.webkitSetPresentationMode('inline');
+        setTimeout(() => { suppressPipPlaybackSync = false; }, 250);
+        setPipButtonState(false);
+        return;
+      }
+
+      const ready = await ensureNativePipSource();
+      if (ready && video && video.requestPictureInPicture) {
+        try {
+          setPipSourceVisible(true);
+          await video.play().catch(() => {});
+          startPipRenderLoop();
+          await video.requestPictureInPicture();
+          setPipButtonState(true);
+          if ('mediaSession' in navigator) {
+            const _p = getPinnedTimerProject();
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: getPinnedTimerTask(_p)?.texto || 'Temporizador activo',
+              artist: _p?.titulo || 'Proyecto',
+              album: 'InFocus CRM',
+            });
+            navigator.mediaSession.playbackState = getRunningLog(_p || {}) ? 'playing' : 'paused';
+            navigator.mediaSession.setActionHandler('play', () => { togglePinnedTimerRun(); });
+            navigator.mediaSession.setActionHandler('pause', () => { togglePinnedTimerRun(); });
+            navigator.mediaSession.setActionHandler('previoustrack', () => { window.focus(); });
+          }
+          return;
+        } catch (e) {}
+      }
+
+      if (ready && video && video.webkitSupportsPresentationMode && video.webkitSetPresentationMode) {
+        try {
+          setPipSourceVisible(true);
+          await video.play().catch(() => {});
+          if (video.webkitSupportsPresentationMode('picture-in-picture')) {
+            startPipRenderLoop();
+            video.webkitSetPresentationMode('picture-in-picture');
+            setPipButtonState(true);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // fallback interno
+      const el = document.getElementById('timerMiniPip');
+      const isHidden = el.classList.contains('hidden');
+      el.classList.toggle('hidden');
+      setPipButtonState(isHidden);
+    }
+
+    function initModalPrioritySelector() {
+      document.querySelectorAll('#modalPrioritySelector .priority-chip').forEach(btn => {
+        btn.addEventListener('click', () => setModalPriority(btn.getAttribute('data-priority'), true));
+      });
+    }
+
+    function ensureFlatpickrAssets(callback) {
+      const runWithLocale = () => {
+        const done = () => {
+          if (window.flatpickr?.l10ns?.es) {
+            window.flatpickr.localize(window.flatpickr.l10ns.es);
+          }
+          callback();
+        };
+
+        if (window.flatpickr?.l10ns?.es) {
+          done();
+          return;
+        }
+
+        if (!document.getElementById('flatpickr-locale-es')) {
+          const localeScript = document.createElement('script');
+          localeScript.id = 'flatpickr-locale-es';
+          localeScript.src = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js';
+          localeScript.onload = done;
+          document.body.appendChild(localeScript);
+          return;
+        }
+
+        const waitLocale = () => {
+          if (window.flatpickr?.l10ns?.es) {
+            done();
+            return;
+          }
+          setTimeout(waitLocale, 50);
+        };
+        waitLocale();
+      };
+
+      if (window.flatpickr) {
+        runWithLocale();
+        return;
+      }
+
+      if (!document.getElementById('flatpickr-css')) {
+        const link = document.createElement('link');
+        link.id = 'flatpickr-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+        document.head.appendChild(link);
+      }
+
+      if (document.getElementById('flatpickr-js')) {
+        const waitFlatpickr = () => {
+          if (window.flatpickr) {
+            runWithLocale();
+            return;
+          }
+          setTimeout(waitFlatpickr, 50);
+        };
+        waitFlatpickr();
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'flatpickr-js';
+      script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+      script.onload = runWithLocale;
+      document.body.appendChild(script);
+    }
+
+    function initModalDuePicker() {
+      ensureFlatpickrAssets(() => {
+        if (modalDuePicker) return;
+        const projectModalHost = document.getElementById('projectModal');
+        modalDuePicker = window.flatpickr('#modalDueDate', {
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altInputClass: 'block w-full h-12 rounded-xl border border-slate-200 pl-11 text-base shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white cursor-pointer',
+          altFormat: 'd M, Y',
+          disableMobile: true,
+          locale: 'es',
+          appendTo: projectModalHost || undefined,
+          clickOpens: true,
+          onOpen: function(_, __, instance) {
+            markCalendarInteraction(1000);
+            if (instance?.calendarContainer) {
+              instance.calendarContainer.style.zIndex = '2147483000';
+              instance.calendarContainer.addEventListener('click', (ev) => ev.stopPropagation());
+              instance.calendarContainer.addEventListener('mousedown', (ev) => ev.stopPropagation());
+              instance.calendarContainer.addEventListener('mouseup', (ev) => ev.stopPropagation());
+              instance.calendarContainer.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+              instance.calendarContainer.addEventListener('pointerup', (ev) => ev.stopPropagation());
+              instance.calendarContainer.addEventListener('touchstart', (ev) => ev.stopPropagation(), { passive: true });
+              instance.calendarContainer.addEventListener('touchend', (ev) => ev.stopPropagation(), { passive: true });
+            }
+          },
+          onChange: function(selectedDates, dateStr) {
+            markCalendarInteraction();
+            updateProjectField('vencimiento', dateStr || null);
+          },
+          onClose: function() {
+            markCalendarInteraction();
+          }
+        });
+      });
+    }
+
+    function setModalDueDate(value) {
+      if (modalDuePicker) {
+        modalDuePicker.setDate(value || null, false);
+      } else {
+        document.getElementById('modalDueDate').value = value || '';
+      }
+    }
+
+    function initNewProjectDatePickers() {
+      ensureFlatpickrAssets(() => {
+        const newProjectModalHost = document.getElementById('newProjectModal');
+        if (!newProjectStartPicker) {
+          newProjectStartPicker = window.flatpickr('#newProjectStart', {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altInputClass: 'w-full h-11 rounded-xl border border-slate-200 pl-11 text-base font-medium text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white cursor-pointer',
+            altFormat: 'd M, Y',
+            disableMobile: true,
+            locale: 'es',
+            appendTo: newProjectModalHost || undefined,
+            clickOpens: true,
+            onOpen: function(_, __, instance) {
+              markCalendarInteraction();
+              if (instance?.calendarContainer) {
+                instance.calendarContainer.style.zIndex = '2147483000';
+                instance.calendarContainer.addEventListener('click', (ev) => ev.stopPropagation());
+                instance.calendarContainer.addEventListener('mousedown', (ev) => ev.stopPropagation());
+                instance.calendarContainer.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+              }
+            },
+            onReady: function(_, __, instance) {
+              if (instance.altInput) {
+                instance.altInput.addEventListener('click', () => instance.open());
+                instance.altInput.addEventListener('focus', () => instance.open());
+              }
+            },
+            onChange: function() {
+              markCalendarInteraction();
+            },
+            onClose: function() {
+              markCalendarInteraction();
+            }
+          });
+        }
+        if (!newProjectDuePicker) {
+          newProjectDuePicker = window.flatpickr('#newProjectDue', {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altInputClass: 'w-full h-11 rounded-xl border border-slate-200 pl-11 text-base font-medium text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500 bg-white cursor-pointer',
+            altFormat: 'd M, Y',
+            disableMobile: true,
+            locale: 'es',
+            appendTo: newProjectModalHost || undefined,
+            clickOpens: true,
+            onOpen: function(_, __, instance) {
+              markCalendarInteraction();
+              if (instance?.calendarContainer) {
+                instance.calendarContainer.style.zIndex = '2147483000';
+                instance.calendarContainer.addEventListener('click', (ev) => ev.stopPropagation());
+                instance.calendarContainer.addEventListener('mousedown', (ev) => ev.stopPropagation());
+                instance.calendarContainer.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+              }
+            },
+            onReady: function(_, __, instance) {
+              if (instance.altInput) {
+                instance.altInput.addEventListener('click', () => instance.open());
+                instance.altInput.addEventListener('focus', () => instance.open());
+              }
+            },
+            onChange: function() {
+              markCalendarInteraction();
+            },
+            onClose: function() {
+              markCalendarInteraction();
+            }
+          });
+        }
+      });
+    }
+
+    function openNewProjectDatePicker(kind) {
+      initNewProjectDatePickers();
+      const tryOpenPicker = (attempt = 0) => {
+        const picker = kind === 'due' ? newProjectDuePicker : newProjectStartPicker;
+        if (picker) {
+          picker.open();
+          return;
+        }
+        if (attempt < 20) {
+          setTimeout(() => tryOpenPicker(attempt + 1), 25);
+        }
+      };
+      tryOpenPicker();
+    }
+    
+    function refreshProjectDescriptionClamp() {
+      const shell = document.getElementById('projectDescShell');
+      const textarea = document.getElementById('modalDesc');
+      const toggleText = document.getElementById('projectDescToggleText');
+      const toggleIcon = document.getElementById('projectDescToggleIcon');
+      if (!shell || !textarea) return;
+
+      const collapsedMaxHeight = 190;
+      textarea.style.height = 'auto';
+      const fullHeight = Math.max(textarea.scrollHeight, 152);
+      const hasOverflow = fullHeight > collapsedMaxHeight + 8;
+
+      shell.classList.toggle('has-overflow', hasOverflow);
+      shell.classList.toggle('is-collapsed', hasOverflow && !projectDescriptionExpanded);
+
+      if (hasOverflow && !projectDescriptionExpanded) {
+        textarea.style.height = `${collapsedMaxHeight}px`;
+      } else {
+        textarea.style.height = `${fullHeight}px`;
+      }
+
+      if (toggleText) {
+        toggleText.textContent = projectDescriptionExpanded ? 'Mostrar menos' : 'Mostrar más';
+      }
+      if (toggleIcon) {
+        toggleIcon.style.transform = projectDescriptionExpanded ? 'rotate(180deg)' : '';
+      }
+    }
+
+    function toggleProjectDescription() {
+      projectDescriptionExpanded = true;
+      document.getElementById('projectDescShell')?.classList.add('toggle-dismissed');
+      refreshProjectDescriptionClamp();
+    }
+
+    function setDescriptionAutosaveStatus(state) {
+      const status = document.getElementById('modalDescAutosaveStatus');
+      if (!status) return;
+      status.classList.remove('text-slate-400', 'text-amber-600', 'text-lime-600', 'text-rose-600');
+      if (state === 'saving') {
+        status.textContent = 'Guardando...';
+        status.classList.add('text-amber-600');
+      } else if (state === 'saved') {
+        status.textContent = 'Guardado';
+        status.classList.add('text-lime-600');
+      } else if (state === 'error') {
+        status.textContent = 'No se pudo guardar';
+        status.classList.add('text-rose-600');
+      } else {
+        status.textContent = 'Autoguardado';
+        status.classList.add('text-slate-400');
+      }
+    }
+
+    function queueDescriptionAutosave() {
+      if (projectModalReadOnly || !currentProjectId) return;
+      const desc = document.getElementById('modalDesc')?.value || '';
+      const projectId = String(currentProjectId);
+      pendingProjectDescriptions[projectId] = desc;
+      const p = projects.find(x => String(x.id) === projectId);
+      if (p) p.descripcion = desc;
+      refreshProjectDescriptionClamp();
+      setDescriptionAutosaveStatus('saving');
+      clearTimeout(modalDescAutosaveTimer);
+      modalDescAutosaveTimer = setTimeout(() => saveDescriptionAutosave(projectId, desc), 650);
+    }
+
+    async function saveDescriptionAutosave(projectId, desc) {
+      if (!projectId) return;
+      try {
+        await updateProjectField('descripcion', desc, projectId);
+        if (pendingProjectDescriptions[projectId] === desc) {
+          delete pendingProjectDescriptions[projectId];
+        }
+        if (String(currentProjectId || '') === projectId) {
+          setDescriptionAutosaveStatus('saved');
+        }
+      } catch (error) {
+        console.error('Error guardando descripcion:', error);
+        if (String(currentProjectId || '') === projectId) {
+          setDescriptionAutosaveStatus('error');
+        }
+      }
+    }
+
+    // --- Tasks ---
+    function formatTaskInvested(totalSeconds) {
+        const sec = Math.max(0, Number(totalSeconds) || 0);
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600).toString().padStart(2, '0');
+      const m = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+      return `${d}d:${h}h:${m}m`;
+    }
+
+    function normalizeTaskPriority(value) {
+      const v = String(value || '').trim().toLowerCase();
+      if (v === 'vencido' || v === 'vencida' || v === 'overdue') return 'Vencido';
+      if (v === 'urgente' || v === 'alta') return 'Urgente';
+      if (v === 'atención' || v === 'atencion' || v === 'media') return 'Atención';
+      return 'Con calma';
+    }
+
+    function getEffectiveTaskPriority(task, project = null) {
+      const due = getTaskDueDate(task, project);
+      if (due && !task?.done) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+        const diffDays = Math.floor((dueDay - today) / 86400000);
+        if (diffDays < 0) return 'Vencido';
+        if (diffDays <= 7) return 'Atención';
+      }
+      return normalizeTaskPriority(task?.priority || project?.prioridad || 'Atención');
+    }
+
+    function getEffectiveProjectPriority(project) {
+      const due = project?.vencimiento ? new Date(`${project.vencimiento}T12:00:00`) : null;
+      if (due && !Number.isNaN(due.getTime())) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+        const diffDays = Math.floor((dueDay - today) / 86400000);
+        if (diffDays < 0) return 'Vencido';
+        if (diffDays <= 7) return 'Atención';
+      }
+      return normalizePriority(project?.prioridad || 'Atención');
+    }
+
+    function getTaskPriorityStyles(value) {
+      const level = normalizeTaskPriority(value);
+      if (level === 'Urgente') {
+        return {
+          bar: 'bg-rose-500',
+          chip: 'bg-rose-50 text-rose-700 border-rose-200',
+        };
+      }
+      if (level === 'Vencido') {
+        return {
+          bar: 'bg-slate-700',
+          chip: 'bg-slate-100 text-slate-700 border-slate-300',
+        };
+      }
+      if (level === 'Atención') {
+        return {
+          bar: 'bg-amber-500',
+          chip: 'bg-amber-50 text-amber-700 border-amber-200',
+        };
+      }
+      return {
+        bar: 'bg-emerald-500',
+        chip: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      };
+    }
+
+    function getTaskPriorityIcon(value, className = 'h-3.5 w-3.5 shrink-0 self-center') {
+      const level = normalizeTaskPriority(value);
+      if (level === 'Urgente') {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`;
+      }
+      if (level === 'Vencido') {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
+      }
+      if (level === 'Atención') {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>`;
+      }
+      return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>`;
+    }
+
+    function getTaskPriorityBadge(value, size = 'sm') {
+      const level = normalizeTaskPriority(value);
+      const textSize = size === 'xs' ? 'text-[10px] leading-none' : 'text-xs';
+      const iconSize = size === 'xs' ? 'h-3 w-3' : 'h-3.5 w-3.5';
+      return `<span class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-bold ${textSize} ${getTaskPriorityStyles(level).chip}">${getTaskPriorityIcon(level, `${iconSize} shrink-0 self-center`)}<span>${level}</span></span>`;
+    }
+
+    function getProjectStageIcon(stage, className = 'h-3.5 w-3.5 shrink-0') {
+      const value = String(stage || '').trim().toLowerCase();
+      if (/complet|cerrad|final|entreg/.test(value)) {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+      }
+      if (/revisi|review|valid/.test(value)) {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>`;
+      }
+      if (/progreso|desarrollo|curso|activo/.test(value)) {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/></svg>`;
+      }
+      if (/pausa|espera|hold/.test(value)) {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M10 15V9"/><path d="M14 15V9"/></svg>`;
+      }
+      if (/cancel|perdid|rechaz/.test(value)) {
+        return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
+      }
+      return `<svg class="${className}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4Z"/></svg>`;
+    }
+
+    function getProjectStageBadge(stage, compact = false) {
+      const label = escapeHtml(stage || 'Sin etapa');
+      const size = compact ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
+      return `<span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 ${size} font-extrabold text-slate-600">${getProjectStageIcon(stage)}<span>${label}</span></span>`;
+    }
+
+    function getProjectStageCircle(stage, className = 'h-8 w-8') {
+      return `<span class="inline-flex ${className} shrink-0 items-center justify-center rounded-full border border-lime-200 bg-lime-50 text-slate-900 shadow-[0_6px_18px_-12px_rgba(132,204,22,0.75)]" title="${escapeHtml(stage || 'Sin etapa')}">${getProjectStageIcon(stage, 'h-4 w-4 shrink-0')}</span>`;
+    }
+
+    function refreshProjectStageUI() {
+      const select = document.getElementById('modalStage');
+      const stage = select?.value || 'Inicio';
+      if (select?._appSelectTrigger) {
+        const trigger = select._appSelectTrigger;
+        const current = select.options[select.selectedIndex] || select.options[0];
+        if (select._appSelectLabel) select._appSelectLabel.textContent = current ? current.textContent.trim() : stage;
+        trigger.classList.remove('has-leading-icon');
+      }
+    }
+
+    function refreshTaskModalPriorityUI() {
+      const select = document.getElementById('taskModalPriority');
+      const iconWrap = document.getElementById('taskModalPriorityIcon');
+      const level = normalizeTaskPriority(select?.value || 'Atención');
+      const styles = getTaskPriorityStyles(level);
+      const textClass = (styles.chip.match(/text-\S+/) || ['text-amber-700'])[0];
+      if (select) {
+        select._appSelectLabelHtml = (current) => {
+          const currentLevel = normalizeTaskPriority(current?.value || current?.textContent || level);
+          return `<span class="inline-flex min-w-0 items-center gap-1.5">${getTaskPriorityIcon(currentLevel, 'h-3.5 w-3.5 shrink-0 self-center')}<span class="truncate">${escapeHtml(currentLevel)}</span></span>`;
+        };
+        select._appSelectOptionHtml = (option) => {
+          const optionLevel = normalizeTaskPriority(option.value || option.label || level);
+          const optionTextClass = (getTaskPriorityStyles(optionLevel).chip.match(/text-\S+/) || ['text-slate-700'])[0];
+          return `<span class="inline-flex min-w-0 items-center gap-2 ${optionTextClass}">${getTaskPriorityIcon(optionLevel, 'h-4 w-4 shrink-0 self-center')}<span class="truncate">${escapeHtml(optionLevel)}</span></span>`;
+        };
+        const trigger = select._appSelectTrigger || null;
+        if (trigger) {
+          const isOpen = trigger.classList.contains('is-open');
+          const isDisabled = select.disabled;
+          const current = select.options[select.selectedIndex] || select.options[0];
+          select.classList.add('app-native-select');
+          if (select._appSelectLabel) select._appSelectLabel.innerHTML = select._appSelectLabelHtml(current);
+          trigger.className = `app-select-trigger rounded-full border px-3 py-1.5 text-sm font-extrabold shadow-sm ${styles.chip}`;
+          trigger.classList.toggle('is-open', isOpen);
+          trigger.classList.toggle('is-disabled', isDisabled);
+          trigger.disabled = isDisabled;
+        }
+      }
+      if (iconWrap) {
+        const isEnhanced = !!select?._appSelectTrigger;
+        iconWrap.className = `pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${textClass} ${isEnhanced ? 'hidden' : ''}`;
+        iconWrap.innerHTML = getTaskPriorityIcon(level, 'w-4 h-4 shrink-0 self-center');
+      }
+    }
+
+    function formatTaskDateRange(task) {
+      const start = task?.start_date || null;
+      const end = task?.end_date || task?.due_date || null;
+      if (!start && !end) return 'Sin fecha';
+      if (start && end) {
+        const s = new Date(start + 'T12:00:00').toLocaleDateString('es-ES');
+        const e = new Date(end + 'T12:00:00').toLocaleDateString('es-ES');
+        return `${s} - ${e}`;
+      }
+      const d = new Date((start || end) + 'T12:00:00').toLocaleDateString('es-ES');
+      return d;
+    }
+
+    function getTaskDueDate(task, project) {
+      const raw = task?.end_date || task?.due_date || project?.vencimiento || '';
+      if (!raw) return null;
+      const date = new Date(`${raw}T12:00:00`);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function taskMatchesGlobalFilter(task, project) {
+      const due = getTaskDueDate(task, project);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const in7 = new Date(today);
+      in7.setDate(in7.getDate() + 7);
+      const level = getEffectiveTaskPriority(task, project);
+
+      if (globalTaskFilter === 'urgent') return level === 'Urgente';
+      if (globalTaskFilter === 'attention') return level === 'Atención';
+      if (globalTaskFilter === 'calm') return level === 'Con calma';
+      if (globalTaskFilter === 'progress') return level === 'Atención' || level === 'Con calma';
+      if (globalTaskFilter === 'inprogress') return !task?.done && Number(task?.total_seconds || 0) > 0;
+      if (globalTaskFilter === 'pending') return !task?.done;
+      if (globalTaskFilter === 'completed') return !!task?.done;
+      if (globalTaskFilter === 'overdue') return !!due && !task?.done && due < today;
+      if (globalTaskFilter === 'upcoming') return !!due && !task?.done && due >= today && due <= in7;
+      return true;
+    }
+
+    function openProjectTask(projectId, taskId) {
+      if (!projectId || !taskId) return;
+      currentProjectId = projectId;
+      currentTaskId = null;
+      currentTaskModalEditing = false;
+      currentTaskEditingNoteId = null;
+      document.getElementById('projectModal')?.classList.add('hidden');
+      openTaskModal(taskId);
+    }
+
+    function getGlobalTasksProjectPage(projectId, totalItems = 0) {
+      const totalPages = Math.max(1, Math.ceil(Math.max(0, Number(totalItems) || 0) / GLOBAL_TASKS_PER_PROJECT_PAGE));
+      const currentPage = Math.max(1, Math.min(totalPages, Number(globalTasksProjectPages[String(projectId)] || 1)));
+      globalTasksProjectPages[String(projectId)] = currentPage;
+      return currentPage;
+    }
+
+    function setGlobalTasksProjectPage(projectId, page) {
+      const safeProjectId = String(projectId || '').trim();
+      if (!safeProjectId) return;
+      globalTasksProjectPages[safeProjectId] = Math.max(1, Number(page) || 1);
+      renderGlobalTasksView(projects);
+    }
+
+    function loadGlobalTasksCollapsedProjects() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(GLOBAL_TASKS_COLLAPSED_KEY) || '[]');
+        if (Array.isArray(parsed)) {
+          parsed.forEach((id) => {
+            const safeId = String(id || '').trim();
+            if (safeId) globalTasksCollapsedProjects.add(safeId);
+          });
+        }
+      } catch (_) {}
+    }
+
+    function persistGlobalTasksCollapsedProjects() {
+      try {
+        localStorage.setItem(GLOBAL_TASKS_COLLAPSED_KEY, JSON.stringify(Array.from(globalTasksCollapsedProjects)));
+      } catch (_) {}
+    }
+
+    function toggleGlobalTasksProjectCollapse(projectId) {
+      const safeProjectId = String(projectId || '').trim();
+      if (!safeProjectId) return;
+      if (globalTasksCollapsedProjects.has(safeProjectId)) {
+        globalTasksCollapsedProjects.delete(safeProjectId);
+      } else {
+        globalTasksCollapsedProjects.add(safeProjectId);
+      }
+      persistGlobalTasksCollapsedProjects();
+      renderGlobalTasksView(projects);
+    }
+
+    function setGlobalTasksClientPage(page) {
+      globalTasksClientPage = Math.max(1, Number(page) || 1);
+      renderGlobalTasksView(projects);
+    }
+
+    function setGlobalTaskSearch(query) {
+      globalTaskSearchQuery = String(query || '').trim().toLowerCase();
+      globalTasksClientPage = 1;
+      Object.keys(globalTasksProjectPages).forEach((key) => {
+        globalTasksProjectPages[key] = 1;
+      });
+      renderGlobalTasksView(projects);
+      renderQuickActionsStatus('tareas');
+    }
+
+    function setListProjectSearch(query) {
+      listProjectSearchQuery = String(query || '').trim().toLowerCase();
+      renderProjectListView(projects);
+      renderQuickActionsStatus('lista');
+    }
+
+    function taskMatchesGlobalSearch(task, project) {
+      const query = globalTaskSearchQuery.trim();
+      if (!query) return true;
+      const haystack = [
+        String(task?.texto || ''),
+        String(project?.titulo || ''),
+        String(project?.cliente || ''),
+        String(getEffectiveTaskPriority(task, project)),
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    }
+
+    function projectMatchesGlobalSearch(project) {
+      const query = globalTaskSearchQuery.trim();
+      if (!query) return true;
+      const haystack = [
+        String(project?.titulo || ''),
+        String(project?.cliente || ''),
+        String(project?.etapa || ''),
+      ].join(' ').toLowerCase();
+      return haystack.includes(query);
+    }
+
+    async function openProjectAddTask(projectId) {
+      if (!projectId) return;
+      await openProject(projectId);
+      window.requestAnimationFrame(() => {
+        const input = document.getElementById('newTaskInput');
+        if (!input) return;
+        input.focus();
+        input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    }
+
+    window.setGlobalTasksProjectPage = setGlobalTasksProjectPage;
+    window.setGlobalTasksClientPage = setGlobalTasksClientPage;
+    window.toggleGlobalTasksProjectCollapse = toggleGlobalTasksProjectCollapse;
+
+    function renderGlobalTasksView(list) {
+      if (!globalTasksBoard) return;
+      const filteredProjects = [];
+
+      list.forEach((p) => {
+        const tasks = Array.isArray(p.tareas) ? p.tareas : [];
+        const filtered = tasks.filter((t) => taskMatchesGlobalFilter(t, p) && taskMatchesGlobalSearch(t, p));
+        const projectWithoutTasks = tasks.length === 0;
+        const includeWithoutTasks = projectWithoutTasks
+          && globalTaskFilter === 'all'
+          && projectMatchesGlobalSearch(p);
+        if (!filtered.length && !includeWithoutTasks) return;
+        filteredProjects.push({ project: p, filteredTasks: filtered });
+      });
+
+      if (!filteredProjects.length) {
+        globalTasksBoard.innerHTML = `<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+          <div class="text-sm font-semibold text-slate-600">No hay tareas para este filtro.</div>
+          <div class="mt-1 text-xs text-slate-500">Cambia los filtros o crea un proyecto para comenzar.</div>
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onclick="resetQuickFilters('tareas')" class="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100">Limpiar filtros</button>
+            <button type="button" onclick="openNewProjectModal()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>Crear proyecto</span>
+            </button>
+          </div>
+        </div>`;
+        renderQuickActionsStatus('tareas');
+        refreshProjectsSimpleModeUI();
+        return;
+      }
+
+      const totalClientPages = Math.max(1, Math.ceil(filteredProjects.length / GLOBAL_TASKS_CLIENTS_PER_PAGE));
+      globalTasksClientPage = Math.max(1, Math.min(totalClientPages, globalTasksClientPage));
+      const clientStart = (globalTasksClientPage - 1) * GLOBAL_TASKS_CLIENTS_PER_PAGE;
+      const visibleProjects = filteredProjects.slice(clientStart, clientStart + GLOBAL_TASKS_CLIENTS_PER_PAGE);
+
+      const blocks = visibleProjects.map(({ project: p, filteredTasks }) => {
+        const taskStats = getProjectTaskStats(p);
+        const safeProjectId = String(p.id || '').replace(/'/g, "\\'");
+        const isCollapsed = globalTasksCollapsedProjects.has(String(p.id || ''));
+        const projectPage = getGlobalTasksProjectPage(p.id, filteredTasks.length);
+        const totalTaskPages = Math.max(1, Math.ceil(filteredTasks.length / GLOBAL_TASKS_PER_PROJECT_PAGE));
+        const taskStart = (projectPage - 1) * GLOBAL_TASKS_PER_PROJECT_PAGE;
+        const visibleTasks = filteredTasks.slice(taskStart, taskStart + GLOBAL_TASKS_PER_PROJECT_PAGE);
+
+        const taskItems = visibleTasks.map((t) => {
+          const level = getEffectiveTaskPriority(t, p);
+          const due = getTaskDueDate(t, p);
+          const dueLabel = due ? due.toLocaleDateString('es-ES') : 'Sin fecha';
+          const ownerSource = getTaskOwnerSources(t, p);
+          const hasOwners = ownerSource.names.length > 0 || ownerSource.ids.length > 0;
+          const ownerLabel = hasOwners ? getResponsibleProfiles(ownerSource.names, ownerSource.ids).map((profile) => profile.name).join(', ') : 'Sin encargados';
+          const ownerBadge = renderResponsibleBadges(ownerSource.names, ownerSource.ids, {
+            limit: 3,
+            bubbleClass: 'w-7 h-7 rounded-full border border-slate-200 bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center overflow-hidden',
+            wrapperClass: 'flex items-center gap-1.5 shrink-0',
+            extraClass: 'text-[10px] text-slate-500 font-semibold',
+            emptyHtml: '<span class="text-slate-500 shrink-0">Sin encargados</span>'
+          });
+          const runningProject = findRunningProject();
+          const runningLog = runningProject ? getRunningLog(runningProject) : null;
+          const isTaskRunning = !!runningProject && String(runningProject.id) === String(p.id) && String(runningLog?.task_id || '') === String(t.id || '');
+          return `<div class="group px-2 py-2 border-b border-slate-200 last:border-b-0 rounded-xl cursor-pointer transition-colors hover:bg-slate-50" onclick="openProjectTask('${p.id}', '${t.id}')">
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="event.stopPropagation(); toggleTask('${t.id}', '${p.id}')" class="flex-none w-5 h-5 rounded border ${t.done ? 'bg-lime-500 border-lime-500 text-white' : 'border-slate-300 text-transparent'} flex items-center justify-center transition-colors" title="${t.done ? 'Desmarcar tarea' : 'Completar tarea'}">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+              </button>
+              <div class="flex-1 min-w-0">
+                <button type="button" onclick="event.stopPropagation(); openProjectTask('${p.id}', '${t.id}')" class="block w-full text-left text-base font-bold ${t.done ? 'text-slate-400 line-through' : 'text-slate-800 hover:text-slate-950'} break-words leading-snug">${escapeHtml(t.texto || 'Tarea')}</button>
+                <div class="mt-1 flex flex-wrap items-center gap-3 text-[11px]">
+                  ${ownerBadge}
+                  <div class="flex items-center gap-1.5 text-slate-600">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>${dueLabel}</span>
+                  </div>
+                  ${getTaskPriorityBadge(level)}
+                  <span class="text-slate-700 font-bold">Tiempo invertido:</span>
+                  <span style="background:#effa97;color:#111729" class="rounded-lg px-2 py-0.5 text-sm font-mono font-extrabold tracking-tight">${formatTaskInvested(t.total_seconds || 0)}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="event.stopPropagation(); openProjectTask('${p.id}', '${t.id}')" class="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center" title="Ver tarea">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/><circle cx="12" cy="12" r="3" stroke-width="2"/></svg>
+                </button>
+                <button type="button" onclick="event.stopPropagation(); toggleTaskTimer('${p.id}', '${t.id}')" class="inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-extrabold shadow-sm transition-colors ${isTaskRunning ? 'border-slate-900 bg-slate-900 text-white hover:bg-slate-800' : 'border-lime-200 bg-lime-50 text-slate-800 hover:bg-lime-100'}" title="${isTaskRunning ? 'Pausar temporizador' : 'Iniciar temporizador'}">
+                  ${isTaskRunning
+                    ? '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg><span>Pausar</span>'
+                    : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Iniciar timer</span>'}
+                </button>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+
+        const addTaskButton = `<div class="px-4 py-3 border-t border-slate-100 bg-slate-50/70">
+          <button type="button" onclick="openProjectAddTask('${safeProjectId}')" class="inline-flex h-8 items-center rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+            Añadir tarea
+          </button>
+        </div>`;
+
+        const emptyTaskState = `<div class="px-4 py-6 text-center">
+          <div class="text-sm font-semibold text-slate-600">Este proyecto aún no tiene tareas.</div>
+        </div>`;
+
+        const hasVisibleTasks = visibleTasks.length > 0;
+        const taskPaginator = hasVisibleTasks && totalTaskPages > 1
+          ? `<div class="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 bg-slate-50">
+              <div class="text-[11px] font-semibold text-slate-500">Tareas ${taskStart + 1}-${Math.min(taskStart + GLOBAL_TASKS_PER_PROJECT_PAGE, filteredTasks.length)} de ${filteredTasks.length}</div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="setGlobalTasksProjectPage('${safeProjectId}', ${projectPage - 1})" ${projectPage <= 1 ? 'disabled' : ''} class="h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+                <span class="text-[11px] font-bold text-slate-600">${projectPage}/${totalTaskPages}</span>
+                <button type="button" onclick="setGlobalTasksProjectPage('${safeProjectId}', ${projectPage + 1})" ${projectPage >= totalTaskPages ? 'disabled' : ''} class="h-8 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+              </div>
+            </div>`
+          : '';
+
+        return `<div class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start gap-2">
+                  <button type="button" onclick="toggleGlobalTasksProjectCollapse('${safeProjectId}')" class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all ${isCollapsed ? 'border-slate-200 bg-white text-slate-500 shadow-sm hover:border-lime-300 hover:bg-lime-50 hover:text-slate-900' : 'border-lime-200 bg-lime-50 text-slate-900 shadow-[0_6px_18px_-12px_rgba(132,204,22,0.65)] hover:bg-lime-100'}" title="${isCollapsed ? 'Desplegar tareas' : 'Comprimir tareas'}" aria-label="${isCollapsed ? 'Desplegar tareas' : 'Comprimir tareas'}" aria-expanded="${isCollapsed ? 'false' : 'true'}">
+                    <svg class="h-4 w-4 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                  <div class="min-w-0">
+                    <button type="button" onclick="openProject('${p.id}')" class="block w-full text-left text-xl font-extrabold leading-tight text-slate-950 hover:text-slate-800">${escapeHtml(p.titulo || 'Proyecto')}</button>
+                    <div>
+                      <button type="button" onclick="openProject('${p.id}')" class="mt-1 text-sm font-medium text-slate-500 hover:text-slate-700">${escapeHtml(p.cliente || 'Sin cliente')} · ${escapeHtml(p.etapa || 'Sin etapa')}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-2.5 py-1 whitespace-nowrap">${taskStats.total} tareas</div>
+            </div>
+            <div class="mt-3">
+              <div class="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-500">
+                <span>Tareas</span>
+                <span class="font-bold text-lime-700">${taskStats.done}/${taskStats.total} · ${taskStats.pct}%</span>
+              </div>
+              <div class="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                <div class="progress-fill-anim h-2 rounded-full transition-all duration-500" style="width:${taskStats.pct}%; background-color:${progressBarColor(taskStats.pct)}"></div>
+              </div>
+            </div>
+          </div>
+          ${isCollapsed ? '' : `<div class="px-3 py-1">${hasVisibleTasks ? taskItems : emptyTaskState}</div>${taskPaginator}${addTaskButton}`}
+        </div>`;
+      });
+
+      const clientPaginator = totalClientPages > 1
+        ? `<div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div class="text-sm font-semibold text-slate-600">Clientes ${clientStart + 1}-${Math.min(clientStart + GLOBAL_TASKS_CLIENTS_PER_PAGE, filteredProjects.length)} de ${filteredProjects.length}</div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="setGlobalTasksClientPage(${globalTasksClientPage - 1})" ${globalTasksClientPage <= 1 ? 'disabled' : ''} class="h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+              <span class="text-sm font-bold text-slate-700">${globalTasksClientPage}/${totalClientPages}</span>
+              <button type="button" onclick="setGlobalTasksClientPage(${globalTasksClientPage + 1})" ${globalTasksClientPage >= totalClientPages ? 'disabled' : ''} class="h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+            </div>
+          </div>`
+        : '';
+
+      globalTasksBoard.innerHTML = `${blocks.join('')}${clientPaginator}`;
+      renderQuickActionsStatus('tareas');
+      refreshProjectsSimpleModeUI();
+    }
+
+    function setProjectListPage(page) {
+      const nextPage = Number(page) || 1;
+      projectListCurrentPage = Math.max(1, nextPage);
+      renderProjectListView(projects);
+    }
+
+    function renderProjectListPagination(totalItems) {
+      const pagination = document.getElementById('projectListPagination');
+      if (!pagination) return;
+
+      const totalPages = Math.max(1, Math.ceil((Number(totalItems) || 0) / PROJECT_LIST_PAGE_SIZE));
+      if (projectListCurrentPage > totalPages) projectListCurrentPage = totalPages;
+
+      if (!totalItems) {
+        pagination.classList.add('hidden');
+        pagination.innerHTML = '';
+        return;
+      }
+
+      const start = (projectListCurrentPage - 1) * PROJECT_LIST_PAGE_SIZE;
+      const from = start + 1;
+      const to = Math.min(start + PROJECT_LIST_PAGE_SIZE, totalItems);
+
+      pagination.classList.remove('hidden');
+      pagination.innerHTML = `<div class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div class="text-sm font-semibold text-slate-600">Proyectos ${from}-${to} de ${totalItems}</div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="setProjectListPage(${projectListCurrentPage - 1})" ${projectListCurrentPage <= 1 ? 'disabled' : ''} class="h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+          <span class="text-sm font-bold text-slate-700">${projectListCurrentPage}/${totalPages}</span>
+          <button type="button" onclick="setProjectListPage(${projectListCurrentPage + 1})" ${projectListCurrentPage >= totalPages ? 'disabled' : ''} class="h-9 px-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+        </div>
+      </div>`;
+    }
+
+    function renderProjectListView(list) {
+      const body = document.getElementById('projectListBody');
+      if (!body) return;
+
+      renderListFilterChips();
+      const filteredList = filterProjectListData(list);
+
+      if (!Array.isArray(filteredList) || !filteredList.length) {
+        projectListCurrentPage = 1;
+        body.innerHTML = `<tr><td colspan="7" class="px-4 py-10 text-center">
+          <div class="text-sm font-semibold text-slate-600">No hay proyectos para este filtro.</div>
+          <div class="mt-1 text-xs text-slate-500">Puedes limpiar filtros o crear un nuevo proyecto.</div>
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onclick="resetQuickFilters('lista')" class="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100">Limpiar filtros</button>
+            <button type="button" onclick="openNewProjectModal()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>Crear proyecto</span>
+            </button>
+          </div>
+        </td></tr>`;
+        renderProjectListPagination(0);
+        renderQuickActionsStatus('lista');
+        refreshProjectsSimpleModeUI();
+        return;
+      }
+
+      const totalItems = filteredList.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / PROJECT_LIST_PAGE_SIZE));
+      if (projectListCurrentPage > totalPages) projectListCurrentPage = totalPages;
+      const start = (projectListCurrentPage - 1) * PROJECT_LIST_PAGE_SIZE;
+      const pageList = filteredList.slice(start, start + PROJECT_LIST_PAGE_SIZE);
+
+      body.innerHTML = pageList.map((p) => {
+        const title = escapeHtml(p.titulo || 'Proyecto sin título');
+        const client = escapeHtml(p.cliente || 'Sin cliente');
+        const priority = getEffectiveProjectPriority(p);
+        const prog = getProjectTaskStats(p).pct;
+        const due = p.vencimiento ? new Date(`${p.vencimiento}T12:00:00`) : null;
+        const dueLabel = (due && !Number.isNaN(due.getTime())) ? due.toLocaleDateString('es-ES') : 'Sin fecha';
+        const initial = escapeHtml(String(p.titulo || 'P').trim().charAt(0).toUpperCase() || 'P');
+        const safeProjectId = String(p.id || '').replace(/'/g, "\\'");
+        const ownerSource = getProjectResponsibleSources(p);
+        const ownerProfiles = getResponsibleProfiles(ownerSource.names, ownerSource.ids);
+        const ownerLabel = ownerProfiles.length ? escapeHtml(ownerProfiles.map((profile) => profile.name).join(', ')) : 'Sin responsables';
+        const ownerBubbles = renderResponsibleBadges(ownerSource.names, ownerSource.ids, {
+          limit: 2,
+          bubbleClass: 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-900 text-[10px] font-extrabold text-white overflow-hidden',
+          wrapperClass: 'flex items-center gap-1.5 min-w-0',
+          extraClass: 'text-xs font-bold text-slate-500',
+          emptyHtml: '<span class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-900 text-[10px] font-extrabold text-white">SR</span>'
+        });
+
+        return `<tr class="cursor-pointer transition-colors hover:bg-slate-50" onclick="openProject('${p.id}')">
+          <td class="px-4 py-4 whitespace-nowrap">
+            <div class="flex items-center gap-2.5">
+              <div class="h-7 w-7 rounded-full bg-slate-900 text-white text-xs font-bold grid place-content-center flex-shrink-0">${initial}</div>
+              <div class="min-w-0">
+                <div class="text-base font-normal text-lime-600 no-underline">${title}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold text-slate-700">${client}</td>
+          <td class="px-4 py-4">
+            ${getTaskPriorityBadge(priority)}
+          </td>
+          <td class="px-4 py-4 min-w-[12rem]">
+            <div class="flex items-center gap-2">
+              <div class="h-2.5 w-24 rounded-full bg-slate-200 overflow-hidden">
+                <div class="progress-fill-anim h-2.5 rounded-full bg-[#101729]" style="width:${prog}%"></div>
+              </div>
+              <span class="font-bold text-slate-700">${prog}%</span>
+            </div>
+          </td>
+          <td class="px-4 py-4 min-w-[12rem]">
+            <div class="min-w-0" title="${ownerLabel}">${ownerBubbles}</div>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap text-slate-700">${dueLabel}</td>
+          <td class="px-4 py-4 whitespace-nowrap">
+            <button type="button" onclick="event.stopPropagation(); archiveProjectById('${safeProjectId}')" class="inline-grid place-content-center w-9 h-9 rounded-full border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-1 shadow-sm" title="Archivar proyecto">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0-12-4 4m4-4 4 4M4 14v3a3 3 0 003 3h10a3 3 0 003-3v-3"/></svg>
+            </button>
+          </td>
+        </tr>`;
+      }).join('');
+      renderProjectListPagination(totalItems);
+      renderQuickActionsStatus('lista');
+      refreshProjectsSimpleModeUI();
+    }
+
+    function renderArchivedProjectsView(list) {
+      const body = document.getElementById('projectListBodyArchived');
+      const emptyState = document.getElementById('archivedProjectsEmpty');
+      if (!body || !emptyState) return;
+
+      // Filter only archived projects
+      const archivedList = Array.isArray(list) ? list.filter(p => p.archived === true || p.archived === 1 || String(p.archived).toLowerCase() === 'true') : [];
+
+      if (!archivedList.length) {
+        body.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      body.innerHTML = archivedList.map((p) => {
+        const title = escapeHtml(p.titulo || 'Proyecto sin título');
+        const client = escapeHtml(p.cliente || 'Sin cliente');
+        const priority = getEffectiveProjectPriority(p);
+        const prog = getProjectTaskStats(p).pct;
+        const due = p.vencimiento ? new Date(`${p.vencimiento}T12:00:00`) : null;
+        const dueLabel = (due && !Number.isNaN(due.getTime())) ? due.toLocaleDateString('es-ES') : 'Sin fecha';
+        const initial = escapeHtml(String(p.titulo || 'P').trim().charAt(0).toUpperCase() || 'P');
+        const ownerSource = getProjectResponsibleSources(p);
+        const ownerProfiles = getResponsibleProfiles(ownerSource.names, ownerSource.ids);
+        const ownerLabel = ownerProfiles.length ? escapeHtml(ownerProfiles.map((profile) => profile.name).join(', ')) : 'Sin responsables';
+        const ownerBubbles = renderResponsibleBadges(ownerSource.names, ownerSource.ids, {
+          limit: 2,
+          bubbleClass: 'inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-900 text-[10px] font-extrabold text-white overflow-hidden',
+          wrapperClass: 'flex items-center gap-1.5 min-w-0',
+          extraClass: 'text-xs font-bold text-slate-500',
+          emptyHtml: '<span class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-900 text-[10px] font-extrabold text-white">SR</span>'
+        });
+
+        return `<tr class="transition-colors hover:bg-slate-50">
+          <td class="px-4 py-4 min-w-[22rem]">
+            <div class="flex items-center gap-2.5 whitespace-nowrap">
+              <div class="h-8 w-8 rounded-full bg-slate-900 text-white text-xs font-bold grid place-content-center flex-shrink-0">${initial}</div>
+              <div class="min-w-0">
+                <button type="button" onclick="openArchivedProjectDetails('${String(p.id).replace(/'/g, "\\'")}')" class="truncate font-medium text-slate-900 hover:underline">${title}</button>
+              </div>
+            </div>
+          </td>
+          <td class="px-4 py-4 min-w-[12rem] whitespace-nowrap text-sm font-semibold text-slate-700">${client}</td>
+          <td class="px-4 py-4">
+            ${getTaskPriorityBadge(priority)}
+          </td>
+          <td class="px-4 py-4 min-w-[12rem]">
+            <div class="flex items-center gap-2">
+              <div class="h-2.5 w-24 rounded-full bg-slate-200 overflow-hidden">
+                <div class="progress-fill-anim h-2.5 rounded-full bg-[#101729]" style="width:${prog}%"></div>
+              </div>
+              <span class="font-bold text-slate-700">${prog}%</span>
+            </div>
+          </td>
+          <td class="px-4 py-4 min-w-[12rem]">
+            <div class="min-w-0" title="${ownerLabel}">${ownerBubbles}</div>
+          </td>
+          <td class="px-4 py-4 whitespace-nowrap text-slate-700">${dueLabel}</td>
+          <td class="px-4 py-4 whitespace-nowrap">
+            <button type="button" onclick="restoreProject('${p.id}')" class="inline-flex h-8 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors">
+              <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Restaurar
+            </button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function getListFilterOptions(type) {
+      if (type === 'priority') return LIST_PRIORITY_OPTIONS;
+      if (type === 'date') return LIST_DATE_OPTIONS;
+      if (type === 'sort') return LIST_SORT_OPTIONS;
+      return [];
+    }
+
+    function getListFilterValue(type) {
+      if (type === 'priority') return listFilterPriority;
+      if (type === 'date') return listFilterDate;
+      if (type === 'sort') return listFilterSort;
+      return '';
+    }
+
+    function getListFilterDisplayLabel(type) {
+      const options = getListFilterOptions(type);
+      const current = String(getListFilterValue(type));
+      const selected = options.find((opt) => String(opt.value) === current);
+      const fallback = type === 'priority' ? 'Prioridad' : (type === 'date' ? 'Fecha' : 'Orden');
+      if (!selected) return fallback;
+      if (type === 'priority') return selected.value ? `Prioridad: ${selected.label}` : 'Prioridad';
+      if (type === 'date') return selected.value !== 'all' ? `Fecha: ${selected.label}` : 'Fecha';
+      return selected.value !== 'newest' ? `Orden: ${selected.label}` : 'Orden';
+    }
+
+    function renderListFilterChips() {
+      const config = [
+        { type: 'priority', buttonId: 'listFilterPriorityBtn', labelId: 'listFilterPriorityLabel' },
+        { type: 'date', buttonId: 'listFilterDateBtn', labelId: 'listFilterDateLabel' },
+        { type: 'sort', buttonId: 'listFilterSortBtn', labelId: 'listFilterSortLabel' },
+      ];
+
+      config.forEach(({ type, buttonId, labelId }) => {
+        const button = document.getElementById(buttonId);
+        const label = document.getElementById(labelId);
+        if (!button || !label) return;
+        label.textContent = getListFilterDisplayLabel(type);
+        const active = type === 'date'
+          ? listFilterDate !== 'all'
+          : (type === 'sort' ? listFilterSort !== 'newest' : !!getListFilterValue(type));
+        button.classList.toggle('border-slate-900', active);
+        button.classList.toggle('text-slate-900', active);
+        button.classList.toggle('border-slate-200', !active);
+        button.classList.toggle('text-slate-700', !active);
+      });
+    }
+
+    function renderListFilterDropdownOptions(type) {
+      const suffix = type.charAt(0).toUpperCase() + type.slice(1);
+      const container = document.getElementById(`listFilter${suffix}Options`);
+      if (!container) return;
+      const search = String(listFilterSearch[type] || '').trim().toLowerCase();
+      const selected = String(getListFilterValue(type));
+      const options = getListFilterOptions(type).filter((opt) => String(opt.label || '').toLowerCase().includes(search));
+
+      if (!options.length) {
+        container.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">Sin resultados</div>';
+        return;
+      }
+
+      container.innerHTML = options.map((opt) => {
+        const isSelected = String(opt.value) === selected;
+        const safeType = type.replace(/'/g, '');
+        const safeValue = String(opt.value ?? '').replace(/'/g, "\\'");
+        return `<button type="button" onclick="setListFilterValue('${safeType}', '${safeValue}')" class="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${isSelected ? 'bg-[#101729] font-extrabold text-white' : 'text-slate-700 hover:bg-[#ecfe88]'}">${escapeHtml(String(opt.label || ''))}${isSelected ? '<svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' : ''}</button>`;
+      }).join('');
+    }
+
+    function closeListFilterDropdowns() {
+      ['priority', 'date', 'sort'].forEach((type) => {
+        const suffix = type.charAt(0).toUpperCase() + type.slice(1);
+        const menu = document.getElementById(`listFilter${suffix}Menu`);
+        if (menu) menu.classList.add('hidden');
+      });
+      listFilterOpenMenu = null;
+    }
+
+    function toggleListFilterDropdown(type) {
+      const suffix = type.charAt(0).toUpperCase() + type.slice(1);
+      const menu = document.getElementById(`listFilter${suffix}Menu`);
+      if (!menu) return;
+      if (listFilterOpenMenu === type) {
+        closeListFilterDropdowns();
+        return;
+      }
+      closeListFilterDropdowns();
+      renderListFilterDropdownOptions(type);
+      menu.classList.remove('hidden');
+      listFilterOpenMenu = type;
+      const searchInput = document.getElementById(`listFilter${suffix}Search`);
+      if (searchInput) searchInput.focus();
+    }
+
+    function updateListFilterOptions(type, query) {
+      listFilterSearch[type] = String(query || '');
+      renderListFilterDropdownOptions(type);
+    }
+
+    function setListFilterValue(type, value) {
+      if (type === 'priority') listFilterPriority = String(value || '');
+      if (type === 'date') listFilterDate = String(value || 'all');
+      if (type === 'sort') listFilterSort = String(value || 'newest');
+      closeListFilterDropdowns();
+      renderProjectListView(projects);
+      renderQuickActionsStatus('lista');
+    }
+
+    function clearListFilters() {
+      listFilterPriority = '';
+      listFilterDate = 'all';
+      listFilterSort = 'newest';
+      listProjectSearchQuery = '';
+      listFilterSearch.priority = '';
+      listFilterSearch.date = '';
+      listFilterSearch.sort = '';
+      const prioritySearch = document.getElementById('listFilterPrioritySearch');
+      const dateSearch = document.getElementById('listFilterDateSearch');
+      const listSearchInput = document.getElementById('listProjectSearchInput');
+      if (prioritySearch) prioritySearch.value = '';
+      if (dateSearch) dateSearch.value = '';
+      if (listSearchInput) listSearchInput.value = '';
+      closeListFilterDropdowns();
+      renderProjectListView(projects);
+      renderQuickActionsStatus('lista');
+    }
+
+    function getProjectCreatedTime(project) {
+      const raw = project?.created_at || project?.updated_at || project?.inicio || project?.vencimiento || null;
+      if (!raw) return 0;
+      const normalized = /^\d{4}-\d{2}-\d{2}$/.test(String(raw)) ? `${raw}T12:00:00` : raw;
+      const timestamp = new Date(normalized).getTime();
+      return Number.isNaN(timestamp) ? 0 : timestamp;
+    }
+
+    function filterProjectListData(list) {
+      if (!Array.isArray(list)) return [];
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const plus7 = new Date(now);
+      plus7.setDate(plus7.getDate() + 7);
+      const plus30 = new Date(now);
+      plus30.setDate(plus30.getDate() + 30);
+
+      const filtered = list.filter((p) => {
+        const listQuery = listProjectSearchQuery.trim();
+        if (listQuery) {
+          const haystack = [
+            String(p?.titulo || ''),
+            String(p?.cliente || ''),
+            String(p?.etapa || ''),
+            String(getEffectiveProjectPriority(p)),
+          ].join(' ').toLowerCase();
+          if (!haystack.includes(listQuery)) return false;
+        }
+
+        const projectPriority = getEffectiveProjectPriority(p);
+        const due = p.vencimiento ? new Date(`${p.vencimiento}T12:00:00`) : null;
+        const hasDue = !!(due && !Number.isNaN(due.getTime()));
+
+        if (listFilterPriority && projectPriority !== listFilterPriority) return false;
+
+        if (listFilterDate === 'no-date') return !hasDue;
+        if (!hasDue) return listFilterDate === 'all';
+
+        const dueDay = new Date(due);
+        dueDay.setHours(0, 0, 0, 0);
+
+        if (listFilterDate === 'overdue') return dueDay < now;
+        if (listFilterDate === 'today') return dueDay.getTime() === now.getTime();
+        if (listFilterDate === 'next7') return dueDay >= now && dueDay <= plus7;
+        if (listFilterDate === 'next30') return dueDay >= now && dueDay <= plus30;
+
+        return true;
+      });
+
+      return filtered.sort((a, b) => {
+        const diff = getProjectCreatedTime(b) - getProjectCreatedTime(a);
+        return listFilterSort === 'oldest' ? -diff : diff;
+      });
+    }
+
+    function renderModalTasks(tasks) {
+        const list = document.getElementById('modalTaskList');
+        const project = projects.find(x => x.id === currentProjectId)
+          || archivedProjects.find(x => x.id === currentProjectId)
+          || null;
+        const readOnly = projectModalReadOnly;
+        list.innerHTML = tasks.map(t => {
+            const ownerSource = getTaskOwnerSources(t, project);
+            const ownerBadges = renderResponsibleBadges(ownerSource.names, ownerSource.ids, {
+              limit: 3,
+              bubbleClass: 'w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center overflow-hidden',
+              wrapperClass: 'flex items-center gap-1 shrink-0',
+              extraClass: 'text-[10px] text-slate-500 font-semibold',
+              emptyHtml: '<span class="text-slate-500 shrink-0">Sin encargados</span>'
+            });
+            return `
+            <div ${readOnly ? '' : `onclick="openTaskModal('${t.id}')"`} class="group px-1 py-2 ${readOnly ? '' : 'cursor-pointer'}">
+              <div class="flex items-center gap-3">
+                <button ${readOnly ? 'disabled' : `onclick="event.stopPropagation(); toggleTask('${t.id}')"`} class="flex-none w-5 h-5 rounded border ${t.done ? 'bg-lime-500 border-lime-500 text-white' : 'border-slate-300 text-transparent'} flex items-center justify-center transition-colors ${readOnly ? 'opacity-70 cursor-default' : ''}">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </button>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="text-[13px] font-bold ${t.done ? 'text-slate-400 line-through' : 'text-slate-800'} truncate leading-tight">${t.texto}</div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      ${getTaskPriorityBadge(getEffectiveTaskPriority(t, project), 'xs')}
+                      <span style="background:#dff8a7;color:#111728" class="rounded-lg px-2 py-0.5 text-[10px] leading-none font-bold">${formatTaskInvested(t.total_seconds || 0)}</span>
+                    </div>
+                  </div>
+                  <div class="mt-1 flex items-center gap-2 text-[10px]">
+                    ${ownerBadges}
+                    <div class="flex items-center gap-1 text-slate-600 shrink-0">
+                      <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                      <span>${formatTaskDateRange(t)}</span>
+                    </div>
+                  </div>
+                </div>
+                ${readOnly ? '' : `<div class="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                  <button onclick="event.stopPropagation(); openTaskModal('${t.id}')" class="w-7 h-7 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center" title="Ver tarea">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/><circle cx="12" cy="12" r="3" stroke-width="2"/></svg>
+                  </button>
+                  <button onclick="event.stopPropagation(); toggleTaskTimer('${currentProjectId}', '${t.id}')" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-50 px-2.5 text-xs font-extrabold text-slate-800 hover:bg-lime-100" title="Iniciar temporizador">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Iniciar timer</span>
+                  </button>
+                  <button onclick="event.stopPropagation(); deleteTask('${t.id}')" class="w-7 h-7 rounded-full border border-rose-200 bg-white text-rose-500 hover:bg-rose-50 flex items-center justify-center" title="Eliminar tarea">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
+                  </button>
+                </div>`}
+              </div>
+              <div class="mt-2 border-b border-slate-200"></div>
+            </div>
+          `;
+          }).join('');
+        
+        // Update progress bar
+        const total = tasks.length;
+        const done = tasks.filter(t => t.done).length;
+        const pct = total === 0 ? 0 : (done / total) * 100;
+        const progressEl = document.getElementById('modalTaskProgress');
+        progressEl.style.width = `${pct}%`;
+        progressEl.style.backgroundColor = progressBarColor(Math.round(pct));
+        const pctLabel = document.getElementById('modalTaskProgressLabel');
+        if (pctLabel) pctLabel.innerText = `${Math.round(pct)}%`;
+
+        if (currentTaskId) {
+          const exists = tasks.some(t => t.id === currentTaskId);
+          if (!exists) {
+            closeTaskModal();
+          } else {
+            const fresh = tasks.find(t => t.id === currentTaskId);
+            renderTaskDetail(fresh);
+          }
+        }
+    }
+
+    async function addTask() {
+      if (projectModalReadOnly) return;
+        const input = document.getElementById('newTaskInput');
+        const text = input.value.trim();
+        if (!text || !currentProjectId) return;
+        
+        const res = await fetch('/api/proyectos/tareas/agregar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({
+          id: currentProjectId,
+          texto: text,
+        })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            input.value = '';
+            renderModalTasks(data.item.tareas || []);
+            // Update local projects array to keep in sync without reload
+            const p = projects.find(x => x.id === currentProjectId);
+            if (p) p.tareas = data.item.tareas;
+
+            const createdTask = (data.item.tareas || []).slice(-1)[0];
+            if (createdTask?.id) {
+              openTaskModal(createdTask.id);
+            }
+        }
+    }
+    
+    async function toggleTask(taskId, projectId = currentProjectId) {
+      if (projectModalReadOnly) return;
+        if (!projectId) return;
+        const res = await fetch('/api/proyectos/tareas/toggle', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+            body: JSON.stringify({id: projectId, tarea_id: taskId})
+        });
+        const data = await res.json();
+        if (data.ok) {
+            const p = projects.find(x => String(x.id) === String(projectId));
+            if (p) p.tareas = data.item.tareas || [];
+            if (String(currentProjectId || '') === String(projectId)) {
+              renderModalTasks(data.item.tareas || []);
+            }
+            renderKanban(projects);
+            renderGlobalTasksView(projects);
+            renderProjectListView(projects);
+        }
+    }
+
+    function openTaskModal(taskId) {
+      if (projectModalReadOnly) return;
+      currentTaskId = taskId;
+      currentTaskModalEditing = false;
+      currentTaskEditingNoteId = null;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return;
+      const task = (p.tareas || []).find(t => t.id === taskId);
+      if (!task) return;
+      renderTaskDetail(task);
+      document.getElementById('taskDetailModal')?.classList.remove('hidden');
+    }
+
+    function closeTaskModal() {
+      currentTaskId = null;
+      currentTaskModalEditing = false;
+      currentTaskEditingNoteId = null;
+      document.getElementById('taskDetailModal')?.classList.add('hidden');
+      document.getElementById('taskOwnerSearchResults')?.classList.add('hidden');
+    }
+
+    function getCurrentTask() {
+      if (!currentProjectId || !currentTaskId) return null;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (!p) return null;
+      return (p.tareas || []).find(t => t.id === currentTaskId) || null;
+    }
+
+    function parseTaskOwnerIds() {
+      const raw = String(document.getElementById('taskModalOwnerIds')?.value || '');
+      return raw.split(',').map(v => v.trim()).filter(Boolean);
+    }
+
+    function renderTaskOwners(names = [], ids = []) {
+      const container = document.getElementById('taskOwnersList');
+      const hiddenIds = document.getElementById('taskModalOwnerIds');
+      if (!container || !hiddenIds) return;
+
+      const cleanNames = Array.isArray(names) ? names.filter(Boolean) : [];
+      const cleanIds = Array.isArray(ids) ? ids.filter(Boolean) : [];
+      hiddenIds.value = cleanIds.join(',');
+
+      if (!cleanNames.length) {
+        container.innerHTML = '<div class="h-11 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 flex items-center text-xs text-slate-500">Sin encargados seleccionados.</div>';
+        return;
+      }
+
+      container.innerHTML = cleanNames.map((name, idx) => {
+        const initials = escapeHtml(String(name).substring(0, 2).toUpperCase());
+        const label = escapeHtml(String(name));
+        return `<div class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center">${initials}</div>
+            <div class="text-sm font-semibold text-slate-700 truncate">${label}</div>
+          </div>
+          ${currentTaskModalEditing ? `<button type="button" onclick="removeTaskOwner(${idx})" class="text-slate-400 hover:text-rose-500" title="Quitar encargado">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>` : '<span class="text-xs font-semibold text-slate-400">Asignado</span>'}
+        </div>`;
+      }).join('');
+    }
+
+    async function searchTaskOwners(query = '', immediate = false) {
+      if (!currentTaskModalEditing) return;
+      const box = document.getElementById('taskOwnerSearchResults');
+      if (!box) return;
+
+      const q = String(query || '').trim();
+      if (!q) {
+        box.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">Escribe para buscar usuarios</div>';
+        box.classList.remove('hidden');
+        return;
+      }
+
+      if (taskOwnerSearchDebounce) clearTimeout(taskOwnerSearchDebounce);
+
+      const run = async () => {
+        if (taskOwnerSearchAbort) taskOwnerSearchAbort.abort();
+        taskOwnerSearchAbort = new AbortController();
+        box.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">Buscando usuarios...</div>';
+        box.classList.remove('hidden');
+
+        try {
+          const res = await fetch('/api/proyectos/responsables/search?q=' + encodeURIComponent(q), {
+            signal: taskOwnerSearchAbort.signal,
+          });
+          const json = await res.json().catch(() => ({data: []}));
+          const list = Array.isArray(json.data) ? json.data : [];
+
+          if (!list.length) {
+            box.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">No se encontraron usuarios</div>';
+            box.classList.remove('hidden');
+            return;
+          }
+
+          box.innerHTML = list.map(u => {
+            const safeId = String(u.id).replace(/'/g, "\\'");
+            const safeName = String(u.name || '').replace(/'/g, "\\'");
+            const initials = escapeHtml(String(u.name || 'US').substring(0, 2).toUpperCase());
+            const name = escapeHtml(u.name || 'Usuario');
+            const email = escapeHtml(u.email || '');
+            return `<button type="button" class="w-full text-left px-3 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-b-0" onclick="addTaskOwnerFromCatalog('${safeId}', '${safeName}')">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center">${initials}</div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-slate-700 truncate">${name}</div>
+                  <div class="text-[11px] text-slate-400 truncate">${email}</div>
+                </div>
+              </div>
+            </button>`;
+          }).join('');
+          box.classList.remove('hidden');
+        } catch (error) {
+          if (error.name === 'AbortError') return;
+          box.innerHTML = '<div class="px-3 py-2 text-xs text-rose-500">No se pudo buscar usuarios</div>';
+          box.classList.remove('hidden');
+        }
+      };
+
+      if (immediate) {
+        run();
+        return;
+      }
+
+      taskOwnerSearchDebounce = setTimeout(run, 220);
+    }
+
+    function addTaskOwnerFromCatalog(userId, userName) {
+      if (!currentTaskModalEditing) return;
+      const task = getCurrentTask();
+      if (!task) return;
+      const names = Array.isArray(task.owners) ? [...task.owners] : [];
+      const ids = Array.isArray(task.owner_ids) ? [...task.owner_ids] : [];
+
+      if (!ids.includes(userId) && !names.includes(userName)) {
+        ids.push(userId);
+        names.push(userName);
+      }
+
+      task.owners = names;
+      task.owner_ids = ids;
+      renderTaskOwners(names, ids);
+
+      const input = document.getElementById('taskOwnerSearchInput');
+      const box = document.getElementById('taskOwnerSearchResults');
+      if (input) input.value = '';
+      if (box) box.classList.add('hidden');
+    }
+
+    function removeTaskOwner(index) {
+      if (!currentTaskModalEditing) return;
+      const task = getCurrentTask();
+      if (!task) return;
+      const names = Array.isArray(task.owners) ? [...task.owners] : [];
+      const ids = Array.isArray(task.owner_ids) ? [...task.owner_ids] : [];
+      names.splice(index, 1);
+      if (ids.length > index) ids.splice(index, 1);
+      task.owners = names;
+      task.owner_ids = ids;
+      renderTaskOwners(names, ids);
+    }
+
+    function initTaskDatePickers() {
+      ensureFlatpickrAssets(() => {
+        if (!taskStartPicker) {
+          taskStartPicker = window.flatpickr('#taskModalStart', {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altInputClass: 'w-full h-11 rounded-xl border border-slate-200 bg-slate-50 pl-9 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500 cursor-pointer',
+            altFormat: 'd M, Y',
+            disableMobile: true,
+            locale: 'es',
+          });
+        }
+
+        if (!taskEndPicker) {
+          taskEndPicker = window.flatpickr('#taskModalEnd', {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altInputClass: 'w-full h-11 rounded-xl border border-slate-200 bg-slate-50 pl-9 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500 cursor-pointer',
+            altFormat: 'd M, Y',
+            disableMobile: true,
+            locale: 'es',
+          });
+        }
+
+        applyTaskModalEditState();
+      });
+    }
+
+    function setTaskDateValues(startDate, endDate) {
+      if (taskStartPicker) {
+        taskStartPicker.setDate(startDate || null, false);
+      } else {
+        const startEl = document.getElementById('taskModalStart');
+        if (startEl) startEl.value = startDate || '';
+      }
+
+      if (taskEndPicker) {
+        taskEndPicker.setDate(endDate || null, false);
+      } else {
+        const endEl = document.getElementById('taskModalEnd');
+        if (endEl) endEl.value = endDate || '';
+      }
+    }
+
+    function setProjectModalTab(tab = 'info') {
+      currentProjectModalTab = ['info', 'tasks', 'notes'].includes(tab) ? tab : 'info';
+      const infoTab = document.getElementById('projectModalInfoTab');
+      const tasksTab = document.getElementById('projectModalTasksTab');
+      const notesTab = document.getElementById('projectModalNotesTab');
+      if (infoTab) infoTab.classList.toggle('hidden', currentProjectModalTab !== 'info');
+      if (tasksTab) tasksTab.classList.toggle('hidden', currentProjectModalTab !== 'tasks');
+      if (notesTab) notesTab.classList.toggle('hidden', currentProjectModalTab !== 'notes');
+
+      document.querySelectorAll('.project-detail-tab').forEach((btn) => {
+        const isActive = btn.getAttribute('data-project-tab') === currentProjectModalTab;
+        btn.classList.toggle('bg-slate-900', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('shadow-sm', isActive);
+        btn.classList.toggle('text-slate-600', !isActive);
+      });
+    }
+
+    function setTaskDatePickerEditable(picker, inputId, editable) {
+      const input = document.getElementById(inputId);
+      if (input) input.disabled = !editable;
+      if (picker) {
+        picker.set('clickOpens', editable);
+        if (picker.altInput) {
+          picker.altInput.disabled = !editable;
+          picker.altInput.classList.toggle('cursor-pointer', editable);
+          picker.altInput.classList.toggle('opacity-70', !editable);
+        }
+      }
+    }
+
+    function applyTaskModalEditState() {
+      const title = document.getElementById('taskModalTitle');
+      const priority = document.getElementById('taskModalPriority');
+      const ownerSearch = document.getElementById('taskOwnerSearchInput');
+      const ownerSearchWrap = document.getElementById('taskOwnerSearchWrap');
+      const editFields = document.getElementById('taskModalEditFields');
+      const subtaskComposer = document.getElementById('taskSubtaskComposer');
+      const primaryBtn = document.getElementById('taskModalPrimaryBtn');
+      const primaryIcon = document.getElementById('taskModalPrimaryIcon');
+
+      if (title) {
+        title.readOnly = !currentTaskModalEditing;
+        title.classList.toggle('cursor-default', !currentTaskModalEditing);
+      }
+      if (priority) {
+        priority.disabled = !currentTaskModalEditing;
+        priority.classList.toggle('opacity-70', !currentTaskModalEditing);
+      }
+      refreshTaskModalPriorityUI();
+      if (ownerSearch) {
+        ownerSearch.disabled = !currentTaskModalEditing;
+      }
+      if (ownerSearchWrap) {
+        ownerSearchWrap.classList.toggle('hidden', !currentTaskModalEditing);
+      }
+      if (editFields) {
+        editFields.classList.toggle('hidden', !currentTaskModalEditing);
+      }
+      if (subtaskComposer) {
+        subtaskComposer.classList.remove('hidden');
+      }
+      if (!currentTaskModalEditing) {
+        document.getElementById('taskOwnerSearchResults')?.classList.add('hidden');
+      }
+
+      setTaskDatePickerEditable(taskStartPicker, 'taskModalStart', currentTaskModalEditing);
+      setTaskDatePickerEditable(taskEndPicker, 'taskModalEnd', currentTaskModalEditing);
+
+      if (primaryBtn) {
+        primaryBtn.title = currentTaskModalEditing ? 'Guardar cambios' : 'Editar tarea';
+      }
+      if (primaryIcon) {
+        primaryIcon.innerHTML = currentTaskModalEditing
+          ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>'
+          : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20h9"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>';
+      }
+
+      const task = getCurrentTask();
+      if (task) {
+        renderTaskOwners(task.owners || [], task.owner_ids || []);
+        renderTaskSubtasks(task.subtasks || []);
+      }
+    }
+
+    function toggleTaskModalEditMode(forceState = null) {
+      if (forceState === null) {
+        if (currentTaskModalEditing) {
+          saveTaskDetails();
+          return;
+        }
+        currentTaskModalEditing = true;
+      } else {
+        currentTaskModalEditing = !!forceState;
+      }
+      applyTaskModalEditState();
+    }
+
+    function renderTaskDetail(task, options = {}) {
+      if (!task) return;
+      const preserveState = !!options.preserveState;
+      if (!preserveState) {
+        currentTaskModalEditing = false;
+        currentTaskEditingNoteId = null;
+      }
+      const title = document.getElementById('taskModalTitle');
+      const start = document.getElementById('taskModalStart');
+      const end = document.getElementById('taskModalEnd');
+      const prio = document.getElementById('taskModalPriority');
+      const meta = document.getElementById('taskModalMeta');
+      if (title) title.value = task.texto || '';
+      initTaskDatePickers();
+      if (start || end) {
+        setTaskDateValues(task.start_date || '', task.end_date || task.due_date || '');
+      }
+      if (prio) {
+        const project = projects.find(x => x.id === currentProjectId) || archivedProjects.find(x => x.id === currentProjectId) || null;
+        prio.value = getEffectiveTaskPriority(task, project);
+        refreshTaskModalPriorityUI();
+      }
+      renderTaskOwners(task.owners || [], task.owner_ids || []);
+      const ownerInput = document.getElementById('taskOwnerSearchInput');
+      if (ownerInput) ownerInput.value = '';
+      document.getElementById('taskOwnerSearchResults')?.classList.add('hidden');
+
+      if (meta) {
+        const status = task.done ? 'Completada' : 'Pendiente';
+        const project = projects.find(x => x.id === currentProjectId) || archivedProjects.find(x => x.id === currentProjectId) || null;
+        const priorityText = getEffectiveTaskPriority(task, project);
+        const startText = formatTaskInlineDate(task.start_date || '');
+        const endText = formatTaskInlineDate(task.end_date || task.due_date || '');
+        const ownersText = (task.owners || []).length ? escapeHtml((task.owners || []).join(', ')) : 'Sin encargados';
+        meta.innerHTML = `<div class="space-y-1.5 text-sm">
+          <div><span class="font-extrabold text-lime-300">Estado:</span> <span class="font-bold text-white">${status}</span></div>
+          <div class="flex items-center gap-2"><span class="font-extrabold text-lime-300">Prioridad:</span> ${getTaskPriorityBadge(priorityText)}</div>
+          <div><span class="font-extrabold text-lime-300">Fecha inicio:</span> <span class="font-bold text-white">${startText}</span></div>
+          <div><span class="font-extrabold text-lime-300">Fecha finalización:</span> <span class="font-bold text-white">${endText}</span></div>
+          <div><span class="font-extrabold text-lime-300">Encargados:</span> <span class="font-bold text-white">${ownersText}</span></div>
+          <div class="pt-2 border-t border-white/15">
+            <div class="text-lime-300 text-xs uppercase tracking-[0.18em] font-bold">Tiempo acumulado</div>
+            <div class="mt-1 text-4xl font-mono font-extrabold tracking-tight text-lime-300">${formatTaskInvested(task.total_seconds || 0)}</div>
+          </div>
+        </div>`;
+      }
+
+      renderTaskSubtasks(task.subtasks || []);
+      renderTaskTimeHistory(task.id);
+      renderTaskPipelineNotes(task);
+      if (!preserveState) {
+        const noteInput = document.getElementById('taskModalNewNoteInput');
+        if (noteInput) noteInput.value = '';
+      }
+      applyTaskModalEditState();
+    }
+
+    function renderTaskSubtasks(subtasks) {
+      const list = document.getElementById('taskSubtasksList');
+      if (!list) return;
+      if (!subtasks.length) {
+        list.innerHTML = '<div class="text-xs text-slate-500">No hay sub tareas todavía.</div>';
+        return;
+      }
+      list.innerHTML = subtasks.map(s => `
+        <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
+          <button onclick="toggleSubtask('${s.id}')" class="w-4 h-4 rounded border ${s.done ? 'bg-cyan-500 border-cyan-500 text-white' : 'border-slate-300 text-transparent'} flex items-center justify-center" title="Marcar / desmarcar sub tarea">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+          </button>
+          <div class="flex-1 text-xs ${s.done ? 'line-through text-slate-400' : 'text-slate-700'}">${escapeHtml(s.texto || '')}</div>
+          <button onclick="removeSubtask('${s.id}')" class="text-rose-500 hover:text-rose-600" title="Eliminar sub tarea">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function formatTaskInlineDate(value) {
+      if (!value) return 'Sin fecha';
+      const date = new Date(`${value}T12:00:00`);
+      if (Number.isNaN(date.getTime())) return 'Sin fecha';
+      return date.toLocaleDateString('es-ES');
+    }
+
+    function renderTaskPipelineNotes(task) {
+      const box = document.getElementById('taskModalPipelineNotes');
+      if (!box) return;
+
+      const notes = (Array.isArray(task?.notes) ? task.notes : [])
+        .slice()
+        .sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+
+      if (!notes.length) {
+        box.innerHTML = '<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">No hay notas de pipeline para esta tarea.</div>';
+        return;
+      }
+
+      box.innerHTML = notes.map((note) => {
+        const author = escapeHtml(String(note.author_name || note.user || 'Usuario'));
+        const created = escapeHtml(formatTaskNoteDate(note.created_at));
+        const updated = note.updated_at ? `<span class="text-[11px] text-slate-400">Editada ${escapeHtml(formatTaskNoteDate(note.updated_at))}</span>` : '';
+        const text = escapeHtml(String(note.texto || ''));
+        return `<div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-xs font-bold text-slate-700">${author}</div>
+            <div class="text-[11px] text-slate-500 text-right">${created}<br>${updated}</div>
+          </div>
+          <div class="mt-2 text-sm text-slate-700 leading-6 whitespace-pre-wrap">${text}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function formatTaskNoteDate(value) {
+      if (!value) return 'Sin fecha';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Sin fecha';
+      return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    function renderProjectNoteTaskOptions(project) {
+      const select = document.getElementById('projectNoteTaskSelect');
+      if (!select) return;
+      const tasks = Array.isArray(project?.tareas) ? project.tareas : [];
+      if (!tasks.length) {
+        select.innerHTML = '<option value="">Sin tareas disponibles</option>';
+        select.disabled = true;
+        return;
+      }
+
+      select.disabled = false;
+      const currentValue = select.value || '';
+      select.innerHTML = tasks.map((task) => `<option value="${escapeHtml(String(task.id || ''))}">${escapeHtml(String(task.texto || 'Tarea sin nombre'))}</option>`).join('');
+      const stillExists = tasks.some((task) => String(task.id || '') === currentValue);
+      select.value = stillExists ? currentValue : String(tasks[0].id || '');
+    }
+
+    function toggleProjectNoteComposer(forceState = null) {
+      const composer = document.getElementById('projectNoteComposer');
+      const toggleBtn = document.getElementById('projectNoteToggleBtn');
+      if (!composer) return;
+
+      isProjectNoteComposerOpen = forceState === null ? !isProjectNoteComposerOpen : !!forceState;
+      composer.classList.toggle('hidden', !isProjectNoteComposerOpen);
+
+      if (toggleBtn) {
+        toggleBtn.textContent = isProjectNoteComposerOpen ? 'Ocultar formulario' : 'Agregar nota';
+      }
+
+      if (isProjectNoteComposerOpen) {
+        document.getElementById('projectNoteInput')?.focus();
+      }
+    }
+
+    function getProjectTaskNoteEntries(project) {
+      const tasks = Array.isArray(project?.tareas) ? project.tareas : [];
+      return tasks.flatMap((task) => {
+        const notes = Array.isArray(task?.notes) ? task.notes : [];
+        return notes.map((note) => ({
+          ...note,
+          task_id: String(task.id || ''),
+          task_name: String(task.texto || 'Tarea sin nombre'),
+        }));
+      }).sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+    }
+
+    function renderProjectNotes(project) {
+      const list = document.getElementById('projectNotesList');
+      if (!list) return;
+      const items = getProjectTaskNoteEntries(project);
+      if (!items.length) {
+        list.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">Todavía no hay notas en este proyecto.</div>';
+        return;
+      }
+
+      list.innerHTML = items.map((note, index) => {
+        const noteId = String(note.id || '');
+        const isEditing = currentProjectEditingNoteId === noteId;
+        const author = escapeHtml(String(note.author_name || 'Usuario'));
+        const created = escapeHtml(formatTaskNoteDate(note.created_at));
+        const updated = note.updated_at ? `<span class="text-xs text-slate-400">Editada ${escapeHtml(formatTaskNoteDate(note.updated_at))}</span>` : '';
+        const text = escapeHtml(String(note.texto || ''));
+        const taskName = escapeHtml(String(note.task_name || 'Tarea sin nombre'));
+        return `<div class="relative pl-8">
+          <div class="absolute left-3 top-0 bottom-0 w-px bg-slate-200 ${index === items.length - 1 ? 'hidden' : ''}"></div>
+          <div class="absolute left-0 top-5 w-6 h-6 rounded-full border border-lime-200 bg-lime-100 text-slate-700 flex items-center justify-center text-[10px] font-bold">${index + 1}</div>
+          <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div class="text-sm font-extrabold text-slate-800">${author}</div>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span class="inline-flex items-center rounded-full border border-lime-200 bg-lime-50 px-2 py-0.5 font-bold text-lime-700">${taskName}</span>
+                  <span>Subida ${created}</span>
+                  ${updated}
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="startEditProjectNote('${note.task_id}','${noteId}')" class="text-xs font-bold text-slate-500 hover:text-slate-800">Editar</button>
+                <button type="button" onclick="deleteProjectNote('${note.task_id}','${noteId}')" class="text-xs font-bold text-rose-500 hover:text-rose-700">Eliminar</button>
+              </div>
+            </div>
+            ${isEditing
+              ? `<div class="space-y-3">
+                  <textarea id="taskNoteEditInput-${noteId}" rows="4" class="w-full rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500">${text}</textarea>
+                  <div class="flex items-center justify-end gap-2">
+                    <button type="button" onclick="cancelProjectNoteEdit()" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-white">Cancelar</button>
+                    <button type="button" onclick="saveProjectNoteEdit('${note.task_id}','${noteId}')" class="px-3 py-2 rounded-xl bg-slate-900 text-sm font-bold text-white hover:bg-slate-800">Guardar</button>
+                  </div>
+                </div>`
+              : `<div class="text-sm leading-6 text-slate-700 whitespace-pre-wrap">${text}</div>`}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderProjectNotesPanel(project) {
+      renderProjectNoteTaskOptions(project);
+      renderProjectNotes(project);
+      toggleProjectNoteComposer(false);
+    }
+
+    function renderTaskTimeHistory(taskId) {
+      const p = projects.find(x => x.id === currentProjectId);
+      const box = document.getElementById('taskTimeHistoryList');
+      if (!p || !box) return;
+
+      const logs = (p.time_logs || []).filter(l => String(l.task_id || '') === String(taskId || ''));
+      if (!logs.length) {
+        box.innerHTML = '<div class="text-xs text-slate-500">No hay registros de tiempo para esta tarea.</div>';
+        return;
+      }
+
+      box.innerHTML = logs.slice().reverse().map((l) => {
+        const start = Number(l.start || 0);
+        const end = Number(l.end || 0);
+        const duration = Math.max(0, (end || Math.floor(Date.now() / 1000)) - start);
+        const date = start ? new Date(start * 1000).toLocaleString('es-ES') : '-';
+        const user = escapeHtml(String(l.user || 'Sistema'));
+        return `<div class="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-xs font-semibold text-slate-700 truncate">${user}</div>
+            <div class="text-xs font-bold text-cyan-600">${formatTimer(duration)}</div>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1">${date}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function syncCurrentProjectTasks(updatedTasks, options = {}) {
+      const p = projects.find(x => x.id === currentProjectId);
+      if (p) p.tareas = updatedTasks || [];
+      renderModalTasks(updatedTasks || []);
+      if (p) renderProjectNotesPanel(p);
+      if (options.rerenderTaskDetail && currentTaskId) {
+        const refreshed = getCurrentTask();
+        if (refreshed) {
+          renderTaskDetail(refreshed, { preserveState: true });
+        }
+      }
+    }
+
+    async function addProjectNote() {
+      if (!currentProjectId) return;
+      const taskSelect = document.getElementById('projectNoteTaskSelect');
+      const taskId = String(taskSelect?.value || '').trim();
+      if (!taskId) return;
+      const input = document.getElementById('projectNoteInput');
+      const texto = String(input?.value || '').trim();
+      if (!texto) return;
+
+      const res = await fetch('/api/proyectos/tareas/notas/agregar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: taskId, texto})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo agregar la nota', 'error');
+        return;
+      }
+
+      if (input) input.value = '';
+      currentProjectEditingNoteId = null;
+      setProjectModalTab('notes');
+      toggleProjectNoteComposer(false);
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+      if (window.showNotification) window.showNotification('Nota agregada', 'success');
+    }
+
+    async function addTaskModalNote() {
+      if (!currentProjectId || !currentTaskId) return;
+      const input = document.getElementById('taskModalNewNoteInput');
+      const texto = String(input?.value || '').trim();
+      if (!texto) return;
+
+      const res = await fetch('/api/proyectos/tareas/notas/agregar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo agregar la nota', 'error');
+        return;
+      }
+
+      if (input) input.value = '';
+      currentProjectEditingNoteId = null;
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+      if (window.showNotification) window.showNotification('Nota agregada', 'success');
+    }
+
+    function startEditProjectNote(taskId, noteId) {
+      currentProjectEditingNoteId = noteId;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (p) renderProjectNotes(p);
+    }
+
+    function cancelProjectNoteEdit() {
+      currentProjectEditingNoteId = null;
+      const p = projects.find(x => x.id === currentProjectId);
+      if (p) renderProjectNotes(p);
+    }
+
+    async function saveProjectNoteEdit(taskId, noteId) {
+      if (!currentProjectId || !taskId || !noteId) return;
+      const input = document.getElementById(`taskNoteEditInput-${noteId}`);
+      const texto = String(input?.value || '').trim();
+      if (!texto) return;
+
+      const res = await fetch('/api/proyectos/tareas/notas/actualizar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: taskId, nota_id: noteId, texto})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo editar la nota', 'error');
+        return;
+      }
+
+      currentProjectEditingNoteId = null;
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+      if (window.showNotification) window.showNotification('Nota actualizada', 'success');
+    }
+
+    async function deleteProjectNote(taskId, noteId) {
+      if (!currentProjectId || !taskId || !noteId) return;
+      if (!confirm('¿Eliminar esta nota?')) return;
+
+      const res = await fetch('/api/proyectos/tareas/notas/eliminar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: taskId, nota_id: noteId})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo eliminar la nota', 'error');
+        return;
+      }
+
+      currentProjectEditingNoteId = null;
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+      if (window.showNotification) window.showNotification('Nota eliminada', 'success');
+    }
+
+    async function saveTaskDetails() {
+      if (!currentProjectId || !currentTaskId) return;
+      const text = (document.getElementById('taskModalTitle')?.value || '').trim();
+      if (!text) return;
+      const start_date = document.getElementById('taskModalStart')?.value || null;
+      const end_date = document.getElementById('taskModalEnd')?.value || null;
+      const due_date = end_date || null;
+      const task = getCurrentTask();
+      const selectedPriority = document.getElementById('taskModalPriority')?.value || 'Atención';
+      const priority = selectedPriority === 'Vencido'
+        ? normalizeTaskPriority(task?.priority || 'Atención')
+        : selectedPriority;
+      const owners = Array.isArray(task?.owners) ? task.owners : [];
+      const owner_ids = parseTaskOwnerIds();
+
+      const res = await fetch('/api/proyectos/tareas/actualizar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto: text, start_date, end_date, due_date, priority, owners, owner_ids})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo guardar la tarea', 'error');
+        return;
+      }
+
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+      currentTaskModalEditing = false;
+      applyTaskModalEditState();
+      if (window.showNotification) window.showNotification('Tarea actualizada', 'success');
+    }
+
+    async function deleteTask(taskId = null) {
+      if (!currentProjectId) return;
+      const targetTaskId = taskId || currentTaskId;
+      if (!targetTaskId) return;
+      if (!confirm('¿Eliminar esta tarea?')) return;
+
+      const res = await fetch('/api/proyectos/tareas/eliminar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: targetTaskId})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo eliminar la tarea', 'error');
+        return;
+      }
+
+      const p = projects.find(x => x.id === currentProjectId);
+      if (p) p.tareas = data.item.tareas || [];
+      renderModalTasks(data.item.tareas || []);
+      if (targetTaskId === currentTaskId) closeTaskModal();
+      if (window.showNotification) window.showNotification('Tarea eliminada', 'success');
+    }
+
+    async function addSubtask() {
+      if (!currentProjectId || !currentTaskId) return;
+      const input = document.getElementById('newSubtaskInput');
+      const text = (input?.value || '').trim();
+      if (!text) return;
+
+      const res = await fetch('/api/proyectos/tareas/subtareas/agregar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto: text})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+
+      if (input) input.value = '';
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+    }
+
+    async function toggleSubtask(subtaskId) {
+      if (!currentProjectId || !currentTaskId || !subtaskId) return;
+      const res = await fetch('/api/proyectos/tareas/subtareas/toggle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, subtarea_id: subtaskId})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+    }
+
+    async function removeSubtask(subtaskId) {
+      if (!currentProjectId || !currentTaskId || !subtaskId) return;
+      const res = await fetch('/api/proyectos/tareas/subtareas/eliminar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, subtarea_id: subtaskId})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) return;
+
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+    }
+
+    // --- Files ---
+    const projectPreviewableImages = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+
+    function projectFileExt(name = '', explicitExt = '') {
+      const ext = String(explicitExt || '').trim().toLowerCase();
+      if (ext) return ext;
+      const clean = String(name || '').split('?')[0];
+      const parts = clean.split('.');
+      return parts.length > 1 ? parts.pop().toLowerCase() : '';
+    }
+
+    function projectFileTone(ext = '') {
+      const normalized = String(ext || '').toLowerCase();
+      if (normalized === 'pdf') return {color: '#4f46e5', label: 'PDF'};
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(normalized)) return {color: '#f59e0b', label: (normalized || 'img').toUpperCase()};
+      if (['doc', 'docx'].includes(normalized)) return {color: '#2563eb', label: normalized.toUpperCase()};
+      if (['xls', 'xlsx', 'csv'].includes(normalized)) return {color: '#059669', label: normalized.toUpperCase()};
+      if (['ppt', 'pptx'].includes(normalized)) return {color: '#ea580c', label: normalized.toUpperCase()};
+      if (['zip', 'rar', '7z'].includes(normalized)) return {color: '#f97316', label: normalized.toUpperCase()};
+      return {color: '#64748b', label: (normalized || 'FILE').toUpperCase()};
+    }
+
+    function projectFileDate(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return date.toLocaleString('es-CO', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function projectFileTitle(name = '') {
+      return String(name || 'Documento').replace(/\.[^/.]+$/, '');
+    }
+
+    let projectFilePreviewScale = 1;
+
+    function setProjectFilePreviewScale(value) {
+      projectFilePreviewScale = Math.max(0.55, Math.min(2.6, value));
+      const content = document.getElementById('projectFilePreviewContent');
+      if (content) content.style.transform = `scale(${projectFilePreviewScale})`;
+    }
+
+    function resetProjectFilePreviewScale() {
+      setProjectFilePreviewScale(1);
+    }
+
+    function openProjectFilePreviewFromCard(card) {
+      if (!card) return;
+      openProjectFilePreview({
+        title: card.dataset.previewTitle || 'Documento',
+        url: card.dataset.previewUrl || '',
+        type: card.dataset.previewType || 'unsupported',
+        downloadUrl: card.dataset.downloadUrl || '',
+        extLabel: card.dataset.extLabel || 'FILE',
+        extColor: card.dataset.extColor || '#475569',
+      });
+    }
+
+    function openProjectFilePreview({title, url, type, downloadUrl, extLabel, extColor}) {
+      const modal = document.getElementById('projectFilePreviewModal');
+      const titleEl = document.getElementById('projectFilePreviewTitle');
+      const subtitleEl = document.getElementById('projectFilePreviewSubtitle');
+      const footerEl = document.getElementById('projectFilePreviewFooter');
+      const frame = document.getElementById('projectFilePreviewFrame');
+      const imageWrap = document.getElementById('projectFilePreviewImageWrap');
+      const image = document.getElementById('projectFilePreviewImage');
+      const unsupported = document.getElementById('projectFilePreviewUnsupported');
+      const download = document.getElementById('projectFilePreviewDownload');
+      const unsupportedDownload = document.getElementById('projectFilePreviewUnsupportedDownload');
+      const unsupportedExt = document.getElementById('projectFilePreviewExt');
+      if (!modal || !frame || !imageWrap || !image || !unsupported) return;
+      if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
+
+      if (titleEl) titleEl.textContent = type === 'unsupported' ? 'Vista previa no disponible' : 'Vista previa del documento';
+      if (subtitleEl) subtitleEl.textContent = type === 'unsupported' ? 'Formato no compatible con vista previa nativa.' : 'Usa trackpad o rueda sobre la vista para acercar y alejar.';
+      if (footerEl) footerEl.textContent = title || 'Documento';
+      frame.classList.add('hidden');
+      imageWrap.classList.add('hidden');
+      unsupported.classList.add('hidden');
+      frame.removeAttribute('src');
+      image.removeAttribute('src');
+      if (download) {
+        download.href = downloadUrl || url || '#';
+        download.classList.toggle('hidden', !(downloadUrl || url));
+      }
+      resetProjectFilePreviewScale();
+
+      if (type === 'image') {
+        image.src = url;
+        imageWrap.classList.remove('hidden');
+      } else if (type === 'pdf') {
+        frame.src = url;
+        frame.classList.remove('hidden');
+      } else {
+        unsupported.classList.remove('hidden');
+        if (unsupportedDownload) unsupportedDownload.href = downloadUrl || url || '#';
+        if (unsupportedExt) {
+          unsupportedExt.textContent = extLabel || 'FILE';
+          unsupportedExt.style.background = extColor || '#475569';
+        }
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeProjectFilePreview() {
+      const modal = document.getElementById('projectFilePreviewModal');
+      const frame = document.getElementById('projectFilePreviewFrame');
+      const image = document.getElementById('projectFilePreviewImage');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      if (frame) frame.removeAttribute('src');
+      if (image) image.removeAttribute('src');
+      resetProjectFilePreviewScale();
+    }
+
+    function renderModalFiles(files) {
+        const container = document.getElementById('modalFilesList');
+        if (!container) return;
+        const canDelete = !projectModalReadOnly;
+        const items = Array.isArray(files) ? files : [];
+        if (!items.length) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = items.map(f => {
+          const project = projects.find(x => String(x?.id || '') === String(currentProjectId || '')) || {};
+          const id = String(f?.id || '').replace(/'/g, "\\'");
+          const name = String(f?.name || 'Documento');
+          const safeName = escapeHtml(name);
+          const ext = projectFileExt(name, f?.ext || '');
+          const tone = projectFileTone(ext);
+          const isImage = projectPreviewableImages.includes(ext);
+          const downloadUrl = f?.download_url || f?.url || (id ? `/documentos/${encodeURIComponent(id)}/download` : '#');
+          const previewUrl = f?.preview_url || (id ? `/documentos/${encodeURIComponent(id)}/preview` : downloadUrl);
+          const openUrl = isImage || ext === 'pdf' ? previewUrl : downloadUrl;
+          const previewType = isImage ? 'image' : (ext === 'pdf' ? 'pdf' : 'unsupported');
+          const folderPath = String(f?.folder || (project?.titulo ? `Proyectos / ${project.titulo}` : 'Proyectos'));
+          const clientId = String(project?.cliente_id || f?.cliente_id || '');
+          const folderSpace = clientId ? 'client' : 'personal';
+          const folderUrl = `/documentos?space=${encodeURIComponent(folderSpace)}${clientId ? `&cliente_id=${encodeURIComponent(clientId)}` : ''}&folder=${encodeURIComponent(folderPath)}`;
+          const metaLabel = `Añadido: ${projectFileDate(f?.date || f?.uploaded_at || f?.created_at)}${isImage ? ' · Imagen' : ''}`;
+          const figure = isImage
+            ? `<img src="${previewUrl}" class="project-file-thumb" alt="${safeName}"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
+            : `<div class="project-file-figure"><div class="project-file-ext" style="background:${tone.color}">${tone.label}</div><div class="project-file-lines" aria-hidden="true"><span></span><span></span></div></div>`;
+
+          return `
+            <div class="project-file-card group cursor-pointer" style="--file-color:${tone.color}" role="button" tabindex="0"
+              data-preview-title="${safeName}"
+              data-preview-url="${escapeHtml(openUrl)}"
+              data-preview-type="${previewType}"
+              data-download-url="${escapeHtml(downloadUrl)}"
+              data-ext-label="${escapeHtml(tone.label)}"
+              data-ext-color="${escapeHtml(tone.color)}"
+              onclick="openProjectFilePreviewFromCard(this)"
+              onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openProjectFilePreviewFromCard(this); }">
+              <div class="project-file-preview" title="${safeName}">
+                ${figure}
+              </div>
+              <div class="min-w-0">
+                <div class="project-file-title" title="${safeName}">${safeName}</div>
+                <div class="project-file-date">${escapeHtml(metaLabel)}</div>
+              </div>
+              <div class="project-file-actions">
+                <a href="${folderUrl}" class="project-file-action" title="Abrir carpeta en Documentos" target="_blank" onclick="event.stopPropagation()">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 17L17 7M9 7h8v8"/></svg>
+                </a>
+                <a href="${downloadUrl}" class="project-file-action" title="Descargar" target="_blank" onclick="event.stopPropagation()">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+                </a>
+                ${(canDelete && id) ? `<button type="button" onclick="event.stopPropagation();removeModalFile('${id}')" class="project-file-action danger" title="Eliminar adjunto"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 6h18M8 6V4h8v2m-1 5v6M9 11v6m-2 4h10a2 2 0 002-2V6H5v13a2 2 0 002 2z"/></svg></button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+    }
+
+    async function removeModalFile(fileId) {
+      if (projectModalReadOnly) return;
+      if (!currentProjectId || !fileId) return;
+      if (!confirm('¿Eliminar este archivo adjunto?')) return;
+
+      try {
+        const res = await fetch('/api/proyectos/archivo/eliminar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+          body: JSON.stringify({id: currentProjectId, file_id: fileId})
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error('delete_failed');
+        }
+
+        renderModalFiles(data.item?.files || []);
+        const p = projects.find(x => x.id === currentProjectId);
+        if (p) p.files = data.item?.files || [];
+        if (window.showNotification) window.showNotification('Adjunto eliminado', 'success');
+      } catch (e) {
+        if (window.showNotification) window.showNotification('No se pudo eliminar el adjunto', 'error');
+      }
+    }
+    
+    function createProjectUploadRow(file, index) {
+      const list = document.getElementById('projectUploadProgressList');
+      if (!list) return null;
+      const row = document.createElement('div');
+      row.className = 'project-upload-row';
+      row.innerHTML = `
+        <div class="project-upload-ghost" aria-hidden="true"></div>
+        <div class="min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-xs font-black text-slate-800 truncate"></div>
+            <div class="project-upload-percent text-[11px] font-bold text-slate-400">0%</div>
+          </div>
+          <div class="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+            <div class="project-upload-bar h-full w-0 rounded-full bg-lime-300 transition-[width] duration-150"></div>
+          </div>
+        </div>`;
+      row.querySelector('.text-xs').textContent = file.name || `Archivo ${index + 1}`;
+      list.appendChild(row);
+      return row;
+    }
+
+    function updateProjectUploadRow(row, percent, done = false) {
+      if (!row) return;
+      const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+      const bar = row.querySelector('.project-upload-bar');
+      const label = row.querySelector('.project-upload-percent');
+      if (bar) bar.style.width = `${clamped}%`;
+      if (label) {
+        label.textContent = done ? 'Listo' : `${clamped}%`;
+        label.classList.toggle('text-emerald-600', done);
+        label.classList.toggle('text-slate-400', !done);
+      }
+    }
+
+    function uploadProjectFile(file, row) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append('id', currentProjectId);
+        formData.append('file', file);
+        formData.append('_token', window.csrfToken);
+
+        xhr.open('POST', '/api/proyectos/archivo');
+        xhr.setRequestHeader('X-CSRF-TOKEN', window.csrfToken);
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.upload.addEventListener('progress', (event) => {
+          if (!event.lengthComputable) return;
+          updateProjectUploadRow(row, (event.loaded / event.total) * 100);
+        });
+        xhr.addEventListener('load', () => {
+          const data = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+            updateProjectUploadRow(row, 100, true);
+            resolve(data.item);
+            return;
+          }
+          reject(new Error('upload_failed'));
+        });
+        xhr.addEventListener('error', () => reject(new Error('upload_failed')));
+        xhr.send(formData);
+      });
+    }
+
+    async function handleModalFileUpload(files) {
+      if (projectModalReadOnly) return;
+      if (!files || files.length === 0 || !currentProjectId) return;
+      const fileList = Array.from(files);
+      const panel = document.getElementById('projectUploadProgress');
+      const list = document.getElementById('projectUploadProgressList');
+      const summary = document.getElementById('projectUploadSummary');
+      if (list) list.innerHTML = '';
+      if (panel) panel.classList.remove('hidden');
+      const rows = fileList.map(createProjectUploadRow);
+
+      try {
+        let lastItem = null;
+        for (let i = 0; i < fileList.length; i++) {
+          if (summary) summary.textContent = `${i + 1} de ${fileList.length}`;
+          lastItem = await uploadProjectFile(fileList[i], rows[i]);
+        }
+
+        if (lastItem) {
+          renderModalFiles(lastItem.files || []);
+          const p = projects.find(x => x.id === currentProjectId);
+          if (p) p.files = lastItem.files || [];
+          if (summary) summary.textContent = `${fileList.length} archivo${fileList.length === 1 ? '' : 's'} subido${fileList.length === 1 ? '' : 's'}`;
+          if (window.showNotification) {
+            window.showNotification(fileList.length > 1 ? 'Archivos subidos correctamente' : 'Archivo subido correctamente', 'success');
+          }
+          setTimeout(() => {
+            panel?.classList.add('hidden');
+            if (list) list.innerHTML = '';
+            if (summary) summary.textContent = 'Preparando...';
+          }, 900);
+        }
+      } catch(e) {
+        if (summary) summary.textContent = 'No se pudo completar la subida.';
+        if (window.showNotification) window.showNotification('Error de conexión al subir', 'error');
+        setTimeout(() => panel?.classList.add('hidden'), 2200);
+      }
+    }
+
+    // --- Modal Timer ---
+    function updateModalTimer(p) {
+        if (timerInterval) clearInterval(timerInterval);
+        
+        const logs = p.time_logs || [];
+        const isRunning = logs.length > 0 && !logs[logs.length-1].end;
+        const btn = document.getElementById('modalTimerBtn');
+        const display = document.getElementById('modalTimerDisplay');
+        syncPipTimerActionButton(isRunning);
+        updateModalTimerTaskLabel(p);
+        updateInvestedDisplays(p);
+        
+        if (isRunning) {
+            btn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg><span>Pausar</span>';
+            btn.className = "w-full py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200";
+            
+            // Start tick
+            timerInterval = setInterval(() => {
+              const totalSeconds = getCurrentProjectTotalSeconds(p);
+              const val = formatTimer(totalSeconds);
+                display.innerText = val;
+                syncTimerPanelsDisplay(val);
+                updateInvestedDisplays(p);
+            }, 1000);
+        } else {
+            btn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>Iniciar</span>';
+            btn.className = "w-full py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 bg-lime-400 text-slate-900 hover:bg-lime-500";
+            
+            const totalSeconds = getCurrentProjectTotalSeconds(p);
+            const val = formatTimer(totalSeconds);
+            display.innerText = val;
+            syncTimerPanelsDisplay(val);
+            updateInvestedDisplays(p);
+        }
+    }
+    
+    async function toggleModalTimer() {
+      if (projectModalReadOnly) return;
+        if (!currentProjectId) return;
+        const p = projects.find(x => x.id === currentProjectId);
+        const logs = p.time_logs || [];
+        const isRunning = logs.length > 0 && !logs[logs.length-1].end;
+
+      if (!isRunning) {
+        const taskId = await openTimerTaskModal(currentProjectId);
+        if (typeof taskId === 'undefined') return;
+        const item = await sendTimerAction(currentProjectId, 'start', taskId || null);
+        p.time_logs = item.time_logs || [];
+        p.tareas = item.tareas || p.tareas || [];
+        updateModalTimer(p);
+        renderModalTasks(p.tareas || []);
+        return;
+      }
+
+      const item = await sendTimerAction(currentProjectId, 'stop', null);
+      p.time_logs = item.time_logs || [];
+      p.tareas = item.tareas || p.tareas || [];
+      updateModalTimer(p);
+      renderModalTasks(p.tareas || []);
+    }
+
+    // --- Inline Title Edit ---
+    async function updateTitle(id, newTitle) {
+      if (projectModalReadOnly) return;
+        if (!newTitle.trim()) return;
+        // Check if title actually changed to avoid unnecessary calls
+        // We can do this by finding the project in local state
+        const p = projects.find(x => x.id === id);
+        if (p && p.titulo === newTitle.trim()) return;
+
+        try {
+            await fetch('/api/proyectos/actualizar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+                body: JSON.stringify({id, titulo: newTitle.trim()})
+            });
+            // No need to reload full data if we just updated title, but good for consistency
+        } catch(e) {
+            console.error('Update title error', e);
+        }
+    }
+
+
+    function applyFocus(on){
+      focusMode = on;
+      kanban.classList.toggle('focus-mode', on);
+      kanban.querySelectorAll('[data-stage]').forEach(col=>{
+        col.addEventListener('mouseenter', ()=>{ if(focusMode){ kanban.querySelectorAll('[data-stage]').forEach(c=>c.style.opacity = c===col? '1':'0.35'); }});
+      });
+      kanban.addEventListener('mouseleave', ()=>{ if(focusMode){ kanban.querySelectorAll('[data-stage]').forEach(c=>c.style.opacity='1'); }});
+    }
+
+    function setProjectView(view) {
+      currentTaskView = ['kanban', 'tareas', 'lista', 'archivados'].includes(view) ? view : 'kanban';
+      updateProjectSectionHeader(currentTaskView);
+      const elKanban = document.getElementById('proyectos-kanban');
+      const elTareas = document.getElementById('proyectos-tareas');
+      const elLista = document.getElementById('proyectos-lista');
+      const elArchivados = document.getElementById('proyectos-archivados');
+      if (elKanban) elKanban.classList.toggle('hidden', currentTaskView !== 'kanban');
+      if (elTareas) elTareas.classList.toggle('hidden', currentTaskView !== 'tareas');
+      if (elLista) elLista.classList.toggle('hidden', currentTaskView !== 'lista');
+      if (elArchivados) elArchivados.classList.toggle('hidden', currentTaskView !== 'archivados');
+
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('view', currentTaskView);
+      window.history.replaceState({}, '', nextUrl);
+
+      if (currentTaskView === 'tareas') {
+        renderGlobalTasksView(projects);
+      } else if (currentTaskView === 'lista') {
+        renderProjectListView(projects);
+      } else if (currentTaskView === 'archivados') {
+        renderArchivedProjectsView(archivedProjects);
+      }
+      renderQuickActionsStatus(currentTaskView);
+      refreshProjectsSimpleModeUI();
+    }
+
+    function updateProjectSectionHeader(view) {
+      const titleEl = document.getElementById('projectsSectionTitle');
+      const descEl = document.getElementById('projectsSectionDescription');
+      if (!titleEl || !descEl) return;
+
+      const copyByView = {
+        kanban: {
+          title: 'Kanban de proyectos',
+          description: 'Organiza y mueve tus proyectos por columnas para ver su estado de un vistazo.',
+        },
+        lista: {
+          title: 'Lista de proyectos',
+          description: 'Ve una lista de todos los proyectos y su progreso.',
+        },
+        tareas: {
+          title: 'Tareas de proyectos',
+          description: 'Revisa todas las tareas de tus proyectos y su avance en un solo lugar.',
+        },
+        archivados: {
+          title: 'Proyectos archivados',
+          description: 'Ve todos los proyectos que has archivado. Puedes restaurarlos en cualquier momento.',
+        },
+      };
+
+      const copy = copyByView[view] || copyByView.kanban;
+      titleEl.textContent = copy.title;
+      descEl.textContent = copy.description;
+    }
+
+    async function loadData(){
+      const qs = currentClienteId ? ('?cliente_id='+encodeURIComponent(currentClienteId)) : '';
+      const res = await fetch('/api/proyectos'+qs);
+      const json = await res.json();
+      let list = json.data || [];
+      list = list.map((project) => {
+        const pendingDesc = pendingProjectDescriptions[String(project.id || '')];
+        return typeof pendingDesc === 'string' ? {...project, descripcion: pendingDesc} : project;
+      });
+      await loadArchivedProjects();
+      // No filter inputs in new UI for now
+      projects = list;
+      renderKanban(list);
+      renderGlobalTasksView(list);
+      renderProjectListView(list);
+      renderArchivedProjectsView(archivedProjects);
+      syncPinnedTimerHud();
+      if (openHeaderTimerFromQuery) {
+        currentTaskView = 'tareas';
+      }
+      setProjectView(currentTaskView);
+	      if (openHeaderTimerFromQuery) {
+	        openHeaderTimerFromQuery = false;
+	        const _htu = new URL(window.location.href);
+	        _htu.searchParams.delete('header_timer');
+	        window.history.replaceState({}, '', _htu);
+	        openQuickProjectActionModal('start-timer');
+	      }
+	      if (openNewProjectFromQuery) {
+	        openNewProjectFromQuery = false;
+	        clearOpenProjectQueryParam();
+	        setTimeout(() => openNewProjectModal(), 120);
+	      }
+	      if (openProjectFromQuery || openTaskFromQuery) {
+        let projectIdToOpen = String(openProjectFromQuery || '');
+        if (!projectIdToOpen && openTaskFromQuery) {
+          const ownerProject = projects.find((p) => (p.tareas || []).some((t) => String(t.id || '') === String(openTaskFromQuery)));
+          projectIdToOpen = String(ownerProject?.id || '');
+        }
+
+        const exists = projectIdToOpen && projects.some((p) => String(p.id) === String(projectIdToOpen));
+        if (exists) {
+          const taskIdToOpen = String(openTaskFromQuery || '');
+          openProjectFromQuery = '';
+          openTaskFromQuery = '';
+          clearOpenProjectQueryParam();
+          setTimeout(() => {
+            if (!taskIdToOpen) {
+              openProject(projectIdToOpen);
+              return;
+            }
+            const targetProject = projects.find((p) => String(p.id) === String(projectIdToOpen));
+            const hasTask = (targetProject?.tareas || []).some((t) => String(t.id || '') === String(taskIdToOpen));
+            if (hasTask) {
+              openProjectTask(projectIdToOpen, taskIdToOpen);
+            } else {
+              openProject(projectIdToOpen);
+            }
+          }, 120);
+        }
+      }
+      // renderSummary(list); // removed
+      // renderList(list); // Removed - function not defined
+      renderCalendar(list);
+    }
+    
+    // Removed filter listeners
+    document.getElementById('focusToggle')?.addEventListener('click', ()=> applyFocus(!focusMode));
+    document.querySelectorAll('.global-task-filter').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        globalTaskFilter = btn.getAttribute('data-task-filter') || 'all';
+        globalTasksClientPage = 1;
+        document.querySelectorAll('.global-task-filter').forEach((b) => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.classList.toggle('bg-slate-900', active);
+          b.classList.toggle('text-white', active);
+        });
+        renderGlobalTasksView(projects);
+        renderQuickActionsStatus('tareas');
+      });
+    });
+
+    initModalPrioritySelector();
+    document.getElementById('taskModalPriority')?.addEventListener('change', refreshTaskModalPriorityUI);
+    document.addEventListener('keydown', (e) => {
+      const quickProjectModal = document.getElementById('quickProjectActionModal');
+      if (e.key === 'Escape' && quickProjectModal && !quickProjectModal.classList.contains('hidden')) {
+        e.preventDefault();
+        closeQuickProjectActionModal();
+        return;
+      }
+
+      const timerPanel = document.getElementById('timerFullscreenPanel');
+      const timerPanelOpen = timerPanel && !timerPanel.classList.contains('hidden');
+      if (e.key === 'Escape' && timerPanelOpen) {
+        e.preventDefault();
+        closeTimerFullscreen();
+        return;
+      }
+
+      if (e.code !== 'Space') return;
+      const modal = document.getElementById('projectModal');
+      if (!modal || modal.classList.contains('hidden')) return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      const isTyping = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+      if (isTyping) return;
+      e.preventDefault();
+      toggleModalTimer();
+    });
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('responsibleSearchWrap');
+      const box = document.getElementById('responsibleSearchResults');
+      if (wrap && box && !wrap.contains(e.target)) {
+        box.classList.add('hidden');
+      }
+
+      const taskWrap = document.getElementById('taskOwnerSearchWrap');
+      const taskBox = document.getElementById('taskOwnerSearchResults');
+      if (taskWrap && taskBox && !taskWrap.contains(e.target)) {
+        taskBox.classList.add('hidden');
+      }
+
+      const filterWrap = e.target?.closest?.('[data-list-filter-wrap]');
+      if (!filterWrap) {
+        closeListFilterDropdowns();
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        document.getElementById('timerFullscreenPanel')?.classList.add('hidden');
+      }
+    });
+
+    document.getElementById('projectFilePreviewModal')?.addEventListener('click', function(event) {
+      event.stopPropagation();
+      if (event.target === this) closeProjectFilePreview();
+    });
+
+    const projectPreviewShell = document.getElementById('projectFilePreviewShell');
+    if (projectPreviewShell) {
+      let projectPreviewTouchDistance = null;
+      projectPreviewShell.addEventListener('wheel', function(event) {
+        if (!document.getElementById('projectFilePreviewModal')?.classList.contains('flex')) return;
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          const direction = event.deltaY > 0 ? -1 : 1;
+          setProjectFilePreviewScale(projectFilePreviewScale + direction * 0.08);
+        }
+      }, { passive: false });
+      projectPreviewShell.addEventListener('touchstart', function(event) {
+        if (event.touches.length === 2) {
+          const dx = event.touches[0].clientX - event.touches[1].clientX;
+          const dy = event.touches[0].clientY - event.touches[1].clientY;
+          projectPreviewTouchDistance = Math.hypot(dx, dy);
+        }
+      }, { passive: true });
+      projectPreviewShell.addEventListener('touchmove', function(event) {
+        if (event.touches.length !== 2 || projectPreviewTouchDistance === null) return;
+        event.preventDefault();
+        const dx = event.touches[0].clientX - event.touches[1].clientX;
+        const dy = event.touches[0].clientY - event.touches[1].clientY;
+        const nextDistance = Math.hypot(dx, dy);
+        const delta = (nextDistance - projectPreviewTouchDistance) / 220;
+        setProjectFilePreviewScale(projectFilePreviewScale + delta);
+        projectPreviewTouchDistance = nextDistance;
+      }, { passive: false });
+      projectPreviewShell.addEventListener('touchend', function(event) {
+        if (event.touches.length < 2) projectPreviewTouchDistance = null;
+      }, { passive: true });
+    }
+
+    document.addEventListener('keydown', function(event) {
+      if (event.key !== 'Escape') return;
+      if (document.getElementById('projectFilePreviewModal')?.classList.contains('flex')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeProjectFilePreview();
+      }
+    }, true);
+
+    window.addEventListener('storage', (event) => {
+      if (event.key !== GLOBAL_TIMER_STATE_KEY && event.key !== POMODORO_STATE_KEY) return;
+      syncPinnedTimerHud();
+    });
+
+    window.addEventListener('infocus-global-timer-updated', () => {
+      syncPinnedTimerHud();
+    });
+
+    window.addEventListener('tdah-pomodoro-state-updated', () => {
+      syncPinnedTimerHud();
+    });
+
+    window.quickAddTaskFromCurrentView = quickAddTaskFromCurrentView;
+    window.quickStartTimerFromCurrentView = quickStartTimerFromCurrentView;
+    window.resetQuickFilters = resetQuickFilters;
+    window.renderQuickProjectActionList = renderQuickProjectActionList;
+    window.confirmQuickProjectAction = confirmQuickProjectAction;
+    window.closeQuickProjectActionModal = closeQuickProjectActionModal;
+
+    const pipVideoEl = document.getElementById('timerPipVideo');
+    setPipSourceVisible(false);
+    setPipButtonState(false);
+    pipVideoEl?.addEventListener('leavepictureinpicture', () => {
+      setPipButtonState(false);
+      if (pipRenderInterval) clearInterval(pipRenderInterval);
+      setPipSourceVisible(false);
+    });
+    pipVideoEl?.addEventListener('webkitpresentationmodechanged', () => {
+      setPipButtonState(pipVideoEl.webkitPresentationMode === 'picture-in-picture');
+      if (pipVideoEl.webkitPresentationMode !== 'picture-in-picture' && pipRenderInterval) {
+        clearInterval(pipRenderInterval);
+      }
+      setPipSourceVisible(pipVideoEl.webkitPresentationMode === 'picture-in-picture');
+    });
+    pipVideoEl?.addEventListener('pause', () => {
+      if (suppressPipPlaybackSync) return;
+      const isNativePip = document.pictureInPictureElement === pipVideoEl || pipVideoEl.webkitPresentationMode === 'picture-in-picture';
+      if (!isNativePip) return;
+      setCurrentProjectTimerRunning(false).catch(() => {});
+    });
+    pipVideoEl?.addEventListener('play', () => {
+      if (suppressPipPlaybackSync) return;
+      const isNativePip = document.pictureInPictureElement === pipVideoEl || pipVideoEl.webkitPresentationMode === 'picture-in-picture';
+      if (!isNativePip) return;
+      setCurrentProjectTimerRunning(true).catch(() => {});
+    });
+
+    function projectDragHasFiles(event) {
+      return !!event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files');
+    }
+
+    const projectDropzone = document.getElementById('modalDropzone');
+    const projectModalEl = document.getElementById('projectModal');
+    const projectDropOverlay = document.getElementById('projectModalDropOverlay');
+    let projectModalDragCounter = 0;
+
+    function showProjectDropOverlay() {
+      if (projectModalReadOnly || !projectDropOverlay) return;
+      projectDropOverlay.classList.add('is-active');
+      projectDropzone?.classList.add('is-dragging');
+    }
+
+    function hideProjectDropOverlay() {
+      projectModalDragCounter = 0;
+      projectDropOverlay?.classList.remove('is-active');
+      projectDropzone?.classList.remove('is-dragging');
+    }
+
+    projectModalEl?.addEventListener('dragenter', (event) => {
+      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      projectModalDragCounter++;
+      showProjectDropOverlay();
+    });
+
+    projectModalEl?.addEventListener('dragover', (event) => {
+      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      showProjectDropOverlay();
+    });
+
+    projectModalEl?.addEventListener('dragleave', (event) => {
+      if (!projectDragHasFiles(event)) return;
+      projectModalDragCounter = Math.max(0, projectModalDragCounter - 1);
+      if (projectModalDragCounter === 0) hideProjectDropOverlay();
+    });
+
+    projectModalEl?.addEventListener('drop', (event) => {
+      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      const files = event.dataTransfer?.files;
+      hideProjectDropOverlay();
+      if (files && files.length) handleModalFileUpload(files);
+    });
+
+    projectDropzone?.addEventListener('dragover', (event) => {
+      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      showProjectDropOverlay();
+    });
+
+    initKanbanDragScroll();
+    setProjectView(currentTaskView);
+
+    // Calendario
+    let calDate = new Date();
+    function renderCalendar(list){
+      const grid = document.getElementById('calendarGrid');
+      const label = document.getElementById('calLabel');
+      const y = calDate.getFullYear(), m = calDate.getMonth();
+      const first = new Date(y,m,1).getDay();
+      const days = new Date(y,m+1,0).getDate();
+      label.textContent = calDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+      grid.innerHTML = '';
+      const startOffset = (first + 6) % 7;
+      for(let i=0;i<startOffset;i++) grid.insertAdjacentHTML('beforeend','<div class="min-h-24 rounded-2xl border border-transparent"></div>');
+      for(let d=1; d<=days; d++){
+        const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const items = list.filter(p => (p.vencimiento||'').startsWith(dateStr));
+        const today = new Date();
+        const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+        grid.insertAdjacentHTML('beforeend', `<div class="min-h-28 rounded-2xl border border-slate-100 bg-slate-50/60 p-2 hover:bg-white transition-colors flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${isToday ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'}">${d}</div>
+            ${items.length ? `<div class="text-[10px] font-bold text-slate-400">${items.length}</div>` : ''}
+          </div>
+          <div class="space-y-2">
+            ${items.map(p=>{
+              const dateForGoogle = p.vencimiento ? p.vencimiento.replace(/-/g,'') : '';
+              const googleLink = dateForGoogle ? `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(p.titulo||'Proyecto')}&dates=${dateForGoogle}/${dateForGoogle}` : '#';
+              return `
+                <div class="rounded-xl border border-slate-100 bg-white px-2 py-1.5 shadow-sm">
+                  <div class="text-[10px] font-bold text-slate-700 truncate">${p.titulo}</div>
+                  <div class="text-[9px] text-slate-400 mt-0.5 flex items-center justify-between">
+                    <span>${p.cliente ?? 'Sin Cliente'}</span>
+                    <a href="${googleLink}" target="_blank" class="text-lime-600 font-bold">+</a>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>`);
+      }
+    }
+    document.getElementById('prevMonth')?.addEventListener('click', ()=>{ calDate.setMonth(calDate.getMonth()-1); renderCalendar(projects); });
+    document.getElementById('nextMonth')?.addEventListener('click', ()=>{ calDate.setMonth(calDate.getMonth()+1); renderCalendar(projects); });
+
+    loadGlobalTasksCollapsedProjects();
+    loadData();
+  </script>
+@endsection

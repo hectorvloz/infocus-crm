@@ -1,0 +1,46 @@
+# InFocus CRM - .htaccess para instalar directamente en la raiz del subdominio.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Bloquear carpetas internas de Laravel cuando todo vive en la raiz web.
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|vendor)(/|$) - [F,L]
+
+    # Bloquear archivos sensibles.
+    RewriteRule ^(\.env|\.env\..*|\.git|\.gitattributes|\.gitignore|composer\.(json|lock)|artisan|phpunit\.xml|package(-lock)?\.json|vite\.config\.js)$ - [F,L]
+
+    # Bloquear ejecucion directa de PHP que no sea el front controller.
+    RewriteCond %{REQUEST_URI} !/index\.php$ [NC]
+    RewriteRule \.php$ - [F,L]
+
+    # Laravel recibe todo lo que no sea archivo/directorio real.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<FilesMatch "^(\.env|\.env\..*|composer\.(json|lock)|artisan|phpunit\.xml|package(-lock)?\.json|vite\.config\.js)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css "access plus 6 months"
+    ExpiresByType application/javascript "access plus 6 months"
+</IfModule>
