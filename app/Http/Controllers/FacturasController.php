@@ -1031,8 +1031,8 @@ class FacturasController extends Controller
             $settingsTpl,
             'template_payment_received_subject',
             'template_payment_received_body',
-            'Factura {folio} parcialmente pagada',
-            "Hola {cliente},\n\nConfirmamos la recepcion de tu pago por {monto_pagado}. La factura queda parcialmente pagada con un saldo pendiente de {saldo_restante}.",
+            'Tu factura {folio} se pagó parcialmente',
+            "Hola {cliente},\n\nTu factura {folio} se pagó parcialmente. Confirmamos la recepción de tu pago por {monto_pagado}; queda un saldo pendiente de {saldo_restante}.",
             [
                 'cliente' => $invoice['cliente'] ?? ($cliente['nombre'] ?? 'Cliente'),
                 'folio' => $invoice['numero'] ?? '---',
@@ -1081,7 +1081,7 @@ class FacturasController extends Controller
         $subject = str_replace(
             ['{folio}', '{cliente}', '{empresa}'],
             [$numero, $clienteNombre, $empresa],
-            (string) ($settingsTpl['template_invoice_paid_subject'] ?? 'Factura {folio} pagada')
+            (string) ($settingsTpl['template_invoice_paid_subject'] ?? '¡Tu factura {folio} ha sido pagada!')
         );
 
         $rowsHtml = '';
@@ -1106,7 +1106,7 @@ class FacturasController extends Controller
 
         $body = '
 <p style="font-size:16px;margin:0 0 12px;">Hola <strong>' . htmlspecialchars($clienteNombre, ENT_QUOTES) . '</strong>,</p>
-<p style="font-size:14px;color:#475569;margin:0 0 20px;">Te confirmamos que la factura <strong>' . htmlspecialchars($numero, ENT_QUOTES) . '</strong> de <strong>' . htmlspecialchars($empresa, ENT_QUOTES) . '</strong> ya se encuentra pagada.</p>
+<p style="font-size:14px;color:#475569;margin:0 0 20px;"><strong>¡Tu factura ' . htmlspecialchars($numero, ENT_QUOTES) . ' ha sido pagada!</strong><br>Te confirmamos que la factura de <strong>' . htmlspecialchars($empresa, ENT_QUOTES) . '</strong> ya se encuentra saldada.</p>
 
 <div style="display:inline-block;padding:6px 16px;border-radius:50px;background:#dcfce7;border:1px solid #bbf7d0;color:#16a34a;font-size:13px;font-weight:700;margin-bottom:20px;">Pagada</div>
 
