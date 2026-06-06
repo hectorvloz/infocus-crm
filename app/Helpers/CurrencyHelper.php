@@ -102,8 +102,14 @@ if (!function_exists('app_public_file_path')) {
         }
 
         $relative = ltrim(parse_url($raw, PHP_URL_PATH) ?: $raw, '/');
+        $publicCandidate = null;
+        try {
+            $publicCandidate = public_path($relative);
+        } catch (\Throwable $e) {
+            $publicCandidate = null;
+        }
         $candidates = [
-            public_path($relative),
+            $publicCandidate,
             base_path('public/' . $relative),
             base_path($relative),
         ];

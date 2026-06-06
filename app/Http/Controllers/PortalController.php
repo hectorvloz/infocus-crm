@@ -376,28 +376,38 @@ class PortalController extends Controller
     private function buildInvoicePdfDownload(array $invoice)
     {
         if (class_exists('\\Barryvdh\\DomPDF\\Facade\\Pdf')) {
-            $this->ensureInvoicePdfRuntime();
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('ventas.facturas_print', [
-                'factura' => $invoice,
-                'pdfMode' => true,
-            ])->setPaper('a4');
-
-            if (method_exists($pdf, 'setOptions')) {
-                $pdf->setOptions([
-                    'defaultFont' => 'DejaVu Sans',
-                    'isRemoteEnabled' => false,
-                    'isHtml5ParserEnabled' => true,
-                    'fontDir' => storage_path('fonts'),
-                    'fontCache' => storage_path('fonts'),
-                    'tempDir' => storage_path('app/dompdf-temp'),
-                    'chroot' => base_path(),
-                ]);
-            }
-
-            return $pdf->download($this->invoicePdfFileName($invoice));
+            return $this->invoicePdfObject($invoice)->download($this->invoicePdfFileName($invoice));
         }
 
         return view('ventas.facturas_print', ['factura' => $invoice]);
+    }
+
+    private function invoicePdfOutput(array $invoice): string
+    {
+        return $this->invoicePdfObject($invoice)->output();
+    }
+
+    private function invoicePdfObject(array $invoice)
+    {
+        $this->ensureInvoicePdfRuntime();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('ventas.facturas_print', [
+            'factura' => $invoice,
+            'pdfMode' => true,
+        ])->setPaper('a4');
+
+        if (method_exists($pdf, 'setOptions')) {
+            $pdf->setOptions([
+                'defaultFont' => 'DejaVu Sans',
+                'isRemoteEnabled' => false,
+                'isHtml5ParserEnabled' => true,
+                'fontDir' => storage_path('fonts'),
+                'fontCache' => storage_path('fonts'),
+                'tempDir' => storage_path('app/dompdf-temp'),
+                'chroot' => base_path(),
+            ]);
+        }
+
+        return $pdf;
     }
 
     private function ensureInvoicePdfRuntime(): void
@@ -539,9 +549,7 @@ class PortalController extends Controller
 
         foreach ($invoices as $inv) {
             if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
-                $factura = $inv;
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('ventas.facturas_print', compact('factura'));
-                $zip->addFromString('factura_' . ($inv['numero'] ?? $inv['id']) . '.pdf', $pdf->output());
+                $zip->addFromString($this->invoicePdfFileName($inv), $this->invoicePdfOutput($inv));
             }
         }
         $zip->close();

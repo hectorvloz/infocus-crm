@@ -18,12 +18,31 @@
     $invoiceLogoSizeMm = (int) ($printSettings['invoice_logo_size'] ?? 52);
     if ($invoiceLogoSizeMm < 24) $invoiceLogoSizeMm = 24;
     if ($invoiceLogoSizeMm > 90) $invoiceLogoSizeMm = 90;
+    $resolvePdfPublicFile = function (string $relative): ?string {
+        $relative = ltrim($relative, '/');
+        $candidates = [];
+        try {
+            $candidates[] = public_path($relative);
+        } catch (\Throwable $e) {
+            // En algunos cPanel Laravel no puede resolver public_path().
+        }
+        $candidates[] = base_path('public/' . $relative);
+        $candidates[] = base_path($relative);
+
+        foreach (array_unique(array_filter($candidates)) as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    };
     $fontFiles = [
-        400 => public_path('fonts/Poppins-Regular.ttf'),
-        500 => public_path('fonts/Poppins-Medium.ttf'),
-        600 => public_path('fonts/Poppins-SemiBold.ttf'),
-        700 => public_path('fonts/Poppins-Bold.ttf'),
-        800 => public_path('fonts/Poppins-ExtraBold.ttf'),
+        400 => $resolvePdfPublicFile('fonts/Poppins-Regular.ttf'),
+        500 => $resolvePdfPublicFile('fonts/Poppins-Medium.ttf'),
+        600 => $resolvePdfPublicFile('fonts/Poppins-SemiBold.ttf'),
+        700 => $resolvePdfPublicFile('fonts/Poppins-Bold.ttf'),
+        800 => $resolvePdfPublicFile('fonts/Poppins-ExtraBold.ttf'),
     ];
 @endphp
 @unless($pdfMode)
