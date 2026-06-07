@@ -434,6 +434,7 @@
     const recurrenceDay = document.getElementById('recurrenceDay');
     const recurrenceEveryMonths = document.getElementById('recurrenceEveryMonths');
     const recurrencePreview = document.getElementById('recurrencePreview');
+    let availableProducts = [];
 
     function formatDateEs(dateObj) {
       return dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -450,13 +451,30 @@
       const lastDay = new Date(candidate.getFullYear(), candidate.getMonth() + 1, 0).getDate();
       candidate.setDate(Math.min(safeDay, lastDay));
 
-      if (candidate < base) {
+      if (candidate <= base) {
         candidate = new Date(candidate.getFullYear(), candidate.getMonth() + safeMonths, 1);
         const lastDay2 = new Date(candidate.getFullYear(), candidate.getMonth() + 1, 0).getDate();
         candidate.setDate(Math.min(safeDay, lastDay2));
       }
 
       return candidate;
+    }
+
+    function selectedRecurringLeadDays() {
+      if (!Array.isArray(availableProducts) || !availableProducts.length) return 0;
+      let leadDays = 0;
+      document.querySelectorAll('#items .item').forEach((row) => {
+        const productId = String(row.querySelector('.product-id-input')?.value || '').trim();
+        const desc = String(row.querySelector('.desc-input')?.value || '').trim();
+        const product = availableProducts.find((p) => (
+          (productId && String(p.id || '') === productId)
+          || (!productId && desc && String(p.nombre || '') === desc)
+        ));
+        if (product?.service_expiry_reminder_enabled) {
+          leadDays = Math.max(leadDays, Math.max(1, Math.min(90, Number(product.service_expiry_reminder_days_before) || 7)));
+        }
+      });
+      return leadDays;
     }
 
     function refreshRecurrenceUI() {
@@ -469,14 +487,26 @@
         return;
       }
 
-      const baseDate = document.getElementById('fecha')?.value || new Date().toISOString().slice(0, 10);
-      const nextDate = computeNextRecurringDate(baseDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+      const issueDate = document.getElementById('fecha')?.value || new Date().toISOString().slice(0, 10);
+      const dueDate = document.getElementById('vencimiento')?.value || issueDate;
+      const leadDays = selectedRecurringLeadDays();
+      const issueObj = new Date(issueDate + 'T12:00:00');
+      const dueObj = new Date(dueDate + 'T12:00:00');
+      let nextDueDate = leadDays > 0 && !Number.isNaN(dueObj.getTime()) && dueObj > issueObj
+        ? dueObj
+        : computeNextRecurringDate(issueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+      const nextDate = nextDueDate ? new Date(nextDueDate.getTime()) : null;
+      if (nextDate && leadDays > 0) {
+        nextDate.setDate(nextDate.getDate() - leadDays);
+      }
       if (!nextDate) {
         recurrencePreview.textContent = 'Configura la fecha de emisión para calcular el próximo envío.';
         return;
       }
 
-      recurrencePreview.textContent = `Próximo envío automático: ${formatDateEs(nextDate)}.`;
+      recurrencePreview.textContent = leadDays > 0
+        ? `Próximo envío automático: ${formatDateEs(nextDate)}. Vence: ${formatDateEs(nextDueDate)}.`
+        : `Próximo envío automático: ${formatDateEs(nextDate)}.`;
     }
 
     recurrenceEnabled?.addEventListener('change', refreshRecurrenceUI);
@@ -733,7 +763,6 @@
     });
 
     // Productos Integration (Datalist)
-    let availableProducts = [];
     const productsListHtml = document.getElementById('productsList');
 
     function renderProductMenu(menu, inputValue = '') {
@@ -845,6 +874,7 @@
         
         productsListHtml.innerHTML = availableProducts.map(p => `<option value="${p.nombre}">`).join('');
         initExistingProductSelectors();
+        refreshRecurrenceUI();
       } catch(e) { console.error('Error loading products', e); }
     }
     loadProducts();
@@ -868,6 +898,7 @@
             detailPreview.classList.toggle('hidden', detailText === '');
           }
           recalc();
+          refreshRecurrenceUI();
         } else {
           delete row.dataset.productPriceBase;
           const idInput = row.querySelector('.product-id-input');
@@ -879,6 +910,7 @@
             detailPreview.textContent = '';
             detailPreview.classList.add('hidden');
           }
+          refreshRecurrenceUI();
         }
       }
     });

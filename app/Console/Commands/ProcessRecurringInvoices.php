@@ -35,6 +35,10 @@ class ProcessRecurringInvoices extends Command
             ->filter(fn ($p) => !empty($p['nombre']))
             ->keyBy(fn ($p) => mb_strtolower(trim((string) $p['nombre'])))
             ->all();
+        $productsById = collect($productosStore->all() ?: [])
+            ->filter(fn ($p) => !empty($p['id']))
+            ->keyBy(fn ($p) => (string) $p['id'])
+            ->all();
 
         $allInvoices = $facturasStore->all();
         $today = $now->copy()->startOfDay();
@@ -54,6 +58,7 @@ class ProcessRecurringInvoices extends Command
             $rec = (array) ($template['recurrencia'] ?? []);
             $dayOfMonth = max(1, min(31, (int) ($rec['day_of_month'] ?? 1)));
             $everyMonths = max(1, min(12, (int) ($rec['every_months'] ?? 1)));
+            $leadDaysBefore = $this->recurringLeadDaysForTemplate($template, $productsById, $productsByName);
 
             try {
                 $nextSend = Carbon::parse((string) $rec['next_send'])->startOfDay();
@@ -68,26 +73,31 @@ class ProcessRecurringInvoices extends Command
 
             $rec['last_checked_at'] = now()->toIso8601String();
 
-            $this->processServiceExpiryReminders(
-                $facturasStore,
-                $clientesStore,
-                $settings,
-                $template,
-                $rec,
-                $nextSend,
-                $today,
-                $productsByName,
-                $allInvoices
-            );
+            if ($leadDaysBefore <= 0) {
+                $this->processServiceExpiryReminders(
+                    $facturasStore,
+                    $clientesStore,
+                    $settings,
+                    $template,
+                    $rec,
+                    $nextSend,
+                    $today,
+                    $productsByName,
+                    $allInvoices
+                );
+            }
 
             $safety = 0;
             while ($nextSend->lte($dueThrough) && $safety < 24) {
                 $safety++;
                 $issueDate = $nextSend->format('Y-m-d');
+                $cycleDueDate = $leadDaysBefore > 0
+                    ? $nextSend->copy()->addDays($leadDaysBefore)->format('Y-m-d')
+                    : null;
                 $newInvoice = $this->findRecurringCycleInvoice($allInvoices, $template, $issueDate);
                 $createdNow = false;
                 if (!$newInvoice) {
-                    $newInvoice = $this->createRecurringInvoice($facturasStore, $allInvoices, $template, $issueDate);
+                    $newInvoice = $this->createRecurringInvoice($facturasStore, $allInvoices, $template, $issueDate, $cycleDueDate);
                     $createdCount++;
                     $createdNow = true;
                 }
@@ -128,8 +138,9 @@ class ProcessRecurringInvoices extends Command
 
                 $this->notifyOwner($settings, $template, $newInvoice, $clientEmail, $sendOk, $sendError);
 
-                $nextSend = $this->calculateNextSend($nextSend, $dayOfMonth, $everyMonths);
+                $nextSend = $this->calculateNextSend($nextSend, $dayOfMonth, $everyMonths, $leadDaysBefore);
                 $rec['next_send'] = $nextSend->format('Y-m-d');
+                $rec['lead_days_before'] = $leadDaysBefore;
                 $facturasStore->update($template['id'], ['recurrencia' => $rec]);
             }
 
@@ -305,7 +316,7 @@ class ProcessRecurringInvoices extends Command
         return null;
     }
 
-    private function createRecurringInvoice(FileStore $store, array &$allInvoices, array $template, string $issueDate): array
+    private function createRecurringInvoice(FileStore $store, array &$allInvoices, array $template, string $issueDate, ?string $cycleDueDate = null): array
     {
         $new = $template;
         unset(
@@ -327,7 +338,9 @@ class ProcessRecurringInvoices extends Command
         $new['recurring_send_status'] = 'pending';
         $new['recurring_generated_at'] = now()->toISOString();
 
-        if (!empty($template['vencimiento']) && !empty($template['fecha'])) {
+        if ($cycleDueDate !== null) {
+            $new['vencimiento'] = $cycleDueDate;
+        } elseif (!empty($template['vencimiento']) && !empty($template['fecha'])) {
             $creditoDias = max(0, (int) floor((strtotime($template['vencimiento']) - strtotime($template['fecha'])) / 86400));
             $new['vencimiento'] = date('Y-m-d', strtotime($issueDate . " +{$creditoDias} days"));
         }
@@ -543,8 +556,41 @@ class ProcessRecurringInvoices extends Command
         }
     }
 
-    private function calculateNextSend(Carbon $current, int $dayOfMonth, int $everyMonths): Carbon
+    private function recurringLeadDaysForTemplate(array $template, array $productsById, array $productsByName): int
     {
+        $leadDays = 0;
+        foreach ((array) ($template['items'] ?? []) as $item) {
+            $product = null;
+            $productId = trim((string) ($item['producto_id'] ?? ''));
+            if ($productId !== '') {
+                $product = $productsById[$productId] ?? null;
+            }
+
+            if (!$product) {
+                $name = mb_strtolower(trim((string) ($item['descripcion'] ?? '')));
+                $product = $name !== '' ? ($productsByName[$name] ?? null) : null;
+            }
+
+            if (!$product || empty($product['service_expiry_reminder_enabled'])) {
+                continue;
+            }
+
+            $leadDays = max($leadDays, max(1, min(90, (int) ($product['service_expiry_reminder_days_before'] ?? 7))));
+        }
+
+        return $leadDays;
+    }
+
+    private function calculateNextSend(Carbon $current, int $dayOfMonth, int $everyMonths, int $leadDaysBefore = 0): Carbon
+    {
+        if ($leadDaysBefore > 0) {
+            $currentDue = $current->copy()->addDays($leadDaysBefore);
+            $nextDue = $currentDue->copy()->addMonthsNoOverflow($everyMonths);
+            $nextDue->day(min($dayOfMonth, $nextDue->daysInMonth));
+
+            return $nextDue->subDays($leadDaysBefore)->startOfDay();
+        }
+
         $next = $current->copy()->addMonthsNoOverflow($everyMonths);
         $next->day(min($dayOfMonth, $next->daysInMonth));
 

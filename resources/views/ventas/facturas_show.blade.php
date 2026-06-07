@@ -72,6 +72,15 @@
         @endif
         <div class="text-slate-600"><span class="font-bold text-slate-900">Fecha:</span> {{ \Illuminate\Support\Carbon::parse($factura['fecha'])->format('d/m/Y') }}</div>
         @if(!empty($factura['vencimiento']))<div class="text-slate-600"><span class="font-bold text-slate-900">Vence:</span> {{ \Illuminate\Support\Carbon::parse($factura['vencimiento'])->format('d/m/Y') }}</div>@endif
+        @if(!empty($recurrenceSummary))
+          <div class="mt-3 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-lime-200 bg-lime-50 px-3 py-2 text-xs md:text-sm text-slate-700">
+            <span class="font-extrabold text-lime-700">Factura recurrente</span>
+            <span class="hidden sm:inline text-slate-300">|</span>
+            <span><span class="font-bold text-slate-900">Próximo envío:</span> {{ $recurrenceSummary['next_send_human'] }}</span>
+            <span class="hidden sm:inline text-slate-300">|</span>
+            <span>{{ $recurrenceSummary['frequency'] }}</span>
+          </div>
+        @endif
       </div>
       <div class="hidden md:block text-xs text-slate-400">Acciones</div>
     </div>

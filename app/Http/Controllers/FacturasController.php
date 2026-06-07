@@ -629,7 +629,8 @@ class FacturasController extends Controller
                 'enabled' => true,
                 'day_of_month' => max(1, min(31, $day)),
                 'every_months' => max(1, min(12, $everyMonths)),
-                'next_send' => $this->calculateNextRecurringDate($day, $everyMonths, $data['fecha'] ?? date('Y-m-d')),
+                'next_send' => $this->calculateNextRecurringSendDate($day, $everyMonths, $data['fecha'] ?? date('Y-m-d'), $data['vencimiento'] ?? null, $data['items'] ?? []),
+                'lead_days_before' => $this->recurringLeadDaysForItems($data['items'] ?? []),
                 'last_sent_at' => null,
             ];
         } else {
@@ -1400,8 +1401,10 @@ class FacturasController extends Controller
                 'enabled' => true,
                 'day_of_month' => max(1, min(31, $day)),
                 'every_months' => max(1, min(12, $everyMonths)),
-                'next_send' => $this->calculateNextRecurringDate($day, $everyMonths, $data['fecha'] ?? date('Y-m-d')),
+                'next_send' => $this->calculateNextRecurringSendDate($day, $everyMonths, $data['fecha'] ?? date('Y-m-d'), $data['vencimiento'] ?? null, $data['items'] ?? []),
+                'lead_days_before' => $this->recurringLeadDaysForItems($data['items'] ?? []),
                 'last_sent_at' => $currentRec['last_sent_at'] ?? null,
+                'service_reminder_sent' => $currentRec['service_reminder_sent'] ?? [],
             ];
         } else {
             $data['recurrencia'] = null;
@@ -1452,7 +1455,7 @@ class FacturasController extends Controller
         $candidate = $base->copy();
         $candidate->day(min($day, $candidate->daysInMonth));
 
-        if ($candidate->lt($base)) {
+        if ($candidate->lte($base)) {
             $candidate->addMonthsNoOverflow($interval);
             $candidate->day(min($day, $candidate->daysInMonth));
         }
@@ -1464,6 +1467,77 @@ class FacturasController extends Controller
         }
 
         return $candidate->format('Y-m-d');
+    }
+
+    protected function calculateNextRecurringSendDate(int $dayOfMonth, int $everyMonths = 1, ?string $issueDate = null, ?string $dueDate = null, array $items = []): string
+    {
+        $leadDays = $this->recurringLeadDaysForItems($items);
+        if ($leadDays <= 0) {
+            return $this->calculateNextRecurringDate($dayOfMonth, $everyMonths, $issueDate);
+        }
+
+        $day = max(1, min(31, $dayOfMonth));
+        $interval = max(1, min(12, $everyMonths));
+        $today = \Illuminate\Support\Carbon::today();
+        $issue = $issueDate ? \Illuminate\Support\Carbon::parse($issueDate)->startOfDay() : $today->copy();
+        $cycleDue = null;
+
+        if ($dueDate) {
+            $due = \Illuminate\Support\Carbon::parse($dueDate)->startOfDay();
+            if ($due->gt($issue)) {
+                $cycleDue = $due;
+            }
+        }
+
+        if (!$cycleDue) {
+            $cycleDue = \Illuminate\Support\Carbon::parse(
+                $this->calculateNextRecurringDate($day, $interval, $issueDate)
+            )->startOfDay();
+        }
+
+        while ($cycleDue->copy()->subDays($leadDays)->lt($today)) {
+            $cycleDue->addMonthsNoOverflow($interval);
+            $cycleDue->day(min($day, $cycleDue->daysInMonth));
+        }
+
+        return $cycleDue->subDays($leadDays)->format('Y-m-d');
+    }
+
+    protected function recurringLeadDaysForItems(array $items): int
+    {
+        $products = collect((new FileStore('productos.json'))->all() ?: []);
+        if ($products->isEmpty()) {
+            return 0;
+        }
+
+        $productsById = $products
+            ->filter(fn ($p) => !empty($p['id']))
+            ->keyBy(fn ($p) => (string) $p['id']);
+        $productsByName = $products
+            ->filter(fn ($p) => !empty($p['nombre']))
+            ->keyBy(fn ($p) => mb_strtolower(trim((string) $p['nombre'])));
+
+        $leadDays = 0;
+        foreach ($items as $item) {
+            $product = null;
+            $productId = trim((string) ($item['producto_id'] ?? ''));
+            if ($productId !== '') {
+                $product = $productsById->get($productId);
+            }
+
+            if (!$product) {
+                $name = mb_strtolower(trim((string) ($item['descripcion'] ?? '')));
+                $product = $name !== '' ? $productsByName->get($name) : null;
+            }
+
+            if (!$product || empty($product['service_expiry_reminder_enabled'])) {
+                continue;
+            }
+
+            $leadDays = max($leadDays, max(1, min(90, (int) ($product['service_expiry_reminder_days_before'] ?? 7))));
+        }
+
+        return $leadDays;
     }
 
     public function show(string $id)
@@ -1485,7 +1559,57 @@ class FacturasController extends Controller
         $whats = $settings['whatsapp_number'] ?? '';
         $waTo = $whats ? 'https://wa.me/'.preg_replace('/\D/','',$whats).'?text='.rawurlencode($subject.' '.$publicUrl) : '#';
         $paymentMethods = $this->paymentMethodOptions();
-        return view('ventas.facturas_show', compact('factura','cliente','invoiceFields','clienteEmail','publicUrl','subject','body','waTo','paymentMethods'));
+        $recurrenceSummary = $this->invoiceRecurrenceSummary($factura);
+        return view('ventas.facturas_show', compact('factura','cliente','invoiceFields','clienteEmail','publicUrl','subject','body','waTo','paymentMethods','recurrenceSummary'));
+    }
+
+    private function invoiceRecurrenceSummary(array $factura): ?array
+    {
+        $source = $factura;
+        if (empty(data_get($source, 'recurrencia.enabled')) && !empty($factura['recurrencia_origen_id'])) {
+            $template = $this->store->find((string) $factura['recurrencia_origen_id']);
+            if ($template) {
+                $source = $template;
+            }
+        }
+
+        $rec = (array) ($source['recurrencia'] ?? []);
+        if (empty($rec['enabled']) && empty($rec['next_send'])) {
+            return null;
+        }
+
+        $day = max(1, min(31, (int) ($rec['day_of_month'] ?? 1)));
+        $everyMonths = max(1, min(12, (int) ($rec['every_months'] ?? 1)));
+        $nextSend = (string) ($rec['next_send'] ?? '');
+
+        return [
+            'day' => $day,
+            'every_months' => $everyMonths,
+            'frequency' => $everyMonths === 1 ? 'Cada mes' : "Cada {$everyMonths} meses",
+            'next_send' => $nextSend,
+            'next_send_human' => $nextSend !== '' ? $this->humanDateEs($nextSend) : 'Pendiente por calcular',
+        ];
+    }
+
+    private function humanDateEs(string $date): string
+    {
+        $dt = \Illuminate\Support\Carbon::parse($date);
+        $months = [
+            1 => 'enero',
+            2 => 'febrero',
+            3 => 'marzo',
+            4 => 'abril',
+            5 => 'mayo',
+            6 => 'junio',
+            7 => 'julio',
+            8 => 'agosto',
+            9 => 'septiembre',
+            10 => 'octubre',
+            11 => 'noviembre',
+            12 => 'diciembre',
+        ];
+
+        return $dt->format('j') . ' de ' . ($months[(int) $dt->format('n')] ?? $dt->format('m')) . ' de ' . $dt->format('Y');
     }
 
     private function paymentMethodOptions(): array

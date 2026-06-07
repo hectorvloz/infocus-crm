@@ -42,12 +42,15 @@ class SendInvoiceDueReminders extends Command
             }
 
             $remaining = $today->diffInDays($dueDate, false);
-            if ($remaining !== $days) {
+            $isDueToday = $remaining === 0;
+            if (!$isDueToday && $remaining !== $days) {
                 continue;
             }
 
             $already = collect($factura['due_reminders_sent'] ?? [])->map(fn ($x) => (string) $x)->all();
-            $token = $today->toDateString() . ':' . $days;
+            $token = $isDueToday
+                ? $today->toDateString() . ':overdue'
+                : $today->toDateString() . ':' . $days;
             if (in_array($token, $already, true)) {
                 continue;
             }
@@ -71,23 +74,43 @@ class SendInvoiceDueReminders extends Command
                 'empresa' => $settings['company_name'] ?? config('app.name', 'Infocus CRM'),
             ];
 
-            [$subject, $body] = TemplateMail::render(
-                $settings,
-                'template_invoice_due_subject',
-                'template_invoice_due_body',
-                'Tu factura {folio} vence en {dias_restantes} dias',
-                "Hola {cliente},\n\nTu factura {folio} vence el {vencimiento}.\n\nTotal: {total}",
-                $vars,
-                [
-                    ['label' => 'Pagar ahora', 'url' => $linkPay, 'kind' => 'primary'],
-                    ['label' => 'Ver factura', 'url' => $linkView, 'kind' => 'secondary'],
-                ]
-            );
+            if ($isDueToday) {
+                [$subject, $body] = TemplateMail::render(
+                    $settings,
+                    'template_invoice_overdue_subject',
+                    'template_invoice_overdue_body',
+                    '¡Tu factura {folio} está vencida!',
+                    "Hola {cliente},\n\n¡Tu factura {folio} está vencida! La fecha de vencimiento es hoy, {vencimiento}.\n\nPara evitar retrasos en tu servicio o gestión, realiza el pago lo antes posible.\n\nTotal pendiente: {total}\n\nPaga aquí: {link_pago}\n\n{empresa}",
+                    $vars,
+                    [
+                        ['label' => 'Pagar ahora', 'url' => $linkPay, 'kind' => 'primary'],
+                        ['label' => 'Ver factura', 'url' => $linkView, 'kind' => 'secondary'],
+                    ]
+                );
+            } else {
+                [$subject, $body] = TemplateMail::render(
+                    $settings,
+                    'template_invoice_due_subject',
+                    'template_invoice_due_body',
+                    'Tu factura {folio} vence en {dias_restantes} dias',
+                    "Hola {cliente},\n\nTu factura {folio} vence el {vencimiento}.\n\nTotal: {total}",
+                    $vars,
+                    [
+                        ['label' => 'Pagar ahora', 'url' => $linkPay, 'kind' => 'primary'],
+                        ['label' => 'Ver factura', 'url' => $linkView, 'kind' => 'secondary'],
+                    ]
+                );
+            }
 
             try {
                 TemplateMail::send((string) $to, $subject, $body);
                 $already[] = $token;
-                $facturasStore->update((string) $factura['id'], ['due_reminders_sent' => array_values(array_unique($already))]);
+                $updates = ['due_reminders_sent' => array_values(array_unique($already))];
+                if ($isDueToday) {
+                    $updates['estado'] = 'Vencida';
+                    $updates['overdue_notified_at'] = now()->toIso8601String();
+                }
+                $facturasStore->update((string) $factura['id'], $updates);
                 $sent++;
             } catch (\Throwable $e) {
                 $this->warn('Error enviando recordatorio de factura ' . ($factura['numero'] ?? $factura['id']) . ': ' . $e->getMessage());

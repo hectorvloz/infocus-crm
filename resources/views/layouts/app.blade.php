@@ -2552,6 +2552,117 @@
         return reminder.id;
       }
 
+      function reminderSearchText(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function reminderSectionForAi(sectionTitle) {
+        const cleanTitle = String(sectionTitle || '').trim();
+        if (!cleanTitle) {
+          return activeReminderSectionId || reminderSections[0]?.id || 'default';
+        }
+
+        const categoryId = activeReminderCategoryId || reminderCategoriesData[0]?.id || 'default-cat';
+        const normalizedTitle = reminderSearchText(cleanTitle);
+        const existing = reminderSections.find((section) => (
+          String(section.categoryId || categoryId) === String(categoryId)
+          && reminderSearchText(section.title || '') === normalizedTitle
+        ));
+        if (existing) {
+          return existing.id;
+        }
+
+        const section = {
+          id: uid('section'),
+          categoryId,
+          title: cleanTitle,
+          collapsed: false,
+        };
+        reminderSections.push(section);
+        return section.id;
+      }
+
+      function resolveAiReminderLink(action) {
+        const link = action?.link || null;
+        if (link?.type && link?.id) {
+          return {
+            type: link.type,
+            id: String(link.id),
+            title: String(link.title || (link.type === 'task' ? 'Tarea' : 'Proyecto')),
+            subtitle: String(link.subtitle || ''),
+            projectId: String(link.projectId || link.id || ''),
+          };
+        }
+
+        const taskId = String(action?.task?.id || '');
+        const taskTitle = reminderSearchText(action?.task?.title || action?.task || '');
+        const projectId = String(action?.project?.id || action?.task?.projectId || '');
+        const projectTitle = reminderSearchText(action?.project?.title || action?.project || '');
+
+        if (taskId) {
+          const byTaskId = reminderLinkOptions.find((item) => item.type === 'task' && String(item.id) === taskId);
+          if (byTaskId) return byTaskId;
+        }
+
+        if (taskTitle) {
+          const byTaskTitle = reminderLinkOptions.find((item) => (
+            item.type === 'task'
+            && (!projectId || String(item.projectId || '') === projectId)
+            && reminderSearchText(item.title || '') === taskTitle
+          )) || reminderLinkOptions.find((item) => (
+            item.type === 'task'
+            && reminderSearchText(item.title || '').includes(taskTitle)
+          ));
+          if (byTaskTitle) return byTaskTitle;
+        }
+
+        if (projectId) {
+          const byProjectId = reminderLinkOptions.find((item) => item.type === 'project' && String(item.id) === projectId);
+          if (byProjectId) return byProjectId;
+        }
+
+        if (projectTitle) {
+          return reminderLinkOptions.find((item) => (
+            item.type === 'project'
+            && (reminderSearchText(item.title || '') === projectTitle || reminderSearchText(item.title || '').includes(projectTitle))
+          )) || null;
+        }
+
+        return null;
+      }
+
+      window.__infocusAiCreateReminder = async function(action) {
+        const text = String(action?.text || '').trim();
+        if (!text) {
+          throw new Error('reminder_text_missing');
+        }
+
+        loadReminders();
+        await loadReminderLinkOptions();
+        const sectionId = reminderSectionForAi(action?.sectionTitle || '');
+        activeReminderSectionId = sectionId;
+        const link = resolveAiReminderLink(action);
+        const id = addReminder(text, action?.priority || '', action?.dueDate || '', link, { sectionId, afterId: '' });
+        if (!id) {
+          throw new Error('reminder_create_failed');
+        }
+
+        openRemindersPanel();
+        setTimeout(() => {
+          const row = remindersList?.querySelector(`[data-reminder-id="${CSS.escape(id)}"]`);
+          row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row?.classList.add('bg-[#f4fdac]/45');
+          setTimeout(() => row?.classList.remove('bg-[#f4fdac]/45'), 900);
+        }, 80);
+
+        return { ok: true, id };
+      };
+
       function playReminderCheckBurst(button) {
         if (!button) return;
         button.querySelector('.reminder-check-burst')?.remove();
@@ -5491,7 +5602,7 @@
         if (/te refieres a .*nota.* o .*proyecto|quieres crear un proyecto basado en esa nota|actualizar la nota que tienes abierta/i.test(text)) {
           return false;
         }
-        const hasNonEmailAction = /factura|proyecto|tarea|subtarea|nota|gasto|reunion|cotizacion|contrato/.test(text);
+        const hasNonEmailAction = /factura|proyecto|tarea|subtarea|nota|recordatorio|gasto|reunion|cotizacion|contrato/.test(text);
         if (/correo|email|e-mail/.test(text) && !hasNonEmailAction && !isStructuredEmailProposal(content)) {
           return false;
         }
@@ -5503,6 +5614,8 @@
           'nueva tarea',
           'nueva subtarea',
           'nueva nota',
+          'nuevo recordatorio',
+          'recordatorio propuesto',
           'actualizar nota personal',
           'editar nota personal',
           'reescribir nota personal',
@@ -5522,11 +5635,12 @@
           'proyecto propuesto',
           'tareas sugeridas',
           'gasto propuesto',
+          'crear recordatorio',
           'confirmas la creacion',
           'confirmas crear',
           'puedo crear',
         ].some((needle) => text.includes(needle));
-        const hasEntity = ['factura', 'proyecto', 'tarea', 'subtarea', 'nota', 'gasto', 'correo', 'email', 'e-mail', 'reunion', 'cotizacion', 'contrato'].some((needle) => text.includes(needle));
+        const hasEntity = ['factura', 'proyecto', 'tarea', 'subtarea', 'nota', 'recordatorio', 'gasto', 'correo', 'email', 'e-mail', 'reunion', 'cotizacion', 'contrato'].some((needle) => text.includes(needle));
         const asksConfirmation = ['confirmas', 'crear ahora', 'enviar ahora', 'agregar ahora', 'actualizar ahora', 'antes de ejecutar', 'antes de enviarlo', 'antes de enviar', 'antes de agregar', 'antes de actualizar', 'antes de crearlo', 'antes de crear'].some((needle) => text.includes(needle));
 
         return hasEntity && (hasCreateIntent || asksConfirmation);
@@ -5542,6 +5656,9 @@
         }
         if (isPersonalNoteProposal(content)) {
           return { accept: 'Crear nota', reject: 'No crear', busy: 'Creando nota...' };
+        }
+        if (/recordatorio|recordar/.test(text)) {
+          return { accept: 'Crear recordatorio', reject: 'No crear', busy: 'Creando recordatorio...' };
         }
         const isProjectCreation = /proyecto/.test(text)
           && (/nuevo proyecto|proyecto propuesto|crear proyecto|crea proyecto|tareas sugeridas|listo para crear|crear ahora este proyecto|crear ahora el proyecto/.test(text));
@@ -5681,6 +5798,9 @@
         }
         if (isPersonalNoteProposal(content)) {
           return ok ? 'Nota creada en Mis Notas' : 'No pude crear la nota. Intenta de nuevo o revisa tus permisos.';
+        }
+        if (/recordatorio|recordar/.test(normalizeAiText(content))) {
+          return ok ? 'Recordatorio creado en tu modal' : 'No pude crear el recordatorio. Intenta de nuevo.';
         }
         return ok ? 'Acción aplicada en el CRM' : 'No pude ejecutar eso en el CRM. Intenta de nuevo o revisa tus permisos.';
       }
@@ -5923,6 +6043,8 @@
           await revealAssistantMessage(thinking, json.message?.content || 'No pude ejecutar esa acción.');
           if (json.ok && json.note_update && window.__infocusAiApplyNoteUpdate) {
             await window.__infocusAiApplyNoteUpdate(json.note_update);
+          } else if (json.ok && json.reminder_action && window.__infocusAiCreateReminder) {
+            await window.__infocusAiCreateReminder(json.reminder_action);
           } else if (json.ok && actionContext.forced_intent === 'note_update') {
             throw new Error('La acción no devolvió la actualización de la nota abierta.');
           }

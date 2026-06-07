@@ -196,6 +196,7 @@ class AiController extends Controller
             'url' => $result['url'] ?? null,
             'project_id' => $result['project_id'] ?? null,
             'note_update' => $result['note_update'] ?? null,
+            'reminder_action' => $result['reminder_action'] ?? null,
         ], ($result['ok'] ?? false) ? 200 : 422);
     }
 

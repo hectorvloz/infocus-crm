@@ -61,6 +61,10 @@ class AiActionExecutor
             return $this->withActionLog($this->sendEmail($text), 'correo');
         }
 
+        if ($intent === 'reminder') {
+            return $this->withActionLog($this->createReminderAction($text), 'recordatorio');
+        }
+
         if ($intent === 'meeting') {
             return $this->withActionLog($this->createMeeting($text), 'reunión');
         }
@@ -127,6 +131,10 @@ class AiActionExecutor
             return $this->withActionLog($this->addProjectTask($text), 'tarea');
         }
 
+        if (str_contains($normalized, 'recordatorio') || str_contains($normalized, 'recordar')) {
+            return $this->withActionLog($this->createReminderAction($text), 'recordatorio');
+        }
+
         if (str_contains($normalized, 'proyecto')) {
             return $this->withActionLog($this->createProjectWithTasks($text), 'proyecto');
         }
@@ -139,7 +147,7 @@ class AiActionExecutor
             return $this->failure('Puedo preparar el gasto, pero necesito dejar cerrado el formulario automático de gastos antes de guardarlo en el CRM.');
         }
 
-        return $this->failure('Por ahora puedo ejecutar proyectos, tareas, notas, subtareas, reuniones, cotizaciones, contratos y correos desde el botón de confirmación.');
+        return $this->failure('Por ahora puedo ejecutar proyectos, tareas, notas, subtareas, recordatorios, reuniones, cotizaciones, contratos y correos desde el botón de confirmación.');
     }
 
     private function resolveProposalIntent(string $text, string $normalized): ?string
@@ -202,6 +210,14 @@ class AiActionExecutor
             return 'email';
         }
 
+        if (
+            $hasHeader(['Recordatorio', 'Recordatorio propuesto', 'Nuevo recordatorio'])
+            || $hasField(['Recordatorio', 'Texto']) && (str_contains($normalized, 'recordatorio') || str_contains($normalized, 'recordar'))
+            || str_contains($normalized, 'crear recordatorio')
+        ) {
+            return 'reminder';
+        }
+
         if ($hasHeader(['Reunión', 'Reunion', 'Reunión propuesta', 'Reunion propuesta']) || (str_contains($normalized, 'programar ahora') && str_contains($normalized, 'reunion'))) {
             return 'meeting';
         }
@@ -230,6 +246,7 @@ class AiActionExecutor
         $hasNote = preg_match('/\bnota(s)?\b/u', $directive) === 1;
         $hasProject = preg_match('/\bproyecto(s)?\b/u', $directive) === 1;
         $hasTask = preg_match('/\btarea(s)?\b/u', $directive) === 1;
+        $hasReminder = preg_match('/\b(recordatorio(s)?|recordar|recuerdame|recu[eé]rdame|reminder)\b/u', $directive) === 1;
         $hasEmail = preg_match('/\b(correo|email|e-mail)\b/u', $directive) === 1;
         $hasMeeting = preg_match('/\b(reunion|meeting|reuniones)\b/u', $directive) === 1;
         $hasQuote = preg_match('/\b(cotizacion|quote)\b/u', $directive) === 1;
@@ -272,6 +289,10 @@ class AiActionExecutor
 
         if ($hasMeeting && ($hasCreate || preg_match('/\b(programa|programar|agenda|agendar)\b/u', $directive) === 1) && ($notePos === null || ($meetingPos !== null && $meetingPos < $notePos))) {
             return 'meeting';
+        }
+
+        if ($hasReminder && ($hasCreate || $hasUpdate || preg_match('/\b(recordar|recuerdame|recu[eé]rdame)\b/u', $directive) === 1)) {
+            return 'reminder';
         }
 
         if ($hasProject && $hasCreate && ! $hasProjectNotePhrase && ($notePos === null || ($projectPos !== null && $projectPos < $notePos))) {
@@ -325,6 +346,121 @@ class AiActionExecutor
         }
 
         return null;
+    }
+
+    private function createReminderAction(string $proposal): array
+    {
+        $text = $this->stripMarkdown($this->field($proposal, ['Texto', 'Recordatorio', 'Título', 'Titulo', 'Descripción', 'Descripcion']));
+        if ($text === '') {
+            if (preg_match('/(?:^|\R)\s*(?:[-*•]\s*)?\**(?:Recordatorio propuesto|Nuevo recordatorio|Recordatorio)\**\s*:?\s*(.+?)(?=\R|$)/iu', $proposal, $match)) {
+                $text = $this->stripMarkdown((string) ($match[1] ?? ''));
+            }
+        }
+        if ($text === '') {
+            $body = $this->extractBody($proposal);
+            $text = trim(preg_split('/\R/u', $body)[0] ?? '');
+        }
+        if ($text === '') {
+            return $this->failure('No encontré el texto del recordatorio. Incluye una línea "Texto: ..." para crearlo.');
+        }
+
+        $project = $this->projectFromProposalOrContext($proposal, ['Proyecto', 'En proyecto']);
+        $taskName = $this->stripMarkdown($this->field($proposal, ['Tarea', 'Enlazar tarea', 'Tarea vinculada']));
+        $task = null;
+
+        if ($project && $taskName !== '') {
+            $task = $this->matchTask($project, $taskName);
+        }
+
+        if (!$task && $project) {
+            $contextTaskId = trim((string) data_get($this->context, 'task_id', ''));
+            if ($contextTaskId !== '') {
+                $task = collect($project['tareas'] ?? [])->first(fn ($item) => (string) ($item['id'] ?? $item['uid'] ?? '') === $contextTaskId);
+            }
+        }
+
+        if (!$task && $taskName !== '') {
+            foreach ($this->projects->all() as $candidateProject) {
+                if (! $this->canUseProject($candidateProject)) {
+                    continue;
+                }
+                $candidateTask = $this->matchTask($candidateProject, $taskName);
+                if ($candidateTask) {
+                    $project = $candidateProject;
+                    $task = $candidateTask;
+                    break;
+                }
+            }
+        }
+
+        $dateRaw = $this->stripMarkdown($this->field($proposal, ['Fecha', 'Vencimiento', 'Fecha de vencimiento', 'Para fecha']));
+        $date = $this->parseDate($dateRaw);
+        $dateWantsDue = $dateRaw === '' || str_contains(Str::lower(Str::ascii($dateRaw)), 'vencimiento');
+        if (!$date && $dateWantsDue) {
+            $date = $this->taskDueDate($task) ?: $this->parseDate((string) ($project['vencimiento'] ?? ''));
+        }
+
+        $priorityRaw = $this->stripMarkdown($this->field($proposal, ['Prioridad']));
+        $priority = $priorityRaw !== '' ? $this->normalizePriority($priorityRaw) : '';
+        $sectionTitle = $this->stripMarkdown($this->field($proposal, ['Lista', 'Sección', 'Seccion', 'Categoría', 'Categoria']));
+
+        $link = null;
+        if ($task && $project) {
+            $taskId = (string) ($task['id'] ?? $task['uid'] ?? '');
+            if ($taskId !== '') {
+                $link = [
+                    'type' => 'task',
+                    'id' => $taskId,
+                    'title' => (string) ($task['title'] ?? $task['texto'] ?? $task['nombre'] ?? 'Tarea'),
+                    'subtitle' => (string) ($project['titulo'] ?? 'Proyecto'),
+                    'projectId' => (string) ($project['id'] ?? ''),
+                ];
+            }
+        }
+
+        if (!$link && $project) {
+            $projectId = (string) ($project['id'] ?? '');
+            if ($projectId !== '') {
+                $link = [
+                    'type' => 'project',
+                    'id' => $projectId,
+                    'title' => (string) ($project['titulo'] ?? 'Proyecto'),
+                    'subtitle' => 'Proyecto',
+                    'projectId' => $projectId,
+                ];
+            }
+        }
+
+        $details = [
+            '- **Recordatorio:** ' . $text,
+        ];
+        if ($priority !== '') $details[] = '- **Prioridad:** ' . $priority;
+        if ($date) $details[] = '- **Fecha:** ' . $date;
+        if ($task) $details[] = '- **Tarea:** ' . (string) ($task['texto'] ?? $task['title'] ?? 'Tarea');
+        if ($project) $details[] = '- **Proyecto:** ' . (string) ($project['titulo'] ?? 'Proyecto');
+
+        return [
+            'ok' => true,
+            'content' => "✅ **Recordatorio creado en tu modal**\n\n" . implode("\n", $details),
+            'url' => null,
+            'project_id' => $project['id'] ?? null,
+            'reminder_action' => [
+                'text' => Str::limit($text, 220, ''),
+                'priority' => $priority,
+                'dueDate' => $date,
+                'sectionTitle' => $sectionTitle,
+                'project' => $project ? [
+                    'id' => (string) ($project['id'] ?? ''),
+                    'title' => (string) ($project['titulo'] ?? 'Proyecto'),
+                ] : null,
+                'task' => $task ? [
+                    'id' => (string) ($task['id'] ?? $task['uid'] ?? ''),
+                    'title' => (string) ($task['title'] ?? $task['texto'] ?? $task['nombre'] ?? 'Tarea'),
+                    'projectId' => (string) ($project['id'] ?? ''),
+                ] : null,
+                'link' => $link,
+            ],
+        ];
     }
 
     private function sendEmail(string $proposal): array
@@ -1484,6 +1620,22 @@ class AiActionExecutor
         });
     }
 
+    private function taskDueDate(?array $task): ?string
+    {
+        if (!$task) {
+            return null;
+        }
+
+        foreach (['vencimiento', 'due_date', 'fecha_fin', 'fecha_entrega', 'deadline'] as $key) {
+            $date = $this->parseDate((string) ($task[$key] ?? ''));
+            if ($date) {
+                return $date;
+            }
+        }
+
+        return null;
+    }
+
     private function normalizeContractStatus(string $value): string
     {
         $value = Str::lower(Str::ascii($value));
@@ -1818,7 +1970,7 @@ class AiActionExecutor
         if ($type === 'tarea' && preg_match('/Tareas:\s*(\d+)\s+tareas/iu', $content, $countMatch)) {
             return 'Infocus AI agregó ' . (string) $countMatch[1] . ' tareas';
         }
-        if (preg_match('/(?:Nombre|Proyecto|Título|Titulo|Número|Numero|Para):\s*([^\n]+)/iu', $content, $match)) {
+        if (preg_match('/(?:Nombre|Proyecto|Título|Titulo|Número|Numero|Para|Recordatorio):\s*([^\n]+)/iu', $content, $match)) {
             return 'Infocus AI ' . $this->pastVerb($type) . ' ' . trim((string) $match[1]);
         }
 
@@ -1835,6 +1987,7 @@ class AiActionExecutor
             'tarea' => 'agregó una tarea',
             'subtarea' => 'agregó una subtarea',
             'nota de proyecto', 'nota personal' => 'agregó una nota',
+            'recordatorio' => 'creó un recordatorio',
             default => 'creó un proyecto',
         };
     }
