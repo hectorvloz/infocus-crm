@@ -1602,7 +1602,6 @@
         inset 0 0 0 1px rgba(148, 163, 184, .14),
         0 28px 70px rgba(15, 23, 42, 0.20);
     }
-
     html[data-color-mode="dark"] body {
       background: #070b14 !important;
       color: #dbe7f5 !important;
@@ -1941,6 +1940,9 @@
           <div id="reminderCategories" class="min-w-0 flex-1 flex gap-2 overflow-x-auto custom-scroll"></div>
           <button id="reminderAddCategoryBtn" type="button" class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#f2fda2] text-slate-900 text-lg font-extrabold leading-none hover:bg-[#e5f27c]" title="Añadir categoría" aria-label="Añadir categoría">+</button>
         </div>
+        <div class="px-5 pt-3 pb-2 border-b border-slate-100">
+          <div id="reminderActiveCategoryTitle"></div>
+        </div>
         <div class="px-5 py-3 flex items-center justify-between">
           <div class="text-sm font-extrabold text-slate-500 uppercase tracking-wide">Lista</div>
           <button id="reminderAddSectionBtn" type="button" class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-slate-900 text-white hover:bg-[#f2fda2] hover:text-slate-900 transition-colors" title="Añadir lista" aria-label="Añadir lista">
@@ -1951,15 +1953,15 @@
         </div>
         <div class="flex-1 min-h-0 overflow-y-auto custom-scroll px-5 pb-5">
           <div id="remindersList" class="space-y-5"></div>
-          <button id="reminderShowComposerBtn" type="button" class="hidden mt-4 inline-flex items-center gap-2.5 rounded-2xl py-0.5 text-base font-extrabold text-slate-500 hover:text-slate-900">
-            <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-base font-black leading-[1]"><span class="-translate-y-px">+</span></span>
+          <button id="reminderShowComposerBtn" type="button" class="hidden mt-3 inline-flex items-center gap-2 rounded-2xl py-0.5 text-sm font-bold text-slate-400 hover:text-slate-600">
+            <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white text-sm font-black leading-[1]"><span class="-translate-y-px">+</span></span>
             <span>Añadir recordatorio</span>
           </button>
           <div id="reminderComposer" class="reminder-row group relative hidden items-start gap-2.5 rounded-2xl py-0.5">
             <span class="mt-[6px] h-6 w-6 shrink-0 rounded-full border-2 border-slate-300 bg-white"></span>
             <div class="min-w-0 flex-1">
               <div class="reminder-text-frame relative mt-[4px]">
-                <input id="reminderNewText" type="text" class="relative z-10 w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 pr-9 text-base font-bold leading-6 text-slate-800 outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Nuevo recordatorio">
+                <input id="reminderNewText" type="text" class="relative z-10 w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 pr-9 text-base font-medium leading-6 text-slate-800 outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Nuevo recordatorio">
                 <button id="reminderAddBtn" type="button" class="absolute right-1.5 top-1/2 z-20 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#f2fda2] text-slate-900 text-sm font-extrabold leading-none hover:bg-[#e5f27c]">+</button>
                 <div id="reminderLinkDropdown" class="hidden absolute left-0 right-0 top-[calc(100%+0.4rem)] rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[70] max-h-64 overflow-y-auto"></div>
               </div>
@@ -2311,6 +2313,7 @@
       const remindersCloseBtn = document.getElementById('remindersCloseBtn');
       const reminderCategories = document.getElementById('reminderCategories');
       const reminderAddCategoryBtn = document.getElementById('reminderAddCategoryBtn');
+      const reminderActiveCategoryTitle = document.getElementById('reminderActiveCategoryTitle');
       const remindersList = document.getElementById('remindersList');
       const reminderShowComposerBtn = document.getElementById('reminderShowComposerBtn');
       const reminderComposer = document.getElementById('reminderComposer');
@@ -2353,6 +2356,7 @@
       let reminderPendingLink = null;
       let activeReminderCategoryId = 'default-cat';
       let activeReminderSectionId = 'default';
+      const ALL_REMINDERS_CATEGORY_ID = '__all__';
 
       function escapeHtml(value) {
         return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -2376,6 +2380,7 @@
         if (!reminderCategoriesData.length) {
           reminderCategoriesData = [{ id: 'default-cat', title: 'Recordatorios' }];
         }
+        reminderCategoriesData = reminderCategoriesData.map((category) => ({ collapsed: false, ...category }));
         if (!reminderSections.length) {
           reminderSections = [{ id: 'default', categoryId: reminderCategoriesData[0].id, title: 'Recordatorios', collapsed: false }];
         }
@@ -2385,8 +2390,8 @@
           ...item,
           priority: normalizeReminderPriority(item?.priority),
         }));
-        activeReminderCategoryId = reminderCategoriesData[0]?.id || 'default-cat';
-        activeReminderSectionId = reminderSections.find((section) => section.categoryId === activeReminderCategoryId)?.id || reminderSections[0]?.id || 'default';
+        activeReminderCategoryId = ALL_REMINDERS_CATEGORY_ID;
+        activeReminderSectionId = reminderSections[0]?.id || 'default';
       }
 
       function persistRemindersOnly() {
@@ -2637,52 +2642,77 @@
         input.style.width = `${Math.min(22, length)}ch`;
       }
 
+      function isAllRemindersCategoryId(categoryId = activeReminderCategoryId) {
+        return String(categoryId || '') === ALL_REMINDERS_CATEGORY_ID;
+      }
+
+      function ensureReminderSectionForCategory(categoryId) {
+        let sections = reminderSections.filter((section) => String(section.categoryId) === String(categoryId));
+        if (!sections.length) {
+          const section = { id: uid('section'), categoryId, title: '', collapsed: false };
+          reminderSections.push(section);
+          sections = [section];
+        }
+        return sections;
+      }
+
+      function renderActiveReminderCategoryTitle() {
+        if (!reminderActiveCategoryTitle) return;
+        const allMode = isAllRemindersCategoryId(activeReminderCategoryId);
+        const activeCategory = reminderCategoriesData.find((category) => String(category.id) === String(activeReminderCategoryId));
+        if (allMode || !activeCategory) {
+          reminderActiveCategoryTitle.innerHTML = `
+            <div class="text-xl font-extrabold leading-tight text-slate-900">Todos</div>
+          `;
+          return;
+        }
+        reminderActiveCategoryTitle.innerHTML = `
+          <input id="reminderActiveCategoryName" data-reminder-active-category-title="${escapeHtml(activeCategory.id)}" value="${escapeHtml(activeCategory.title || 'Categoría')}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="block w-full rounded-none border-0 bg-transparent p-0 text-xl font-extrabold leading-tight text-slate-900 outline-none ring-0 focus:border-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none">
+        `;
+        const input = reminderActiveCategoryTitle.querySelector('[data-reminder-active-category-title]');
+        input?.addEventListener('input', () => {
+          const id = input.getAttribute('data-reminder-active-category-title') || '';
+          reminderCategoriesData = reminderCategoriesData.map((category) => String(category.id) === String(id) ? { ...category, title: input.value || 'Categoría' } : category);
+          persistRemindersOnly();
+          renderReminderCategories();
+        });
+        input?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            input.blur();
+            saveReminders();
+          }
+        });
+      }
+
       function renderReminderCategories() {
         if (!reminderCategories) return;
-        reminderCategories.innerHTML = reminderCategoriesData.map((category) => {
+        const totalPending = reminders.filter((item) => !item.done).length;
+        const allActive = isAllRemindersCategoryId(activeReminderCategoryId);
+        const allChip = `<button type="button" data-reminder-category="${ALL_REMINDERS_CATEGORY_ID}" class="shrink-0 inline-flex w-fit items-center gap-1.5 rounded-full border py-1.5 pl-3 pr-2 text-[11px] font-extrabold transition-colors ${allActive ? 'bg-[#111729] text-white border-[#111729] shadow-sm' : 'bg-white text-[#111729] border-slate-200 hover:border-[#111729] hover:bg-slate-50'}">
+          <span>Todos</span>
+          <span class="rounded-full px-1.5 py-0.5 text-[10px] leading-none ${allActive ? 'bg-white/14 text-white' : 'bg-slate-100 text-slate-500'}">${totalPending}</span>
+        </button>`;
+        const categoryChips = reminderCategoriesData.map((category) => {
           const active = category.id === activeReminderCategoryId;
           const sectionIds = reminderSections
             .filter((section) => String(section.categoryId) === String(category.id))
             .map((section) => String(section.id));
           const count = reminders.filter((item) => sectionIds.includes(String(item.sectionId || '')) && !item.done).length;
-          return `<div data-reminder-category="${escapeHtml(category.id)}" class="shrink-0 inline-flex w-fit max-w-[13rem] items-center gap-1.5 rounded-full border py-1.5 pl-3 pr-2 text-[11px] font-extrabold transition-colors ${active ? 'bg-[#111729] text-white border-[#111729] shadow-sm' : 'bg-white text-[#111729] border-slate-200 hover:border-[#111729] hover:bg-slate-50'}">
-            <input data-reminder-category-title="${escapeHtml(category.id)}" value="${escapeHtml(category.title || 'Categoría')}" class="min-w-[4ch] max-w-[12ch] border-0 bg-transparent p-0 text-[11px] font-extrabold text-inherit outline-none ring-0 focus:outline-none focus:ring-0">
+          return `<div data-reminder-category="${escapeHtml(category.id)}" class="shrink-0 inline-flex w-fit max-w-[13rem] cursor-pointer items-center gap-1.5 rounded-full border py-1.5 pl-3 pr-2 text-[11px] font-extrabold transition-colors ${active ? 'bg-[#111729] text-white border-[#111729] shadow-sm' : 'bg-white text-[#111729] border-slate-200 hover:border-[#111729] hover:bg-slate-50'}">
+            <span class="truncate">${escapeHtml(category.title || 'Categoría')}</span>
             <span class="rounded-full px-1.5 py-0.5 text-[10px] leading-none ${active ? 'bg-white/14 text-white' : 'bg-slate-100 text-slate-500'}">${count}</span>
             <button type="button" data-reminder-category-delete="${escapeHtml(category.id)}" class="${reminderCategoriesData.length <= 1 ? 'hidden' : ''} inline-flex h-4 w-4 items-center justify-center rounded-full text-xs ${active ? 'text-white/65 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-rose-500'}" title="Eliminar categoría" aria-label="Eliminar categoría">×</button>
           </div>`;
         }).join('');
+        reminderCategories.innerHTML = allChip + categoryChips;
         reminderCategories.querySelectorAll('[data-reminder-category]').forEach((btn) => {
           btn.addEventListener('click', () => {
             activeReminderCategoryId = btn.getAttribute('data-reminder-category') || 'default-cat';
-            activeReminderSectionId = reminderSections.find((section) => String(section.categoryId) === String(activeReminderCategoryId))?.id || activeReminderSectionId;
+            activeReminderSectionId = isAllRemindersCategoryId(activeReminderCategoryId)
+              ? (reminderSections[0]?.id || activeReminderSectionId)
+              : (reminderSections.find((section) => String(section.categoryId) === String(activeReminderCategoryId))?.id || activeReminderSectionId);
             saveReminders();
-          });
-        });
-        reminderCategories.querySelectorAll('[data-reminder-category-title]').forEach((input) => {
-          resizeReminderCategoryInput(input);
-          input.addEventListener('click', (event) => event.stopPropagation());
-          input.addEventListener('focus', () => {
-            const id = input.getAttribute('data-reminder-category-title') || activeReminderCategoryId;
-            const changed = activeReminderCategoryId !== id;
-            activeReminderCategoryId = id;
-            activeReminderSectionId = reminderSections.find((section) => String(section.categoryId) === String(activeReminderCategoryId))?.id || activeReminderSectionId;
-            if (changed) {
-              renderReminders();
-              setTimeout(() => reminderCategories?.querySelector(`[data-reminder-category-title="${CSS.escape(id)}"]`)?.focus(), 0);
-            }
-          });
-          input.addEventListener('input', () => {
-            const id = input.getAttribute('data-reminder-category-title') || '';
-            reminderCategoriesData = reminderCategoriesData.map((category) => category.id === id ? { ...category, title: input.value || 'Categoría' } : category);
-            resizeReminderCategoryInput(input);
-            persistRemindersOnly();
-          });
-          input.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              input.blur();
-              saveReminders();
-            }
           });
         });
         reminderCategories.querySelectorAll('[data-reminder-category-delete]').forEach((btn) => {
@@ -2705,63 +2735,96 @@
 
       function renderReminders() {
         if (!remindersList) return;
-        if (!reminderCategoriesData.some((category) => category.id === activeReminderCategoryId)) {
-          activeReminderCategoryId = reminderCategoriesData[0]?.id || 'default-cat';
+        if (!isAllRemindersCategoryId(activeReminderCategoryId) && !reminderCategoriesData.some((category) => category.id === activeReminderCategoryId)) {
+          activeReminderCategoryId = ALL_REMINDERS_CATEGORY_ID;
         }
-        let categorySections = reminderSections.filter((section) => String(section.categoryId) === String(activeReminderCategoryId));
-        if (!categorySections.length) {
-          const section = { id: uid('section'), categoryId: activeReminderCategoryId, title: 'Lista', collapsed: false };
-          reminderSections.push(section);
-          categorySections = [section];
-        }
+        const allMode = isAllRemindersCategoryId(activeReminderCategoryId);
+        let categorySections = allMode
+          ? ensureReminderSectionForCategory(reminderCategoriesData[0]?.id || activeReminderCategoryId)
+          : ensureReminderSectionForCategory(activeReminderCategoryId);
         if (!categorySections.some((section) => section.id === activeReminderSectionId)) {
           activeReminderSectionId = categorySections[0]?.id || reminderSections[0]?.id || 'default';
         }
         renderRemindersCounter();
         renderReminderCategories();
-        const sectionsHtml = categorySections.map((section) => {
-          const items = reminders.filter((item) => String(item.sectionId || 'default') === String(section.id));
-          const itemHtml = items.map((item) => {
-            const priority = priorityText(item.priority);
-            const date = formatReminderDate(item.dueDate);
-            const metaHtml = (priority || date || item.link) ? `<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold group-focus-within:hidden">
-                  ${priority ? `<span class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${priorityClass(item.priority)}">${reminderPriorityIcon(item.priority)}${priority}</span>` : ''}
-                  ${date ? `<span class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500">${date}</span>` : ''}
-                  ${item.link ? reminderLinkMarkup(item.link) : ''}
-                </div>` : '';
-            return `<div class="reminder-row group relative flex items-start gap-2.5 rounded-2xl py-0.5 transition-colors" draggable="true" data-reminder-id="${escapeHtml(item.id)}" data-reminder-section-id="${escapeHtml(section.id)}">
-              <button type="button" data-reminder-toggle="${escapeHtml(item.id)}" class="relative mt-[6px] inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-visible rounded-full border-2 ${item.done ? 'border-[#f2fda2] bg-[#f2fda2] text-slate-900' : 'border-slate-300 bg-white text-transparent'}">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6"/></svg>
-              </button>
-              <div class="min-w-0 flex-1">
-                <div class="reminder-text-frame relative">
-                  <textarea data-reminder-text="${escapeHtml(item.id)}" rows="1" class="relative z-10 block w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 text-base font-bold leading-6 ${item.done ? 'text-slate-400 line-through' : 'text-slate-800'} outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Recordatorio">${escapeHtml(item.text || '')}</textarea>
-                </div>
-                ${metaHtml}
-                <div class="mt-2 hidden group-focus-within:flex flex-nowrap items-center gap-1.5">
-                  <div class="relative">
-                    ${reminderPriorityButtonHtml(item.priority, `data-reminder-priority-edit="${escapeHtml(item.id)}"`)}
-                    ${reminderPriorityMenuHtml(item.priority, `data-reminder-priority-set="${escapeHtml(item.id)}"`, item.id)}
-                  </div>
-                  <input data-reminder-date="${escapeHtml(item.id)}" type="text" value="${escapeHtml(item.dueDate || '')}" readonly placeholder="Fecha" class="h-7 w-28 rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500 outline-none placeholder:text-slate-500 focus:border-[#f2fda2]">
-                  ${item.link ? reminderLinkMarkup(item.link) : ''}
-                </div>
+        renderActiveReminderCategoryTitle();
+
+        const reminderItemHtml = (item, sectionId) => {
+          const priority = priorityText(item.priority);
+          const date = formatReminderDate(item.dueDate);
+          const metaHtml = (priority || date || item.link) ? `<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold group-focus-within:hidden">
+                ${priority ? `<span class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${priorityClass(item.priority)}">${reminderPriorityIcon(item.priority)}${priority}</span>` : ''}
+                ${date ? `<span class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500">${date}</span>` : ''}
+                ${item.link ? reminderLinkMarkup(item.link) : ''}
+              </div>` : '';
+          return `<div class="reminder-row group relative flex items-start gap-2.5 rounded-2xl py-0.5 transition-colors" draggable="true" data-reminder-id="${escapeHtml(item.id)}" data-reminder-section-id="${escapeHtml(sectionId)}">
+            <button type="button" data-reminder-toggle="${escapeHtml(item.id)}" class="relative mt-[6px] inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-visible rounded-full border-2 ${item.done ? 'border-[#f2fda2] bg-[#f2fda2] text-slate-900' : 'border-slate-300 bg-white text-transparent'}">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6"/></svg>
+            </button>
+            <div class="min-w-0 flex-1">
+              <div class="reminder-text-frame relative">
+                <textarea data-reminder-text="${escapeHtml(item.id)}" rows="1" class="relative z-10 block w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 text-base font-medium leading-6 ${item.done ? 'text-slate-400 line-through' : 'text-slate-800'} outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Recordatorio">${escapeHtml(item.text || '')}</textarea>
               </div>
-              <button type="button" data-reminder-delete="${escapeHtml(item.id)}" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-sm font-bold">×</button>
-            </div>`;
-          }).join('');
-          return `<section data-reminder-section="${escapeHtml(section.id)}">
-            <div class="flex items-center justify-between gap-2">
-              <input data-reminder-section-title="${escapeHtml(section.id)}" value="${escapeHtml(section.title || 'Lista')}" class="min-w-0 flex-1 rounded-xl border-0 bg-transparent px-2 py-1 text-lg font-extrabold text-slate-900 outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none">
-              <button type="button" data-reminder-section-delete="${escapeHtml(section.id)}" class="text-slate-300 hover:text-rose-500 text-sm font-bold ${categorySections.length <= 1 ? 'hidden' : ''}">×</button>
+              ${metaHtml}
+              <div class="mt-2 hidden group-focus-within:flex flex-nowrap items-center gap-1.5">
+                <div class="relative">
+                  ${reminderPriorityButtonHtml(item.priority, `data-reminder-priority-edit="${escapeHtml(item.id)}"`)}
+                  ${reminderPriorityMenuHtml(item.priority, `data-reminder-priority-set="${escapeHtml(item.id)}"`, item.id)}
+                </div>
+                <input data-reminder-date="${escapeHtml(item.id)}" type="text" value="${escapeHtml(item.dueDate || '')}" readonly placeholder="Fecha" class="h-7 w-28 rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500 outline-none placeholder:text-slate-500 focus:border-[#f2fda2]">
+                ${item.link ? reminderLinkMarkup(item.link) : ''}
+              </div>
             </div>
-            <div class="mt-1.5 space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
-            <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="mt-2 inline-flex items-center gap-2.5 rounded-2xl py-0.5 text-base font-extrabold text-slate-500 hover:text-slate-900">
-              <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-base font-black leading-[1]"><span class="-translate-y-px">+</span></span>
+            <button type="button" data-reminder-delete="${escapeHtml(item.id)}" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-sm font-bold">×</button>
+          </div>`;
+        };
+
+        const sectionHtml = (section, siblingSections, compact = false) => {
+          const items = reminders.filter((item) => String(item.sectionId || 'default') === String(section.id));
+          const collapsed = !!section.collapsed;
+          const title = String(section.title || '').trim();
+          const isImplicitSection = !title || title.toLowerCase() === 'recordatorios';
+          const itemHtml = items.map((item) => reminderItemHtml(item, section.id)).join('');
+          return `<section data-reminder-section="${escapeHtml(section.id)}">
+            <div class="${isImplicitSection ? 'hidden' : 'flex'} items-center justify-between gap-2">
+              <button type="button" data-reminder-section-collapse="${escapeHtml(section.id)}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700" title="${collapsed ? 'Abrir lista' : 'Compactar lista'}" aria-label="${collapsed ? 'Abrir lista' : 'Compactar lista'}">
+                <svg class="h-3 w-3 transition-transform ${collapsed ? '-rotate-90' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <input data-reminder-section-title="${escapeHtml(section.id)}" value="${escapeHtml(section.title || 'Lista')}" class="min-w-0 flex-1 rounded-xl border-0 bg-transparent px-1.5 py-0.5 ${compact ? 'text-lg' : 'text-xl'} font-black leading-tight text-slate-900 outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none">
+              <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-500">${items.filter((item) => !item.done).length}</span>
+              <button type="button" data-reminder-section-delete="${escapeHtml(section.id)}" class="text-slate-300 hover:text-rose-500 text-sm font-bold ${siblingSections.length <= 1 ? 'hidden' : ''}">×</button>
+            </div>
+            <div class="${collapsed && !isImplicitSection ? 'hidden' : ''} ${isImplicitSection ? 'mt-0' : 'mt-1.5'} space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
+            <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="${collapsed && !isImplicitSection ? 'hidden' : ''} mt-2 inline-flex items-center gap-2 rounded-2xl py-0.5 text-sm font-bold text-slate-400 hover:text-slate-600">
+              <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white text-sm font-black leading-[1]"><span class="-translate-y-px">+</span></span>
               <span>Añadir recordatorio</span>
             </button>
           </section>`;
-        }).join('');
+        };
+
+        const sectionsHtml = allMode
+          ? reminderCategoriesData.map((category) => {
+              const sections = ensureReminderSectionForCategory(category.id);
+              const sectionIds = sections.map((section) => String(section.id));
+              const categoryPending = reminders.filter((item) => sectionIds.includes(String(item.sectionId || '')) && !item.done).length;
+              const collapsed = !!category.collapsed;
+              return `<section class="rounded-2xl border border-slate-100 bg-white/70 px-3 py-2.5 shadow-sm" data-reminder-category-group="${escapeHtml(category.id)}">
+                <div class="flex items-center gap-2">
+                  <button type="button" data-reminder-category-collapse="${escapeHtml(category.id)}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#111729] text-white/90 hover:bg-slate-800" title="${collapsed ? 'Abrir categoría' : 'Compactar categoría'}" aria-label="${collapsed ? 'Abrir categoría' : 'Compactar categoría'}">
+                    <svg class="h-3 w-3 transition-transform ${collapsed ? '-rotate-90' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate text-xl font-black leading-tight text-slate-900">${escapeHtml(category.title || 'Categoría')}</div>
+                  </div>
+                  <span class="rounded-full bg-[#f2fda2] px-2 py-0.5 text-[11px] font-black text-slate-900">${categoryPending}</span>
+                </div>
+                <div class="${collapsed ? 'hidden' : ''} mt-2 space-y-2.5 pl-6">
+                  ${sections.map((section) => sectionHtml(section, sections, true)).join('')}
+                </div>
+              </section>`;
+            }).join('')
+          : categorySections.map((section) => sectionHtml(section, categorySections)).join('');
+
         remindersList.innerHTML = sectionsHtml;
         bindReminderRows();
       }
@@ -2968,6 +3031,24 @@
 
       function bindReminderRows() {
         let draggedReminderId = '';
+        remindersList?.querySelectorAll('[data-reminder-category-collapse]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-reminder-category-collapse') || '';
+            reminderCategoriesData = reminderCategoriesData.map((category) => (
+              String(category.id) === String(id) ? { ...category, collapsed: !category.collapsed } : category
+            ));
+            saveReminders();
+          });
+        });
+        remindersList?.querySelectorAll('[data-reminder-section-collapse]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-reminder-section-collapse') || '';
+            reminderSections = reminderSections.map((section) => (
+              String(section.id) === String(id) ? { ...section, collapsed: !section.collapsed } : section
+            ));
+            saveReminders();
+          });
+        });
         remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((btn) => {
           btn.addEventListener('click', () => {
             openReminderComposer(btn.getAttribute('data-reminder-section-add') || activeReminderSectionId);
@@ -3526,17 +3607,16 @@
       });
       reminderAddCategoryBtn?.addEventListener('click', () => {
         const title = 'Nueva categoría';
-        const category = { id: uid('cat'), title };
-        const section = { id: uid('section'), categoryId: category.id, title: 'Lista', collapsed: false };
+        const category = { id: uid('cat'), title, collapsed: false };
+        const section = { id: uid('section'), categoryId: category.id, title: '', collapsed: false };
         reminderCategoriesData.push(category);
         reminderSections.push(section);
         activeReminderCategoryId = category.id;
         activeReminderSectionId = section.id;
         saveReminders();
         setTimeout(() => {
-          const input = reminderCategories?.querySelector(`[data-reminder-category-title="${CSS.escape(category.id)}"]`);
+          const input = reminderActiveCategoryTitle?.querySelector(`[data-reminder-active-category-title="${CSS.escape(category.id)}"]`);
           input?.focus();
-          input?.select();
         }, 0);
       });
       reminderAddBtn?.addEventListener('click', () => {
@@ -3574,7 +3654,9 @@
         }
       });
       reminderAddSectionBtn?.addEventListener('click', () => {
-        const categoryId = activeReminderCategoryId || reminderCategoriesData[0]?.id || 'default-cat';
+        const categoryId = isAllRemindersCategoryId(activeReminderCategoryId)
+          ? (reminderCategoriesData[0]?.id || 'default-cat')
+          : (activeReminderCategoryId || reminderCategoriesData[0]?.id || 'default-cat');
         reminderSections.push({
           id: uid('section'),
           categoryId,
