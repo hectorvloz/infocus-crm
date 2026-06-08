@@ -486,6 +486,7 @@ class AiService
 
         $lines = $invoices->map(function ($invoice) {
             $rec = (array) ($invoice['recurrencia'] ?? []);
+            $id = (string) ($invoice['id'] ?? '');
             $number = (string) ($invoice['numero'] ?? 'Sin numero');
             $client = (string) ($invoice['cliente'] ?? 'Sin cliente');
             $next = (string) ($rec['next_send'] ?? $rec['siguiente'] ?? $invoice['vencimiento'] ?? 'Sin próxima fecha');
@@ -493,7 +494,7 @@ class AiService
             $status = (string) ($invoice['recurring_send_status'] ?? $invoice['estado'] ?? 'Sin estado');
             $total = $this->formatAmount((float) ($invoice['total'] ?? 0), (string) ($invoice['moneda'] ?? '$'));
 
-            return "- {$number} | Cliente: {$client} | Total: {$total} | Frecuencia: {$every} | Próximo envío: {$next} | Estado envío: {$status}";
+            return "- ID: {$id} | {$number} | Cliente: {$client} | Total: {$total} | Frecuencia: {$every} | Próximo envío: {$next} | Estado envío: {$status}";
         })->implode("\n");
 
         return "Facturas recurrentes y programadas:\n{$lines}";
@@ -727,6 +728,7 @@ Si estás creando o editando una nota personal, la acción sigue siendo nota aun
 Si el usuario pide reescribir, estructurar, ordenar, ampliar, agregar ideas o mejorar "esta nota", conserva la intención original, limpia redundancias y devuelve una versión completa lista para aplicar. Si hace falta, cierra con una sugerencia breve para aplicar cambios o ajustar algo, pero no lo repitas mecánicamente.
 Para reuniones, usa: Reunión, Cliente, Fecha, Hora inicio, Hora fin, Ubicación, Responsables, Invitados y Notas.
 Para cotizaciones, usa: Cotización propuesta, Cliente, Moneda, Vencimiento, Estado y "Items:" con líneas como "Servicio - 1 x 500".
+Para adelantar el envío de una factura recurrente ya programada, no cambies sus fechas. Usa exactamente: "Factura recurrente adelantada:", "Factura:", "Cliente:", "Fecha de emisión original:", "Vencimiento original:" y "Acción: Enviar hoy". Explica brevemente que se creará/publicará ahora si aún no existe la factura de ese ciclo, pero conservará la fecha de emisión y vencimiento ya programados. Termina invitando a tocar "Enviar ahora".
 Para contratos, usa: Contrato, Cliente, Proyecto, Monto, Moneda, Estado y Mensaje/Contenido.
 Para correos, usa campos claros en líneas separadas: Para, Asunto y Mensaje. No prometas que el correo fue enviado antes de la confirmación humana.
 Para Pomodoro TDAH o bloqueo mental, propone un bloque enfocado con campos claros: Pomodoro propuesto, Tarea, Duración (25, 30 o 60 minutos) y Motivo. Termina invitando a tocar "Activar pomodoro"; no digas que está activado antes de la confirmación.

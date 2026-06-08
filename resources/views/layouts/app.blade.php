@@ -2501,20 +2501,20 @@
         const targetRow = afterReminderId
           ? remindersList?.querySelector(`[data-reminder-id="${CSS.escape(afterReminderId)}"]`)
           : null;
-        const targetButton = activeReminderSectionId
+        const targetAppendZone = activeReminderSectionId
           ? remindersList?.querySelector(`[data-reminder-section-add="${CSS.escape(activeReminderSectionId)}"]`)
           : null;
         if (targetRow && reminderComposer) {
           targetRow.insertAdjacentElement('afterend', reminderComposer);
-        } else if (targetButton && reminderComposer) {
-          targetButton.insertAdjacentElement('afterend', reminderComposer);
+        } else if (targetAppendZone && reminderComposer) {
+          targetAppendZone.insertAdjacentElement('beforebegin', reminderComposer);
         }
         if (reminderComposer) {
           reminderComposer.dataset.sectionId = activeReminderSectionId || '';
           reminderComposer.dataset.afterReminderId = afterReminderId || '';
         }
-        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((btn) => {
-          btn.classList.toggle('hidden', btn.getAttribute('data-reminder-section-add') === activeReminderSectionId);
+        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((zone) => {
+          zone.classList.toggle('hidden', zone.getAttribute('data-reminder-section-add') === activeReminderSectionId);
         });
         reminderShowComposerBtn?.classList.add('hidden');
         reminderComposer?.classList.remove('hidden');
@@ -2535,7 +2535,7 @@
           reminderComposer.dataset.afterReminderId = '';
         }
         reminderShowComposerBtn?.classList.add('hidden');
-        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((btn) => btn.classList.remove('hidden'));
+        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((zone) => zone.classList.remove('hidden'));
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
         clearReminderPendingLink();
@@ -2785,7 +2785,7 @@
           const title = String(section.title || '').trim();
           const isImplicitSection = !title || title.toLowerCase() === 'recordatorios';
           const itemHtml = items.map((item) => reminderItemHtml(item, section.id)).join('');
-          return `<section data-reminder-section="${escapeHtml(section.id)}">
+          return `<section class="${isImplicitSection ? '' : 'mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'}" data-reminder-section="${escapeHtml(section.id)}">
             <div class="${isImplicitSection ? 'hidden' : 'flex'} items-center justify-between gap-2">
               <button type="button" data-reminder-section-collapse="${escapeHtml(section.id)}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700" title="${collapsed ? 'Abrir lista' : 'Compactar lista'}" aria-label="${collapsed ? 'Abrir lista' : 'Compactar lista'}">
                 <svg class="h-3 w-3 transition-transform ${collapsed ? '-rotate-90' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
@@ -2794,10 +2794,9 @@
               <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-500">${items.filter((item) => !item.done).length}</span>
               <button type="button" data-reminder-section-delete="${escapeHtml(section.id)}" class="text-slate-300 hover:text-rose-500 text-sm font-bold ${siblingSections.length <= 1 ? 'hidden' : ''}">×</button>
             </div>
-            <div class="${collapsed && !isImplicitSection ? 'hidden' : ''} ${isImplicitSection ? 'mt-0' : 'mt-1.5'} space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
-            <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="${collapsed && !isImplicitSection ? 'hidden' : ''} mt-2 inline-flex items-center gap-2 rounded-2xl py-0.5 text-sm font-bold text-slate-400 hover:text-slate-600">
-              <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white text-sm font-black leading-[1]"><span class="-translate-y-px">+</span></span>
-              <span>Añadir recordatorio</span>
+            <div class="${collapsed && !isImplicitSection ? 'hidden' : ''} ${isImplicitSection ? 'mt-0' : 'mt-2'} space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
+            <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="${collapsed && !isImplicitSection ? 'hidden' : ''} group mt-2 block h-8 w-full rounded-lg border-b border-slate-100 text-left transition hover:bg-slate-50/60" title="Añadir recordatorio" aria-label="Añadir recordatorio">
+              <span class="sr-only">Añadir recordatorio</span>
             </button>
           </section>`;
         };
@@ -2818,7 +2817,7 @@
                   </div>
                   <span class="rounded-full bg-[#f2fda2] px-2 py-0.5 text-[11px] font-black text-slate-900">${categoryPending}</span>
                 </div>
-                <div class="${collapsed ? 'hidden' : ''} mt-2 space-y-2.5 pl-6">
+                <div class="${collapsed ? 'hidden' : ''} mt-3 space-y-4 pl-6">
                   ${sections.map((section) => sectionHtml(section, sections, true)).join('')}
                 </div>
               </section>`;

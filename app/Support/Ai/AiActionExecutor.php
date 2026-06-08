@@ -2,12 +2,14 @@
 
 namespace App\Support\Ai;
 
+use App\Http\Controllers\FacturasController;
 use App\Repositories\FileStore;
 use App\Repositories\TimelineStore;
 use App\Support\RoleAccess;
 use App\Support\TemplateMail;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class AiActionExecutor
@@ -79,6 +81,10 @@ class AiActionExecutor
             return $this->withActionLog($this->createContract($text), 'contrato');
         }
 
+        if ($intent === 'recurring_invoice_advance') {
+            return $this->withActionLog($this->sendRecurringInvoiceEarly($text), 'factura recurrente');
+        }
+
         if ($intent === 'clarify_note_project') {
             return $this->failure('Antes de continuar: ¿te refieres a actualizar la nota que tienes abierta o quieres crear un proyecto basado en esa nota?');
         }
@@ -139,6 +145,10 @@ class AiActionExecutor
 
         if (str_contains($normalized, 'proyecto')) {
             return $this->withActionLog($this->createProjectWithTasks($text), 'proyecto');
+        }
+
+        if (str_contains($normalized, 'factura') && str_contains($normalized, 'recurrent')) {
+            return $this->withActionLog($this->sendRecurringInvoiceEarly($text), 'factura recurrente');
         }
 
         if (str_contains($normalized, 'factura')) {
@@ -224,6 +234,18 @@ class AiActionExecutor
             return 'meeting';
         }
 
+        if (
+            $hasHeader(['Factura recurrente adelantada', 'Enviar factura recurrente', 'Factura recurrente para enviar'])
+            || (str_contains($normalized, 'factura recurrente') && (
+                str_contains($normalized, 'adelant')
+                || str_contains($normalized, 'antes de tiempo')
+                || str_contains($normalized, 'enviar hoy')
+                || str_contains($normalized, 'enviarla hoy')
+            ))
+        ) {
+            return 'recurring_invoice_advance';
+        }
+
         if ($hasHeader(['Cotización propuesta', 'Cotizacion propuesta']) || str_contains($normalized, 'cotizacion propuesta')) {
             return 'quote';
         }
@@ -250,6 +272,8 @@ class AiActionExecutor
         $hasTask = preg_match('/\btarea(s)?\b/u', $directive) === 1;
         $hasReminder = preg_match('/\b(recordatorio(s)?|recordar|recuerdame|recu[eé]rdame|reminder)\b/u', $directive) === 1;
         $hasEmail = preg_match('/\b(correo|email|e-mail)\b/u', $directive) === 1;
+        $hasInvoice = preg_match('/\b(factura|facturas|invoice)\b/u', $directive) === 1;
+        $hasRecurringInvoice = $hasInvoice && preg_match('/\b(recurrente|recurrentes|recurrencia|recurring)\b/u', $directive) === 1;
         $hasMeeting = preg_match('/\b(reunion|meeting|reuniones)\b/u', $directive) === 1;
         $hasQuote = preg_match('/\b(cotizacion|quote)\b/u', $directive) === 1;
         $hasContract = preg_match('/\b(contrato|contract)\b/u', $directive) === 1;
@@ -283,6 +307,10 @@ class AiActionExecutor
 
         if ($hasCurrentNote && $hasCurrentNoteReference && $hasProject && ($hasCreate || str_contains($directive, 'proyecto'))) {
             return 'clarify_note_project';
+        }
+
+        if ($hasRecurringInvoice && ($hasSend || str_contains($directive, 'adelant') || str_contains($directive, 'antes de tiempo') || str_contains($directive, 'hoy'))) {
+            return 'recurring_invoice_advance';
         }
 
         if ($hasEmail && $hasSend && ($notePos === null || ($emailPos !== null && $emailPos < $notePos))) {
@@ -1063,6 +1091,238 @@ class AiActionExecutor
         return ($client['id'] ?? 'general') !== 'general' || Str::lower(Str::ascii($clientRaw)) === 'sin cliente'
             ? $client
             : null;
+    }
+
+    private function sendRecurringInvoiceEarly(string $proposal): array
+    {
+        if (! RoleAccess::can(Auth::user(), 'facturas.create') || ! RoleAccess::can(Auth::user(), 'facturas.read')) {
+            return $this->failure('Tu usuario no tiene permiso para crear o enviar facturas recurrentes.');
+        }
+
+        $store = new FileStore('facturas.json');
+        $clientsStore = new FileStore('clientes.json');
+        $allInvoices = $store->all();
+        $template = $this->matchRecurringInvoiceTemplate($proposal, $allInvoices);
+
+        if (!$template) {
+            return $this->failure('No encontré una factura recurrente exacta para adelantar. Indica el número de factura o el cliente.');
+        }
+
+        $rec = (array) ($template['recurrencia'] ?? []);
+        if (empty($rec['enabled']) || empty($rec['next_send'])) {
+            return $this->failure('La factura encontrada no tiene una próxima recurrencia activa para adelantar.');
+        }
+
+        try {
+            $issueDate = Carbon::parse((string) $rec['next_send'], config('app.timezone'))->startOfDay()->format('Y-m-d');
+        } catch (\Throwable) {
+            return $this->failure('La próxima fecha de envío de esa recurrencia no es válida.');
+        }
+
+        $cycleDueDate = $this->recurringCycleDueDate($template, $issueDate, $rec);
+        $invoice = $this->findRecurringCycleInvoice($allInvoices, $template, $issueDate);
+        $createdNow = false;
+
+        if (!$invoice) {
+            $invoice = $this->createRecurringCycleInvoice($store, $allInvoices, $template, $issueDate, $cycleDueDate);
+            $createdNow = true;
+        }
+
+        if (!empty($invoice['sent_at'])) {
+            $url = '/facturas/' . rawurlencode((string) ($invoice['id'] ?? ''));
+            return [
+                'ok' => true,
+                'content' => "✅ **La factura recurrente ya estaba enviada**\n\n- **Factura:** {$invoice['numero']}\n- **Cliente:** {$invoice['cliente']}\n- **Fecha de emisión:** {$invoice['fecha']}\n- **Vencimiento:** " . ($invoice['vencimiento'] ?? 'Sin vencimiento') . "\n\n[Abrir factura]({$url})",
+                'url' => $url,
+            ];
+        }
+
+        $clientEmail = $this->resolveInvoiceClientEmail($invoice, $clientsStore);
+        if (!$clientEmail) {
+            return $this->failure('No pude enviar la factura recurrente porque el cliente no tiene un correo válido configurado.');
+        }
+
+        try {
+            $response = app(FacturasController::class)->enviarEmail(new Request([
+                'id' => (string) ($invoice['id'] ?? ''),
+                'to' => $clientEmail,
+                'mail_mode' => 'recurrente',
+            ]));
+            $payload = method_exists($response, 'getData') ? (array) $response->getData(true) : [];
+            $ok = (bool) ($payload['ok'] ?? false);
+            if (!$ok) {
+                return $this->failure('No se pudo enviar la factura recurrente adelantada: ' . (string) ($payload['error'] ?? 'error desconocido'));
+            }
+        } catch (\Throwable $e) {
+            return $this->failure('No se pudo enviar la factura recurrente adelantada: ' . $e->getMessage());
+        }
+
+        $invoice = $store->update((string) ($invoice['id'] ?? ''), [
+            'estado' => 'Pendiente',
+            'sent_at' => now()->toISOString(),
+            'recurring_send_status' => 'sent_early',
+            'recurring_send_error' => null,
+            'recurring_sent_early_at' => now()->toISOString(),
+            'recurring_sent_early_by' => (string) (Auth::user()?->email ?? 'IA'),
+        ]) ?: $invoice;
+
+        $url = '/facturas/' . rawurlencode((string) ($invoice['id'] ?? ''));
+        $createdText = $createdNow ? 'creada y enviada antes de tiempo' : 'enviada antes de tiempo';
+
+        return [
+            'ok' => true,
+            'content' => "✅ **Factura recurrente {$createdText}**\n\n- **Factura:** {$invoice['numero']}\n- **Cliente:** {$invoice['cliente']}\n- **Fecha de emisión conservada:** {$invoice['fecha']}\n- **Vencimiento:** " . ($invoice['vencimiento'] ?? 'Sin vencimiento') . "\n- **Enviada a:** {$clientEmail}\n\n[Abrir factura]({$url})",
+            'url' => $url,
+        ];
+    }
+
+    private function matchRecurringInvoiceTemplate(string $proposal, array $allInvoices): ?array
+    {
+        $number = $this->stripMarkdown($this->field($proposal, ['Factura', 'Número', 'Numero', 'Folio']));
+        if ($number !== '' && preg_match('/\b(?:INV|FAC)-\d+(?:-[A-Z0-9]+)?\b/iu', $number, $match)) {
+            $number = (string) $match[0];
+        }
+        if ($number === '' && preg_match('/\b(?:INV|FAC)-\d+(?:-[A-Z0-9]+)?\b/iu', $proposal, $match)) {
+            $number = (string) $match[0];
+        }
+        $client = $this->stripMarkdown($this->field($proposal, ['Cliente', 'Empresa']));
+        $directive = (string) data_get($this->context, 'last_user_message', '');
+        if ($number === '' && preg_match('/\b(?:INV|FAC)-\d+(?:-[A-Z0-9]+)?\b/iu', $directive, $match)) {
+            $number = (string) $match[0];
+        }
+
+        $templates = collect($allInvoices)
+            ->filter(fn ($invoice) => (bool) data_get($invoice, 'recurrencia.enabled', false) && !empty(data_get($invoice, 'recurrencia.next_send')))
+            ->values();
+
+        $normalize = fn (string $value): string => Str::lower(Str::ascii(trim($value)));
+
+        if ($number !== '') {
+            $needle = $normalize($number);
+            $matched = $templates->first(fn ($invoice) => $normalize((string) ($invoice['numero'] ?? '')) === $needle);
+            if ($matched) {
+                return $matched;
+            }
+
+            $child = collect($allInvoices)->first(fn ($invoice) => $normalize((string) ($invoice['numero'] ?? '')) === $needle && !empty($invoice['recurrencia_origen_id']));
+            if ($child) {
+                $templateId = (string) ($child['recurrencia_origen_id'] ?? '');
+                return $templates->first(fn ($invoice) => (string) ($invoice['id'] ?? '') === $templateId) ?: null;
+            }
+        }
+
+        if ($client !== '') {
+            $needle = $normalize($client);
+            $matches = $templates->filter(function ($invoice) use ($needle, $normalize) {
+                $haystack = $normalize((string) ($invoice['cliente'] ?? ''));
+                return $haystack !== '' && (str_contains($haystack, $needle) || str_contains($needle, $haystack));
+            })->values();
+
+            if ($matches->count() === 1) {
+                return $matches->first();
+            }
+        }
+
+        return $templates->count() === 1 ? $templates->first() : null;
+    }
+
+    private function findRecurringCycleInvoice(array $allInvoices, array $template, string $issueDate): ?array
+    {
+        $templateId = (string) ($template['id'] ?? '');
+        if ($templateId === '') {
+            return null;
+        }
+
+        return collect($allInvoices)->first(function ($invoice) use ($templateId, $issueDate) {
+            return (string) ($invoice['recurrencia_origen_id'] ?? '') === $templateId
+                && (string) ($invoice['fecha'] ?? '') === $issueDate;
+        });
+    }
+
+    private function createRecurringCycleInvoice(FileStore $store, array &$allInvoices, array $template, string $issueDate, ?string $cycleDueDate): array
+    {
+        $new = $template;
+        unset(
+            $new['id'],
+            $new['created_at'],
+            $new['updated_at'],
+            $new['pagos'],
+            $new['saldo'],
+            $new['saldo_base'],
+            $new['sent_at'],
+            $new['recurrencia']
+        );
+
+        $new['numero'] = $this->nextInvoiceNumber($allInvoices);
+        $new['fecha'] = $issueDate;
+        $new['estado'] = 'Pendiente';
+        $new['origen'] = 'recurrente';
+        $new['recurrencia_origen_id'] = $template['id'] ?? null;
+        $new['recurring_send_status'] = 'pending';
+        $new['recurring_generated_at'] = now()->toISOString();
+
+        if ($cycleDueDate !== null) {
+            $new['vencimiento'] = $cycleDueDate;
+        } elseif (!empty($template['vencimiento']) && !empty($template['fecha'])) {
+            $creditDays = max(0, (int) floor((strtotime((string) $template['vencimiento']) - strtotime((string) $template['fecha'])) / 86400));
+            $new['vencimiento'] = date('Y-m-d', strtotime($issueDate . " +{$creditDays} days"));
+        }
+
+        $created = $store->create($new);
+        $allInvoices[] = $created;
+
+        if (!empty($created['cliente_id'])) {
+            $this->timeline->add((string) $created['cliente_id'], 'factura', [
+                'numero' => $created['numero'] ?? '',
+                'total' => $created['total'] ?? 0,
+                'total_base' => $created['total_base'] ?? null,
+                'moneda' => $created['moneda'] ?? null,
+                'estado' => 'Creada',
+                'factura_id' => $created['id'] ?? null,
+            ]);
+        }
+
+        return $created;
+    }
+
+    private function recurringCycleDueDate(array $template, string $issueDate, array $rec): ?string
+    {
+        $leadDays = max(0, (int) ($rec['lead_days_before'] ?? 0));
+        if ($leadDays > 0) {
+            return Carbon::parse($issueDate, config('app.timezone'))->addDays($leadDays)->format('Y-m-d');
+        }
+
+        if (!empty($template['vencimiento']) && !empty($template['fecha'])) {
+            $creditDays = max(0, (int) floor((strtotime((string) $template['vencimiento']) - strtotime((string) $template['fecha'])) / 86400));
+            return date('Y-m-d', strtotime($issueDate . " +{$creditDays} days"));
+        }
+
+        return null;
+    }
+
+    private function resolveInvoiceClientEmail(array $invoice, FileStore $clientsStore): ?string
+    {
+        if (empty($invoice['cliente_id'])) {
+            return null;
+        }
+
+        $client = $clientsStore->find((string) $invoice['cliente_id']);
+        $email = trim((string) ($client['contacto_email'] ?? $client['email'] ?? ''));
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+    }
+
+    private function nextInvoiceNumber(array $source, string $prefix = 'INV'): string
+    {
+        $max = 0;
+        foreach ($source as $invoice) {
+            $number = strtoupper((string) ($invoice['numero'] ?? ''));
+            if ($number !== '' && preg_match('/^' . preg_quote(strtoupper($prefix), '/') . '-(\d+)/', $number, $match)) {
+                $max = max($max, (int) $match[1]);
+            }
+        }
+
+        return strtoupper($prefix) . '-' . str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
     }
 
     private function createMeeting(string $proposal): array
@@ -2036,6 +2296,7 @@ class AiActionExecutor
             'reunión' => 'programó una reunión',
             'cotización' => 'creó una cotización',
             'contrato' => 'creó un contrato',
+            'factura recurrente' => 'envió una factura recurrente',
             'tarea' => 'agregó una tarea',
             'subtarea' => 'agregó una subtarea',
             'nota de proyecto', 'nota personal' => 'agregó una nota',
