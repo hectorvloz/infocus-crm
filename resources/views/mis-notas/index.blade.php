@@ -399,6 +399,24 @@ document.addEventListener('DOMContentLoaded', function () {
     setAiNoteWorking(!!event.detail?.working);
   });
 
+  window.addEventListener('infocus-ai-undo-applied', async (event) => {
+    if (event.detail?.store !== 'mis_notas') return;
+    const activeId = editingNoteIndex >= 0 ? String(allNotes[editingNoteIndex]?.id || '') : '';
+    await hydrateNotes();
+    const nextIndex = allNotes.findIndex((note) => String(note.id || '') === activeId);
+    if (nextIndex >= 0) {
+      editingNoteIndex = nextIndex;
+      paintNoteEditor(allNotes[nextIndex], { focus: false });
+    } else {
+      editingNoteIndex = -1;
+      noteEditView.classList.add('hidden');
+      notesListView.classList.remove('hidden');
+      window.__infocusAiCurrentNote = null;
+      syncHeaderBackButton();
+    }
+    renderNotes();
+  });
+
   function getTitlePlaceholderHtml() {
     return '<h1 class="note-title-placeholder is-empty" data-placeholder="Nota sin titulo"><br></h1>';
   }

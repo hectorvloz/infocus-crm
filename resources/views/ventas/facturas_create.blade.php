@@ -10,6 +10,26 @@
         ->values()
         ->all();
       $base = $s['base_currency'] ?? 'USD';
+      $allowedCurrencies = ['USD','EUR','MXN','COP','ARS','CLP','PEN','GBP','CAD','JPY','AUD','CNY','CHF','HKD','NZD','SEK','KRW','SGD','INR','BRL','RUB','ZAR','TRY'];
+      $clientCurrencyById = collect($clientes)
+        ->filter(fn($c) => !empty($c['id']))
+        ->mapWithKeys(fn($c) => [(string) $c['id'] => strtoupper((string) ($c['moneda'] ?? $base))])
+        ->all();
+      $clientCurrencyByName = collect($clientes)
+        ->filter(fn($c) => !empty($c['empresa']))
+        ->mapWithKeys(fn($c) => [mb_strtolower(trim((string) $c['empresa'])) => strtoupper((string) ($c['moneda'] ?? $base))])
+        ->all();
+      $initialCurrency = old('moneda');
+      if (!$initialCurrency && !empty($prefill_id ?? '')) {
+        $initialCurrency = $clientCurrencyById[(string) $prefill_id] ?? null;
+      }
+      if (!$initialCurrency && !empty($prefill ?? '')) {
+        $initialCurrency = $clientCurrencyByName[mb_strtolower(trim((string) $prefill))] ?? null;
+      }
+      $initialCurrency = strtoupper((string) ($initialCurrency ?: $base));
+      if (!in_array($initialCurrency, $allowedCurrencies, true)) {
+        $initialCurrency = strtoupper((string) $base);
+      }
       $defaultTaxRate = (int) round((float) ($s['tax_rate'] ?? 16));
       $oldItems = old('items', [[
         'producto_id' => '',
@@ -196,8 +216,8 @@
         <div>
           <label class="text-sm font-medium">Moneda</label>
           <select name="moneda" id="monedaField" class="form-select mt-1">
-            @foreach(['USD','EUR','MXN','COP','ARS','CLP','PEN','GBP','CAD','JPY','AUD','CNY','CHF','HKD','NZD','SEK','KRW','SGD','INR','BRL','RUB','ZAR','TRY'] as $m)
-              <option @selected(old('moneda', $base)===$m)>{{ $m }}</option>
+            @foreach($allowedCurrencies as $m)
+              <option @selected($initialCurrency===$m)>{{ $m }}</option>
             @endforeach
           </select>
         </div>
@@ -325,6 +345,25 @@
   </div>
   <script>
     // Setup Client Dropdown
+    const clientCurrenciesById = @json($clientCurrencyById);
+    const clientCurrenciesByName = @json($clientCurrencyByName);
+
+    function normalizedClientName(value) {
+      return String(value || '').trim().toLocaleLowerCase('es');
+    }
+
+    function resolveClientCurrency(itemOrData) {
+      if (!itemOrData) return '';
+      const id = String(itemOrData.dataset?.id || itemOrData.id || '').trim();
+      const name = String(itemOrData.dataset?.value || itemOrData.value || itemOrData.name || '').trim();
+      return String(
+        itemOrData.dataset?.currency
+        || (id ? clientCurrenciesById[id] : '')
+        || (name ? clientCurrenciesByName[normalizedClientName(name)] : '')
+        || ''
+      ).toUpperCase();
+    }
+
     function setClientInfoFromItem(item) {
         const info = document.getElementById('clienteInfo');
         if (!info) return;
@@ -338,7 +377,23 @@
       const optionExists = Array.from(monedaField.options || []).some((opt) => opt.value === normalized);
       if (!optionExists || monedaField.value === normalized) return;
       monedaField.value = normalized;
+      monedaField.dispatchEvent(new Event('input', { bubbles: true }));
       monedaField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function selectClientItem(item, updateSearch = false) {
+        if (!item || item.dataset.createClient === '1') return;
+        const id = item.dataset.id || '';
+        const name = item.dataset.value || item.innerText.trim();
+        document.getElementById('clienteField').value = name;
+        document.getElementById('clienteIdField').value = id;
+        if (updateSearch) {
+          const searchInput = document.getElementById('clienteSearch');
+          if (searchInput) searchInput.value = name;
+        }
+        setClientInfoFromItem(item);
+        applyClientCurrency(resolveClientCurrency(item));
+        loadProyectosByCliente(id || null);
     }
 
     function setClientInfoById(id) {
@@ -346,19 +401,12 @@
         if (!menu) return;
         const match = menu.querySelector(`.dropdown-item[data-id="${id}"]`);
         if (match) {
-          setClientInfoFromItem(match);
-          applyClientCurrency(match.dataset.currency || '');
+          selectClientItem(match, true);
         }
     }
 
     setupDropdown('clienteDropdown', (item) => {
-        const id = item.dataset.id || '';
-        const name = item.dataset.value || '';
-        document.getElementById('clienteField').value = name;
-        document.getElementById('clienteIdField').value = id;
-        setClientInfoFromItem(item);
-        applyClientCurrency(item.dataset.currency || '');
-        loadProyectosByCliente(id || null);
+        selectClientItem(item, false);
     });
 
     const quickClientModal = document.getElementById('quickClientModal');
@@ -510,6 +558,15 @@
         document.getElementById('proyectoSearch').value = '';
         document.getElementById('proyectoIdField').value = '';
         loadProyectosByCliente(null);
+
+        const typed = normalizedClientName(e.target.value);
+        if (!typed) return;
+        const menu = document.querySelector('#clienteDropdown .dropdown-menu');
+        const exactMatch = Array.from(menu?.querySelectorAll('.dropdown-item[data-id]') || [])
+          .find((item) => normalizedClientName(item.dataset.value || item.innerText) === typed);
+        if (exactMatch) {
+          selectClientItem(exactMatch, false);
+        }
     });
 
     // Setup Project Dropdown (Dynamic)
@@ -601,6 +658,15 @@
       return candidate;
     }
 
+    function advanceRecurringDate(dateObj, day, everyMonths) {
+      const safeDay = Math.max(1, Math.min(31, Number(day) || 1));
+      const safeMonths = Math.max(1, Math.min(12, Number(everyMonths) || 1));
+      const next = new Date(dateObj.getFullYear(), dateObj.getMonth() + safeMonths, 1, 12, 0, 0);
+      const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+      next.setDate(Math.min(safeDay, lastDay));
+      return next;
+    }
+
     function selectedRecurringLeadDays() {
       if (!Array.isArray(availableProducts) || !availableProducts.length) return 0;
       let leadDays = 0;
@@ -629,16 +695,23 @@
       }
 
       const issueDate = document.getElementById('fecha')?.value || new Date().toISOString().slice(0, 10);
-      const dueDate = document.getElementById('vencimiento')?.value || issueDate;
       const leadDays = selectedRecurringLeadDays();
-      const issueObj = new Date(issueDate + 'T12:00:00');
-      const dueObj = new Date(dueDate + 'T12:00:00');
-      let nextDueDate = leadDays > 0 && !Number.isNaN(dueObj.getTime()) && dueObj > issueObj
-        ? dueObj
-        : computeNextRecurringDate(issueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
-      const nextDate = nextDueDate ? new Date(nextDueDate.getTime()) : null;
+      let nextDueDate = computeNextRecurringDate(issueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+      let nextDate = nextDueDate ? new Date(nextDueDate.getTime()) : null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       if (nextDate && leadDays > 0) {
         nextDate.setDate(nextDate.getDate() - leadDays);
+        while (nextDate < today) {
+          nextDueDate = advanceRecurringDate(nextDueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+          nextDate = new Date(nextDueDate.getTime());
+          nextDate.setDate(nextDate.getDate() - leadDays);
+        }
+      } else if (nextDate) {
+        while (nextDate < today) {
+          nextDueDate = advanceRecurringDate(nextDueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+          nextDate = new Date(nextDueDate.getTime());
+        }
       }
       if (!nextDate) {
         recurrencePreview.textContent = 'Configura la fecha de emisión para calcular el próximo envío.';
@@ -716,11 +789,6 @@
     function autoResizeDesc(el) {
       if (!el) return;
       const resize = () => {
-        const val = String(el.value || '');
-        if (!val.includes('\n')) {
-          el.style.height = '54px';
-          return;
-        }
         el.style.height = 'auto';
         el.style.height = `${Math.max(el.scrollHeight, 54)}px`;
       };

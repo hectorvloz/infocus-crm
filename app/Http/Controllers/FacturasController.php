@@ -1272,6 +1272,13 @@ class FacturasController extends Controller
     {
         $factura = $this->store->find($id);
         abort_if(!$factura, 404);
+        $recurrenceSource = $factura;
+        if (empty(data_get($recurrenceSource, 'recurrencia.enabled')) && !empty($factura['recurrencia_origen_id'])) {
+            $template = $this->store->find((string) $factura['recurrencia_origen_id']);
+            if ($template && !empty(data_get($template, 'recurrencia.enabled'))) {
+                $recurrenceSource = $template;
+            }
+        }
         $settings = (new FileStore('settings.json'))->find('settings') ?: [];
         $clientes = collect($this->clientes->all())
             ->reject(fn($c) => mb_strtolower(trim((string) ($c['empresa'] ?? ''))) === 'sin cliente')
@@ -1279,7 +1286,7 @@ class FacturasController extends Controller
             ->values()
             ->all();
         $base = $settings['base_currency'] ?? 'USD';
-        return view('ventas.facturas_edit', compact('factura', 'settings', 'clientes', 'base'));
+        return view('ventas.facturas_edit', compact('factura', 'recurrenceSource', 'settings', 'clientes', 'base'));
     }
 
     public function update(Request $request, string $id)
@@ -1392,12 +1399,23 @@ class FacturasController extends Controller
             }
         }
 
+        $recurrenceTargetId = null;
+        $recurrenceTargetData = null;
+        $usesOriginRecurrence = empty(data_get($current, 'recurrencia.enabled')) && !empty($current['recurrencia_origen_id']);
+
         if ($request->boolean('recurrence_enabled')) {
-            $currentRec = (array) ($current['recurrencia'] ?? []);
+            $recurrenceSource = $current;
+            if ($usesOriginRecurrence) {
+                $template = $this->store->find((string) $current['recurrencia_origen_id']);
+                if ($template && !empty(data_get($template, 'recurrencia.enabled'))) {
+                    $recurrenceSource = $template;
+                }
+            }
+            $currentRec = (array) ($recurrenceSource['recurrencia'] ?? []);
             $day = (int) ($request->input('recurrence_day') ?: ($currentRec['day_of_month'] ?? date('j')));
             $everyMonths = (int) ($request->input('recurrence_every_months') ?: ($currentRec['every_months'] ?? 1));
 
-            $data['recurrencia'] = [
+            $recurrenceTargetData = [
                 'enabled' => true,
                 'day_of_month' => max(1, min(31, $day)),
                 'every_months' => max(1, min(12, $everyMonths)),
@@ -1406,12 +1424,27 @@ class FacturasController extends Controller
                 'last_sent_at' => $currentRec['last_sent_at'] ?? null,
                 'service_reminder_sent' => $currentRec['service_reminder_sent'] ?? [],
             ];
+            if ($usesOriginRecurrence) {
+                $recurrenceTargetId = (string) $current['recurrencia_origen_id'];
+                $data['recurrencia'] = $current['recurrencia'] ?? null;
+            } else {
+                $data['recurrencia'] = $recurrenceTargetData;
+            }
         } else {
-            $data['recurrencia'] = null;
+            if ($usesOriginRecurrence) {
+                $recurrenceTargetId = (string) $current['recurrencia_origen_id'];
+                $recurrenceTargetData = null;
+                $data['recurrencia'] = $current['recurrencia'] ?? null;
+            } else {
+                $data['recurrencia'] = null;
+            }
         }
 
         $data['numero'] = $current['numero'] ?? ($current['id'] ?? $id);
         $updated = $this->store->update($id, $data);
+        if ($recurrenceTargetId !== null && $recurrenceTargetId !== (string) ($updated['id'] ?? $id)) {
+            $this->store->update($recurrenceTargetId, ['recurrencia' => $recurrenceTargetData]);
+        }
 
         if (($current['estado'] ?? '') !== 'Pagada' && ($updated['estado'] ?? '') === 'Pagada') {
             try {
@@ -1479,21 +1512,9 @@ class FacturasController extends Controller
         $day = max(1, min(31, $dayOfMonth));
         $interval = max(1, min(12, $everyMonths));
         $today = \Illuminate\Support\Carbon::today();
-        $issue = $issueDate ? \Illuminate\Support\Carbon::parse($issueDate)->startOfDay() : $today->copy();
-        $cycleDue = null;
-
-        if ($dueDate) {
-            $due = \Illuminate\Support\Carbon::parse($dueDate)->startOfDay();
-            if ($due->gt($issue)) {
-                $cycleDue = $due;
-            }
-        }
-
-        if (!$cycleDue) {
-            $cycleDue = \Illuminate\Support\Carbon::parse(
-                $this->calculateNextRecurringDate($day, $interval, $issueDate)
-            )->startOfDay();
-        }
+        $cycleDue = \Illuminate\Support\Carbon::parse(
+            $this->calculateNextRecurringDate($day, $interval, $issueDate)
+        )->startOfDay();
 
         while ($cycleDue->copy()->subDays($leadDays)->lt($today)) {
             $cycleDue->addMonthsNoOverflow($interval);

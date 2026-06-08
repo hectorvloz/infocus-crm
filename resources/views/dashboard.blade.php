@@ -157,7 +157,7 @@
               </div>
 
               <!-- 4. Gastos del Mes (Small - 2 Cols) -->
-              <div class="col-span-6 md:col-span-6 lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow h-[200px]">
+              <div class="col-span-6 md:col-span-6 lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow min-h-[230px]">
                   <div>
                       <div class="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-4">
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg> <!-- Trend Down Icon for expenses? No, expenses usually imply money out. -->
@@ -177,7 +177,7 @@
               </div>
 
               <!-- 3. Clientes Totales (Small - 2 Cols) -->
-              <div class="col-span-6 md:col-span-6 lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow h-[200px]">
+              <div class="col-span-6 md:col-span-6 lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow min-h-[230px]">
                   <div>
                       <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>

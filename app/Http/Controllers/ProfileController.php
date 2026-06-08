@@ -276,7 +276,7 @@ class ProfileController extends Controller
 
         $readIds = collect($state['read_ids'] ?? [])->map(fn ($id) => (string) $id)->push((string) $data['notification_id'])->unique()->values()->all();
 
-        $this->notificationState->update($stateKey, [
+        $this->saveNotificationState($stateKey, [
             'read_ids' => $readIds,
             'updated_at' => now()->toIso8601String(),
         ]);
@@ -291,7 +291,7 @@ class ProfileController extends Controller
         $ids = collect($notifications)->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
 
         $stateKey = $this->notificationStateKey($identity);
-        $this->notificationState->update($stateKey, [
+        $this->saveNotificationState($stateKey, [
             'read_ids' => $ids,
             'updated_at' => now()->toIso8601String(),
         ]);
@@ -329,6 +329,22 @@ class ProfileController extends Controller
     {
         $base = trim((string) ($identity['email'] ?: $identity['id']));
         return 'user:'.Str::slug(Str::lower($base), '-');
+    }
+
+    protected function saveNotificationState(string $stateKey, array $payload): void
+    {
+        $existing = $this->notificationState->find($stateKey);
+        $data = [
+            'id' => $stateKey,
+            ...$payload,
+        ];
+
+        if ($existing) {
+            $this->notificationState->update($stateKey, $data);
+            return;
+        }
+
+        $this->notificationState->create($data);
     }
 
     protected function isTaskAssignedToIdentity(array $task, array $project, array $identity): bool

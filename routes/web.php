@@ -53,6 +53,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/api/ia/chats/{id}', [AiController::class, 'show'])->name('api.ai.chats.show');
     Route::post('/api/ia/chat', [AiController::class, 'chat'])->name('api.ai.chat');
     Route::post('/api/ia/actions/execute', [AiController::class, 'executeAction'])->name('api.ai.actions.execute');
+    Route::post('/api/ia/actions/undo', [AiController::class, 'undoAction'])->name('api.ai.actions.undo');
     Route::delete('/api/ia/chats/{id}', [AiController::class, 'destroy'])->name('api.ai.chats.destroy');
     Route::get('/clientes', [ClientesController::class, 'index'])->name('clientes.index');
     Route::get('/clientes/export', [ClientesController::class, 'export'])->name('clientes.export');

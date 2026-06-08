@@ -197,7 +197,7 @@
         </a>
         <a href="{{ route('settings.ai') }}" class="settings-nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors {{ request()->routeIs('settings.ai') ? 'is-active' : '' }}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5V3m-5 7H5a2 2 0 00-2 2v2m16-4h-2m2 0a2 2 0 012 2v2M7 10h10a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6a2 2 0 012-2zM9 15h.01M15 15h.01M10 18h4"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8V4m0 4H9.5M12 8h2.5M7 11h10a2 2 0 012 2v5a2 2 0 01-2 2H7a2 2 0 01-2-2v-5a2 2 0 012-2zM4 15H3m18 0h-1M9 16h.01M15 16h.01M10 19h4"/>
             </svg>
             <span class="text-sm">IA</span>
         </a>

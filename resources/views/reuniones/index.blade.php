@@ -19,14 +19,51 @@
   $now = \Carbon\Carbon::now($timezone);
   $nowMinutes = max(0, min((22 - 8 + 1) * 60, ($now->hour * 60 + $now->minute) - (8 * 60)));
   $daysCount = count($days);
-  $calendarMinWidth = $daysCount === 1 ? '500px' : '940px';
-  $dayMinTrack = $daysCount === 1 ? '22rem' : '7.15rem';
-  $timeTrack = '4.65rem';
+  $calendarMinWidth = $daysCount === 1 ? '360px' : '100%';
+  $dayMinTrack = $daysCount === 1 ? '18rem' : '0';
+  $timeTrack = $daysCount === 1 ? '4.4rem' : 'clamp(2.75rem, 5vw, 4.2rem)';
 @endphp
 
 <style>
   .meetings-calendar {
-    --slot-height: 112px;
+    --slot-height: 62px;
+    --calendar-day-pad-x: 0.55rem;
+    --calendar-day-pad-y: 0.7rem;
+    --calendar-event-font: 0.78rem;
+    --calendar-event-pad: 0.45rem;
+    overflow-y: visible;
+    overflow-x: visible !important;
+  }
+  .meetings-main {
+    overflow: visible !important;
+  }
+  .meetings-calendar-week-header {
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    box-shadow: 0 1px 0 rgba(226, 232, 240, 0.9), 0 12px 24px rgba(15, 23, 42, 0.04);
+  }
+  .meetings-calendar-sticky-clone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 110;
+    display: none;
+    overflow: hidden;
+    pointer-events: none;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.10);
+  }
+  .meetings-calendar-sticky-clone.is-visible {
+    display: block;
+  }
+  .meetings-calendar-sticky-clone-inner {
+    will-change: transform;
+  }
+  .meetings-calendar-sticky-clone-inner > .meetings-calendar-week-header {
+    position: static;
+    width: 100%;
   }
   .meeting-card {
     top: calc(var(--start-min) / 60 * var(--slot-height));
@@ -37,6 +74,9 @@
     height: 100%;
     overflow: hidden;
     border-radius: 0;
+  }
+  .meeting-card {
+    font-size: var(--calendar-event-font);
   }
   .meeting-card-time-row {
     display: flex;
@@ -187,7 +227,8 @@
   }
   .meeting-card-title {
     display: block;
-    line-height: 1.12;
+    font-size: var(--calendar-event-title-font, 0.74rem);
+    line-height: 1.08;
     overflow: visible;
     padding-left: 0.08rem;
     padding-bottom: 0.18rem;
@@ -369,7 +410,38 @@
   }
   @media (max-width: 1024px) {
     .meetings-calendar {
-      --slot-height: 64px;
+      --slot-height: 50px;
+      --calendar-day-pad-x: 0.38rem;
+      --calendar-day-pad-y: 0.48rem;
+      --calendar-event-font: 0.68rem;
+      --calendar-event-title-font: 0.66rem;
+      --calendar-event-pad: 0.32rem;
+    }
+  }
+  @media (max-width: 760px) {
+    .meetings-calendar {
+      --slot-height: 46px;
+      --calendar-day-pad-x: 0.24rem;
+      --calendar-day-pad-y: 0.38rem;
+      --calendar-event-font: 0.58rem;
+      --calendar-event-title-font: 0.58rem;
+      --calendar-event-pad: 0.24rem;
+      overflow-x: auto !important;
+    }
+    .meetings-calendar-day-name {
+      font-size: 0.58rem;
+      letter-spacing: 0.06em;
+    }
+    .meetings-calendar-day-number {
+      height: 1.85rem;
+      width: 1.85rem;
+      border-radius: 999px;
+      font-size: 0.98rem;
+    }
+    .meetings-calendar-time {
+      font-size: 0.62rem;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
     }
   }
 </style>
@@ -428,12 +500,12 @@
 
       <div class="meetings-calendar overflow-x-auto">
         <div style="min-width: {{ $calendarMinWidth }};">
-          <div class="grid border-b border-slate-100 bg-white sticky top-0 z-10" style="grid-template-columns: {{ $timeTrack }} repeat({{ $daysCount }}, minmax({{ $dayMinTrack }}, 1fr));">
-            <div class="px-3 py-4 text-xs font-bold text-slate-400">Hora</div>
+          <div class="meetings-calendar-week-header grid border-b border-slate-100 bg-white" style="grid-template-columns: {{ $timeTrack }} repeat({{ $daysCount }}, minmax({{ $dayMinTrack }}, 1fr));">
+            <div class="px-1.5 py-[var(--calendar-day-pad-y)] text-[11px] font-bold text-slate-400 sm:px-2">Hora</div>
             @foreach($days as $index => $day)
-              <div class="px-3 py-4 border-l border-slate-100">
-                <div class="text-xs font-extrabold uppercase tracking-[0.12em] {{ $day->toDateString() === $today ? 'text-lime-700' : 'text-slate-400' }}">{{ $dayNames[$day->dayOfWeekIso - 1] }}</div>
-                <div class="mt-1 inline-flex items-center justify-center h-9 w-9 rounded-2xl text-lg font-extrabold {{ $day->toDateString() === $today ? 'bg-[#ecfe88] text-slate-950' : 'text-slate-900' }}">{{ $day->format('d') }}</div>
+              <div class="px-[var(--calendar-day-pad-x)] py-[var(--calendar-day-pad-y)] border-l border-slate-100 text-center">
+                <div class="meetings-calendar-day-name text-xs font-extrabold uppercase tracking-[0.12em] {{ $day->toDateString() === $today ? 'text-lime-700' : 'text-slate-400' }}">{{ $dayNames[$day->dayOfWeekIso - 1] }}</div>
+                <div class="meetings-calendar-day-number mt-1 inline-flex items-center justify-center h-9 w-9 rounded-2xl text-lg font-extrabold {{ $day->toDateString() === $today ? 'bg-[#ecfe88] text-slate-950' : 'text-slate-900' }}">{{ $day->format('d') }}</div>
               </div>
             @endforeach
           </div>
@@ -441,7 +513,7 @@
           <div class="grid relative" style="grid-template-columns: {{ $timeTrack }} repeat({{ $daysCount }}, minmax({{ $dayMinTrack }}, 1fr));">
             <div>
               @foreach($hours as $hour)
-                <div class="h-[var(--slot-height)] px-3 pt-2 text-xs font-bold text-slate-400 border-b border-slate-100">{{ str_pad((string) $hour, 2, '0', STR_PAD_LEFT) }}:00</div>
+                <div class="meetings-calendar-time h-[var(--slot-height)] px-2 pt-2 text-xs font-bold text-slate-400 border-b border-slate-100">{{ str_pad((string) $hour, 2, '0', STR_PAD_LEFT) }}:00</div>
               @endforeach
             </div>
             @foreach($days as $dayIndex => $day)
@@ -457,7 +529,7 @@
 	                  <div class="meeting-past-overlay" style="height: calc({{ $nowMinutes }} / 60 * var(--slot-height));"></div>
 	                  <div class="meeting-now-line" style="top: calc({{ $nowMinutes }} / 60 * var(--slot-height));"></div>
 	                @endif
-	                <div class="absolute inset-x-2 top-0 bottom-0 pointer-events-none">
+	                <div class="absolute inset-x-1 top-0 bottom-0 pointer-events-none sm:inset-x-1.5 lg:inset-x-2">
 	                  @php
 	                    $dayMeetings = collect($weekMeetings[$day->toDateString()] ?? [])
 	                      ->map(function ($meeting, $meetingIndex) use ($timezone) {
@@ -545,7 +617,7 @@
                       $isPastMeeting = $end->lt($now);
                     @endphp
                     <div
-	                      class="meeting-card absolute rounded-2xl border px-2.5 py-2 shadow-sm pointer-events-auto cursor-pointer hover:shadow-md transition {{ $accent }} {{ $isPastMeeting ? 'is-past' : '' }}"
+	                      class="meeting-card absolute rounded-xl border px-[var(--calendar-event-pad)] py-[var(--calendar-event-pad)] shadow-sm pointer-events-auto cursor-pointer hover:shadow-md transition {{ $accent }} {{ $isPastMeeting ? 'is-past' : '' }}"
 	                      style="--start-min: {{ $startMin }}; --duration-min: {{ $durationMin }}; left: {{ $leftPct }}%; width: calc({{ $widthPct }}%); z-index: {{ 10 + $meetingLane }};"
                       data-meeting-card
                       data-title="{{ e($meeting['titulo'] ?? 'Reunion') }}"
@@ -569,7 +641,7 @@
                     >
                       <div class="meeting-card-content">
                         <div class="min-w-0">
-                          <div class="meeting-card-title text-[13px] font-extrabold text-slate-900">{{ $meeting['titulo'] ?? 'Reunion' }}</div>
+                          <div class="meeting-card-title font-extrabold text-slate-900">{{ $meeting['titulo'] ?? 'Reunion' }}</div>
                           <div class="meeting-card-time-row mt-1">
                             <span class="meeting-time-pill">{{ $start->format('H:i') }} - {{ $end->format('H:i') }}</span>
                           </div>
@@ -892,8 +964,49 @@
     const manualMeetWrap = document.getElementById('meetingManualMeetWrap');
     const colorInput = document.getElementById('meetingColorInput');
     const calendarScroller = document.querySelector('.meetings-calendar');
+    const calendarHeader = document.querySelector('.meetings-calendar-week-header');
     const colorButtons = Array.from(document.querySelectorAll('[data-meeting-color]'));
     if (calendarScroller) {
+      let stickyClone = null;
+      let stickyCloneInner = null;
+      const pageScrollHost = document.querySelector('main.custom-scroll') || window;
+      const getStickyTop = () => {
+        if (pageScrollHost === window) return 0;
+        return Math.max(0, pageScrollHost.getBoundingClientRect().top);
+      };
+      const updateStickyCalendarHeader = () => {
+        if (!calendarHeader) return;
+        if (!stickyClone) {
+          stickyClone = document.createElement('div');
+          stickyClone.className = 'meetings-calendar-sticky-clone';
+          stickyCloneInner = document.createElement('div');
+          stickyCloneInner.className = 'meetings-calendar-sticky-clone-inner';
+          stickyCloneInner.innerHTML = calendarHeader.outerHTML;
+          stickyClone.appendChild(stickyCloneInner);
+          document.body.appendChild(stickyClone);
+        }
+
+        const scrollerRect = calendarScroller.getBoundingClientRect();
+        const headerRect = calendarHeader.getBoundingClientRect();
+        const stickyTop = getStickyTop();
+        const shouldShow = headerRect.top < stickyTop && scrollerRect.bottom > stickyTop + headerRect.height;
+
+        stickyClone.classList.toggle('is-visible', shouldShow);
+        if (!shouldShow || !stickyCloneInner) return;
+
+        stickyClone.style.top = '0px';
+        stickyClone.style.left = `${scrollerRect.left}px`;
+        stickyClone.style.width = `${scrollerRect.width}px`;
+        stickyClone.style.height = `${stickyTop + headerRect.height}px`;
+        stickyCloneInner.style.width = `${calendarHeader.scrollWidth}px`;
+        stickyCloneInner.style.transform = `translate(${-calendarScroller.scrollLeft}px, ${stickyTop}px)`;
+      };
+
+      updateStickyCalendarHeader();
+      pageScrollHost.addEventListener('scroll', updateStickyCalendarHeader, { passive: true });
+      window.addEventListener('resize', updateStickyCalendarHeader);
+      calendarScroller.addEventListener('scroll', updateStickyCalendarHeader, { passive: true });
+
       let isCalendarDragging = false;
       let didCalendarDrag = false;
       let calendarStartX = 0;

@@ -14,6 +14,16 @@
   <script>
     (function () {
       try {
+        localStorage.setItem('infocusAppearanceMode', 'light');
+        document.documentElement.setAttribute('data-color-mode', 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-color-mode', 'light');
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      try {
         var saved = parseInt(localStorage.getItem('sidebarScrollTop') || '0', 10) || 0;
         if (saved > 0) document.documentElement.classList.add('sidebar-scroll-pending');
       } catch (e) {}
@@ -615,9 +625,9 @@
       position: absolute;
       left: 0;
       right: 0;
-      top: 50%;
-      height: 1.85rem;
-      transform: translateY(-34%);
+      top: 0.1rem;
+      bottom: 0.05rem;
+      min-height: 1.85rem;
       border-radius: 0.75rem;
       background: rgba(244, 253, 172, 0.45);
       opacity: 0;
@@ -627,12 +637,24 @@
       box-shadow: none;
     }
 
-    .reminder-text-frame input {
+    .reminder-text-frame input,
+    .reminder-text-frame textarea {
       border: 0 !important;
       box-shadow: none !important;
       outline: 0 !important;
       -webkit-appearance: none;
       appearance: none;
+    }
+
+    .reminder-text-frame textarea {
+      min-height: 1.95rem;
+      resize: none;
+      overflow: hidden;
+      scrollbar-width: none;
+    }
+
+    .reminder-text-frame textarea::-webkit-scrollbar {
+      display: none;
     }
 
     .reminder-text-frame:focus-within::before {
@@ -1464,6 +1486,45 @@
       color: #fff;
       background: rgba(255,255,255,.06);
     }
+    #sidebar .appearance-toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .35rem;
+      margin-top: .55rem;
+      padding: .32rem;
+      border-radius: 1.25rem;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    #sidebar .appearance-toolbar.hidden {
+      display: none !important;
+    }
+    #sidebar .appearance-mode-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      min-height: 2.35rem;
+      border-radius: 1rem;
+      color: rgba(255,255,255,.62);
+      font-size: .78rem;
+      font-weight: 800;
+      transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+    }
+    #sidebar .appearance-mode-btn:hover {
+      color: #fff;
+      background: rgba(255,255,255,.08);
+    }
+    html[data-color-mode="light"] #sidebar .appearance-mode-btn[data-appearance-mode="light"],
+    html[data-color-mode="dark"] #sidebar .appearance-mode-btn[data-appearance-mode="dark"] {
+      color: #111729;
+      background: #f2fda2;
+      box-shadow: 0 10px 24px rgba(0,0,0,.18);
+    }
+    #sidebar .appearance-mode-btn svg {
+      width: 1rem;
+      height: 1rem;
+    }
     #sidebar.sidebar-shell{transition:width .28s cubic-bezier(.2,.8,.2,1);will-change:width;contain:layout paint}
     .menu-glass{position:relative;isolation:isolate}
     .menu-glass .menu-link{position:relative;z-index:1;transition-property:background-color,color,opacity;transition-duration:.2s;transition-timing-function:ease}
@@ -1504,11 +1565,14 @@
     .sidebar-is-collapsed #sidebar { width: 6rem !important; } /* w-24 */
     .sidebar-is-collapsed #sidebar .menu-link span[data-label],
     .sidebar-is-collapsed #sidebar [data-label="INFOCUS"],
-    .sidebar-is-collapsed #sidebar svg[data-submenu-chevron] { display: none !important; }
+    .sidebar-is-collapsed #sidebar svg[data-submenu-chevron],
+    .sidebar-is-collapsed #sidebar .appearance-toolbar span { display: none !important; }
     .sidebar-is-collapsed #sidebar [id^="submenu-"] { display: none !important; }
     .sidebar-is-collapsed #sidebar .menu-link { justify-content: center; padding-left: 0; padding-right: 0; margin-left: auto; margin-right: auto; width: 40px; height: 40px; border-radius: 9999px; }
     .sidebar-is-collapsed #sidebar .menu-link svg { margin: 0; width: 20px; height: 20px; }
     .sidebar-is-collapsed #sidebar #sidebarToggle { margin: 0 auto; }
+    .sidebar-is-collapsed #sidebar .appearance-toolbar { grid-template-columns: 1fr; padding: .25rem; }
+    .sidebar-is-collapsed #sidebar .appearance-mode-btn { min-height: 2.25rem; border-radius: 9999px; }
     
     /* Logo switching */
     [data-collapsed-logo] { display: none !important; }
@@ -1530,10 +1594,177 @@
     }
 
     #remindersPanel {
-      border: 2px solid transparent;
+      border: 8px solid transparent;
       background:
         linear-gradient(#ffffff, #ffffff) padding-box,
-        linear-gradient(135deg, #f4fdac 0%, #d8f6ff 34%, #f0d4ff 68%, #f4fdac 100%) border-box;
+        linear-gradient(135deg, rgba(244, 253, 172, .58) 0%, rgba(216, 246, 255, .5) 34%, rgba(240, 212, 255, .46) 68%, rgba(244, 253, 172, .5) 100%) border-box;
+      box-shadow:
+        inset 0 0 0 1px rgba(148, 163, 184, .14),
+        0 28px 70px rgba(15, 23, 42, 0.20);
+    }
+
+    html[data-color-mode="dark"] body {
+      background: #070b14 !important;
+      color: #dbe7f5 !important;
+      color-scheme: dark;
+    }
+    html[data-color-mode="dark"] header {
+      background: rgba(7, 11, 20, .88) !important;
+      border-bottom: 1px solid rgba(148, 163, 184, .12);
+    }
+    html[data-color-mode="dark"] main {
+      background:
+        radial-gradient(circle at 18% 0%, rgba(236, 254, 136, .08), transparent 34%),
+        radial-gradient(circle at 100% 0%, rgba(56, 189, 248, .08), transparent 30%),
+        #070b14 !important;
+    }
+    html[data-color-mode="dark"] #sidebar > div {
+      background: linear-gradient(180deg, #f2fda2 0%, #ecfe88 100%) !important;
+      border-color: rgba(17, 23, 41, .12) !important;
+      color: #111729 !important;
+      box-shadow: 0 28px 70px rgba(0,0,0,.32), inset 0 0 0 1px rgba(255,255,255,.34) !important;
+    }
+    html[data-color-mode="dark"] #sidebar > div > .h-16,
+    html[data-color-mode="dark"] #sidebar .border-t {
+      border-color: rgba(17, 23, 41, .14) !important;
+    }
+    html[data-color-mode="dark"] #sidebar .menu-link,
+    html[data-color-mode="dark"] #sidebar .submenu-link,
+    html[data-color-mode="dark"] #sidebar button {
+      color: rgba(17, 23, 41, .72) !important;
+    }
+    html[data-color-mode="dark"] #sidebar .menu-link:hover,
+    html[data-color-mode="dark"] #sidebar .submenu-link:hover,
+    html[data-color-mode="dark"] #sidebar button:hover {
+      background: rgba(17, 23, 41, .08) !important;
+      color: #111729 !important;
+    }
+    html[data-color-mode="dark"] #sidebar .menu-link.is-active {
+      background: rgba(17, 23, 41, .12) !important;
+      border-color: rgba(17, 23, 41, .08) !important;
+      color: #111729 !important;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 14px 30px rgba(17, 23, 41, .1) !important;
+      font-weight: 800 !important;
+    }
+    html[data-color-mode="dark"] #sidebar .menu-link.is-active * {
+      color: #111729 !important;
+      stroke: currentColor;
+    }
+    html[data-color-mode="dark"] #sidebar .menu-link.is-active:hover {
+      background: rgba(17, 23, 41, .16) !important;
+      color: #111729 !important;
+    }
+    html[data-color-mode="dark"] #sidebar .submenu-link.is-active {
+      color: #111729 !important;
+      background: rgba(17, 23, 41, .1) !important;
+    }
+    html[data-color-mode="dark"] #sidebar .appearance-toolbar {
+      background: rgba(17, 23, 41, .1) !important;
+      border-color: rgba(17, 23, 41, .14) !important;
+    }
+    html[data-color-mode="dark"] #sidebar .appearance-mode-btn {
+      color: rgba(17, 23, 41, .68) !important;
+    }
+    html[data-color-mode="dark"] #sidebar .appearance-mode-btn[data-appearance-mode="dark"] {
+      background: #111729 !important;
+      color: #f2fda2 !important;
+    }
+    html[data-color-mode="dark"] :is(.bg-white, .bg-neutral-50, .bg-slate-50, .bg-slate-50\/70, .bg-slate-100, .bg-gray-50):not(#sidebar *):not(.mobile-bottom-nav *) {
+      background-color: #111827 !important;
+    }
+    html[data-color-mode="dark"] :is(.bg-slate-900, .bg-\[\#111729\]):not(#sidebar *):not(.mobile-bottom-nav *) {
+      background-color: #070b14 !important;
+    }
+    html[data-color-mode="dark"] :is(.text-slate-950, .text-slate-900, .text-slate-800):not(#sidebar *):not(.mobile-bottom-nav *) {
+      color: #f8fafc !important;
+    }
+    html[data-color-mode="dark"] :is(.text-slate-700, .text-slate-600):not(#sidebar *):not(.mobile-bottom-nav *) {
+      color: #cbd5e1 !important;
+    }
+    html[data-color-mode="dark"] :is(.text-slate-500, .text-slate-400):not(#sidebar *):not(.mobile-bottom-nav *) {
+      color: #94a3b8 !important;
+    }
+    html[data-color-mode="dark"] :is(.border-slate-100, .border-slate-200, .border-gray-100, .border-gray-200, .divide-slate-100 > *, .divide-slate-200 > *):not(#sidebar *):not(.mobile-bottom-nav *) {
+      border-color: #263349 !important;
+    }
+    html[data-color-mode="dark"] :is(input, textarea, select):not(#sidebar *):not(.flatpickr-input) {
+      background-color: #0b1220 !important;
+      border-color: #334155 !important;
+      color: #e5edf8 !important;
+    }
+    html[data-color-mode="dark"] :is(input, textarea, select):not(#sidebar *)::placeholder {
+      color: #64748b !important;
+    }
+    html[data-color-mode="dark"] :is(table, thead, tbody, tr, td, th):not(#sidebar *) {
+      border-color: #263349 !important;
+    }
+    html[data-color-mode="dark"] :is(thead, .bg-slate-50):not(#sidebar *) {
+      background-color: #0d1626 !important;
+    }
+    html[data-color-mode="dark"] :is(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl):not(#sidebar *) {
+      --tw-shadow-color: rgba(0, 0, 0, .45) !important;
+    }
+    html[data-color-mode="dark"] .app-select-trigger,
+    html[data-color-mode="dark"] .app-select-menu {
+      background: #0b1220 !important;
+      border-color: #334155 !important;
+      color: #e5edf8 !important;
+    }
+    html[data-color-mode="dark"] .app-select-option:hover {
+      background: #172033 !important;
+    }
+    html[data-color-mode="dark"] :is(.bg-lime-100, .bg-lime-200, .bg-lime-300, .bg-lime-400, .bg-\[\#ecfe88\], .bg-\[\#f2fda2\], .bg-\[\#f6fdb5\], .bg-\[\#d9ef60\], .bg-\[\#d9ea76\], .bg-\[\#d9f99d\]):not(#sidebar *),
+    html[data-color-mode="dark"] :is(.bg-lime-100, .bg-lime-200, .bg-lime-300, .bg-lime-400, .bg-\[\#ecfe88\], .bg-\[\#f2fda2\], .bg-\[\#f6fdb5\], .bg-\[\#d9ef60\], .bg-\[\#d9ea76\], .bg-\[\#d9f99d\]):not(#sidebar *) * {
+      color: #101729 !important;
+    }
+    html[data-color-mode="dark"] :is(.bg-lime-100, .bg-lime-200, .bg-lime-300, .bg-lime-400, .bg-\[\#ecfe88\], .bg-\[\#f2fda2\], .bg-\[\#f6fdb5\], .bg-\[\#d9ef60\], .bg-\[\#d9ea76\], .bg-\[\#d9f99d\]):not(#sidebar *) :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300, .text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, .text-slate-800, .text-slate-900, .text-slate-950) {
+      color: #101729 !important;
+    }
+    html[data-color-mode="dark"] :is(.bg-lime-100, .bg-lime-200, .bg-lime-300, .bg-lime-400, .bg-\[\#ecfe88\], .bg-\[\#f2fda2\], .bg-\[\#f6fdb5\], .bg-\[\#d9ef60\], .bg-\[\#d9ea76\], .bg-\[\#d9f99d\]):not(#sidebar *) :is(.text-lime-600, .text-lime-700, .text-emerald-600, .text-emerald-700) {
+      color: #365314 !important;
+    }
+    html[data-color-mode="dark"] :is(.bg-lime-100, .bg-lime-200, .bg-lime-300, .bg-lime-400, .bg-\[\#ecfe88\], .bg-\[\#f2fda2\], .bg-\[\#f6fdb5\], .bg-\[\#d9ef60\], .bg-\[\#d9ea76\], .bg-\[\#d9f99d\]):not(#sidebar *) :is(.bg-slate-900, .bg-\[\#111729\], .bg-black),
+    html[data-color-mode="dark"] :is(.bg-lime-100, .bg-lime-200, .bg-lime-300, .bg-lime-400, .bg-\[\#ecfe88\], .bg-\[\#f2fda2\], .bg-\[\#f6fdb5\], .bg-\[\#d9ef60\], .bg-\[\#d9ea76\], .bg-\[\#d9f99d\]):not(#sidebar *) :is(.bg-slate-900, .bg-\[\#111729\], .bg-black) * {
+      color: #f8fafc !important;
+    }
+    html[data-color-mode="dark"] #remindersPanel > .bg-\[\#f6fdb5\],
+    html[data-color-mode="dark"] #remindersPanel > .bg-\[\#f6fdb5\] * {
+      color: #101729 !important;
+    }
+    html[data-color-mode="dark"] #reminderAddCategoryBtn,
+    html[data-color-mode="dark"] #reminderAddCategoryBtn * {
+      color: #101729 !important;
+    }
+    html[data-color-mode="dark"] #headerRemindersBtn {
+      background: #070b14 !important;
+      border-color: rgba(236, 254, 136, .18) !important;
+      color: #f2fda2 !important;
+      box-shadow: 0 0 0 1px rgba(236, 254, 136, .08), 0 18px 38px rgba(0,0,0,.35) !important;
+    }
+    html[data-color-mode="dark"] #notificationsPanel,
+    html[data-color-mode="dark"] #remindersPanel {
+      color: #e5edf8 !important;
+    }
+    html[data-color-mode="dark"] #remindersPanel {
+      background:
+        linear-gradient(#111827, #111827) padding-box,
+        linear-gradient(135deg, rgba(244,253,172,.8) 0%, rgba(216,246,255,.7) 34%, rgba(240,212,255,.74) 68%, rgba(244,253,172,.78) 100%) border-box;
+    }
+    html[data-color-mode="dark"] .flatpickr-calendar {
+      background: #111827 !important;
+      border-color: #334155 !important;
+      box-shadow: 0 24px 70px rgba(0,0,0,.55) !important;
+    }
+    html[data-color-mode="dark"] .flatpickr-months,
+    html[data-color-mode="dark"] .flatpickr-weekdays,
+    html[data-color-mode="dark"] .flatpickr-current-month,
+    html[data-color-mode="dark"] .flatpickr-weekday,
+    html[data-color-mode="dark"] .flatpickr-day {
+      color: #e5edf8 !important;
+    }
+    html[data-color-mode="dark"] .flatpickr-day:hover {
+      background: #263349 !important;
+      border-color: #334155 !important;
     }
 
     html, body {
@@ -1698,7 +1929,7 @@
         <div id="notificationsList" class="flex-1 min-h-0 p-4 space-y-2 overflow-y-auto custom-scroll"></div>
       </aside>
       <div id="remindersBackdrop" class="hidden fixed inset-0 bg-slate-950/40" style="z-index:2147483290"></div>
-      <aside id="remindersPanel" class="fixed top-5 right-5 bottom-5 h-auto w-[calc(100%-2.5rem)] max-w-md bg-white border border-slate-200 shadow-2xl transform translate-x-[calc(100%+2rem)] transition-transform duration-300 ease-out flex flex-col rounded-[2rem] overflow-hidden" style="z-index:2147483300">
+      <aside id="remindersPanel" class="fixed top-5 right-5 bottom-5 h-auto w-[calc(100%-2.5rem)] max-w-md bg-white border-0 shadow-2xl transform translate-x-[calc(100%+2rem)] transition-transform duration-300 ease-out flex flex-col rounded-[2rem] overflow-hidden" style="z-index:2147483300">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-[#f6fdb5]">
           <div>
             <h3 class="text-2xl font-extrabold text-slate-900">Recordatorios</h3>
@@ -1721,7 +1952,7 @@
         <div class="flex-1 min-h-0 overflow-y-auto custom-scroll px-5 pb-5">
           <div id="remindersList" class="space-y-5"></div>
           <button id="reminderShowComposerBtn" type="button" class="hidden mt-4 inline-flex items-center gap-2.5 rounded-2xl py-0.5 text-base font-extrabold text-slate-500 hover:text-slate-900">
-            <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-sm leading-none">+</span>
+            <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-base font-black leading-[1]"><span class="-translate-y-px">+</span></span>
             <span>Añadir recordatorio</span>
           </button>
           <div id="reminderComposer" class="reminder-row group relative hidden items-start gap-2.5 rounded-2xl py-0.5">
@@ -1793,6 +2024,29 @@
     const btn = document.getElementById('sidebarToggle');
     const sidebarScrollHost = el ? el.querySelector('.custom-scroll') : null;
     const SIDEBAR_SCROLL_KEY = 'sidebarScrollTop';
+    const APPEARANCE_MODE_KEY = 'infocusAppearanceMode';
+    const APPEARANCE_MODE_ENABLED = false;
+    const applyAppearanceMode = (mode) => {
+      const nextMode = mode === 'dark' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-color-mode', nextMode);
+      document.body?.setAttribute('data-color-mode', nextMode);
+      document.querySelectorAll('[data-appearance-mode]').forEach((button) => {
+        const isActive = button.getAttribute('data-appearance-mode') === nextMode;
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+      try { localStorage.setItem(APPEARANCE_MODE_KEY, nextMode); } catch (e) {}
+    };
+    try {
+      applyAppearanceMode('light');
+    } catch (e) {
+      applyAppearanceMode('light');
+    }
+    document.querySelectorAll('[data-appearance-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!APPEARANCE_MODE_ENABLED) return;
+        applyAppearanceMode(button.getAttribute('data-appearance-mode'));
+      });
+    });
     const saveSidebarScroll = () => {
       if (!sidebarScrollHost) return;
       try { localStorage.setItem(SIDEBAR_SCROLL_KEY, String(sidebarScrollHost.scrollTop || 0)); } catch (e) {}
@@ -2391,10 +2645,10 @@
             .filter((section) => String(section.categoryId) === String(category.id))
             .map((section) => String(section.id));
           const count = reminders.filter((item) => sectionIds.includes(String(item.sectionId || '')) && !item.done).length;
-          return `<div data-reminder-category="${escapeHtml(category.id)}" class="shrink-0 inline-flex w-fit max-w-[calc(100vw-7rem)] items-center gap-2 rounded-full border py-2.5 pl-4 pr-2.5 text-xs font-extrabold transition-colors ${active ? 'bg-[#111729] text-white border-[#111729] shadow-sm' : 'bg-white text-[#111729] border-slate-200 hover:border-[#111729] hover:bg-slate-50'}">
-            <input data-reminder-category-title="${escapeHtml(category.id)}" value="${escapeHtml(category.title || 'Categoría')}" class="min-w-[4ch] max-w-[22ch] border-0 bg-transparent p-0 text-xs font-extrabold text-inherit outline-none ring-0 focus:outline-none focus:ring-0">
-            <span class="rounded-full px-1.5 py-0.5 text-[11px] ${active ? 'bg-white/14 text-white' : 'bg-slate-100 text-slate-500'}">${count}</span>
-            <button type="button" data-reminder-category-delete="${escapeHtml(category.id)}" class="${reminderCategoriesData.length <= 1 ? 'hidden' : ''} inline-flex h-5 w-5 items-center justify-center rounded-full ${active ? 'text-white/65 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-rose-500'}" title="Eliminar categoría" aria-label="Eliminar categoría">×</button>
+          return `<div data-reminder-category="${escapeHtml(category.id)}" class="shrink-0 inline-flex w-fit max-w-[13rem] items-center gap-1.5 rounded-full border py-1.5 pl-3 pr-2 text-[11px] font-extrabold transition-colors ${active ? 'bg-[#111729] text-white border-[#111729] shadow-sm' : 'bg-white text-[#111729] border-slate-200 hover:border-[#111729] hover:bg-slate-50'}">
+            <input data-reminder-category-title="${escapeHtml(category.id)}" value="${escapeHtml(category.title || 'Categoría')}" class="min-w-[4ch] max-w-[12ch] border-0 bg-transparent p-0 text-[11px] font-extrabold text-inherit outline-none ring-0 focus:outline-none focus:ring-0">
+            <span class="rounded-full px-1.5 py-0.5 text-[10px] leading-none ${active ? 'bg-white/14 text-white' : 'bg-slate-100 text-slate-500'}">${count}</span>
+            <button type="button" data-reminder-category-delete="${escapeHtml(category.id)}" class="${reminderCategoriesData.length <= 1 ? 'hidden' : ''} inline-flex h-4 w-4 items-center justify-center rounded-full text-xs ${active ? 'text-white/65 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:bg-slate-100 hover:text-rose-500'}" title="Eliminar categoría" aria-label="Eliminar categoría">×</button>
           </div>`;
         }).join('');
         reminderCategories.querySelectorAll('[data-reminder-category]').forEach((btn) => {
@@ -2481,7 +2735,7 @@
               </button>
               <div class="min-w-0 flex-1">
                 <div class="reminder-text-frame relative">
-                  <input data-reminder-text="${escapeHtml(item.id)}" value="${escapeHtml(item.text || '')}" class="relative z-10 w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 text-base font-bold leading-6 ${item.done ? 'text-slate-400 line-through' : 'text-slate-800'} outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Recordatorio">
+                  <textarea data-reminder-text="${escapeHtml(item.id)}" rows="1" class="relative z-10 block w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 text-base font-bold leading-6 ${item.done ? 'text-slate-400 line-through' : 'text-slate-800'} outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Recordatorio">${escapeHtml(item.text || '')}</textarea>
                 </div>
                 ${metaHtml}
                 <div class="mt-2 hidden group-focus-within:flex flex-nowrap items-center gap-1.5">
@@ -2503,7 +2757,7 @@
             </div>
             <div class="mt-1.5 space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
             <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="mt-2 inline-flex items-center gap-2.5 rounded-2xl py-0.5 text-base font-extrabold text-slate-500 hover:text-slate-900">
-              <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-sm leading-none">+</span>
+              <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-base font-black leading-[1]"><span class="-translate-y-px">+</span></span>
               <span>Añadir recordatorio</span>
             </button>
           </section>`;
@@ -2550,6 +2804,12 @@
         saveReminders();
         openReminderComposer(targetSectionId, reminder.id);
         return reminder.id;
+      }
+
+      function autoSizeReminderText(input) {
+        if (!input || input.tagName !== 'TEXTAREA') return;
+        input.style.height = 'auto';
+        input.style.height = `${Math.max(30, input.scrollHeight)}px`;
       }
 
       function reminderSearchText(value) {
@@ -2661,6 +2921,17 @@
         }, 80);
 
         return { ok: true, id };
+      };
+
+      window.__infocusAiUndoReminder = async function(id) {
+        const reminderId = String(id || '').trim();
+        if (!reminderId) return false;
+        loadReminders();
+        const beforeCount = reminders.length;
+        reminders = reminders.filter((item) => String(item.id || '') !== reminderId);
+        if (reminders.length === beforeCount) return false;
+        saveReminders();
+        return true;
       };
 
       function playReminderCheckBurst(button) {
@@ -2792,8 +3063,10 @@
           });
         });
         remindersList?.querySelectorAll('[data-reminder-text]').forEach((input) => {
+          autoSizeReminderText(input);
           input.addEventListener('input', () => {
             const id = input.getAttribute('data-reminder-text');
+            autoSizeReminderText(input);
             reminders = reminders.map((item) => item.id === id ? { ...item, text: input.value, updatedAt: Date.now() } : item);
             maybeShowReminderLinkDropdown(input, id);
             persistRemindersOnly();
@@ -3005,6 +3278,36 @@
         return 'all';
       }
 
+      function notificationVisual(item) {
+        const kind = String((item && item.kind) || '');
+        const title = String((item && item.title) || '').toLowerCase();
+        if (kind === 'payment' || title.includes('pago')) {
+          return { icon: 'fa-solid fa-dollar-sign', wrap: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        }
+        if (kind === 'invoice_sent' || kind === 'due_soon' || title.includes('factura')) {
+          return { icon: 'fa-regular fa-file-lines', wrap: 'bg-sky-50 text-sky-700 border-sky-200' };
+        }
+        if (kind === 'overdue') {
+          return { icon: 'fa-solid fa-triangle-exclamation', wrap: 'bg-rose-50 text-rose-700 border-rose-200' };
+        }
+        if (kind === 'meeting_reminder') {
+          return { icon: 'fa-regular fa-calendar-check', wrap: 'bg-violet-50 text-violet-700 border-violet-200' };
+        }
+        if (kind === 'lead_reminder' || String(item?.id || '').includes('lead:')) {
+          return { icon: 'fa-solid fa-bullseye', wrap: 'bg-orange-50 text-orange-700 border-orange-200' };
+        }
+        if (kind === 'portal_access') {
+          return { icon: 'fa-solid fa-right-to-bracket', wrap: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+        }
+        if (kind === 'timer_started') {
+          return { icon: 'fa-regular fa-clock', wrap: 'bg-amber-50 text-amber-700 border-amber-200' };
+        }
+        if (kind === 'progress' || kind === 'upcoming' || title.includes('proyecto')) {
+          return { icon: 'fa-solid fa-diagram-project', wrap: 'bg-lime-50 text-lime-700 border-lime-200' };
+        }
+        return { icon: 'fa-regular fa-bell', wrap: 'bg-slate-50 text-slate-600 border-slate-200' };
+      }
+
       function applyPresence(status) {
         const safe = statusMap[status] ? status : 'available';
         const info = statusMap[safe];
@@ -3073,12 +3376,19 @@
           const tone = item.kind === 'overdue'
             ? 'border-rose-200 bg-rose-50'
             : (item.kind === 'upcoming' || item.kind === 'meeting_reminder' ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50');
-          return `<a href="${item.url || '#'}" data-notification-id="${item.id}" class="block rounded-xl border ${tone} px-3 py-3 hover:bg-white transition-colors">
-            <div class="flex items-center justify-between gap-2">
-              <div class="text-sm font-bold text-slate-900">${item.title || 'Notificación'}</div>
-              ${item.read ? '<span class="text-[11px] font-semibold text-slate-400">Leída</span>' : '<span class="inline-flex w-2 h-2 rounded-full bg-rose-500"></span>'}
+          const visual = notificationVisual(item);
+          return `<a href="${item.url || '#'}" data-notification-id="${item.id}" class="relative block rounded-xl border ${tone} px-3 py-3 pr-8 hover:bg-white transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${visual.wrap}">
+                <i class="${visual.icon} text-sm" aria-hidden="true"></i>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-bold text-slate-900">${item.title || 'Notificación'}</div>
+                <div class="mt-1 text-xs text-slate-600 leading-5">${item.message || ''}</div>
+              </div>
+              ${item.read ? '<span class="shrink-0 text-[11px] font-semibold text-slate-400">Leída</span>' : ''}
             </div>
-            <div class="mt-1 text-xs text-slate-600 leading-5">${item.message || ''}</div>
+            ${item.read ? '' : '<span class="absolute right-3 top-4 inline-flex w-2 h-2 rounded-full bg-rose-500"></span>'}
           </a>`;
         }).join('');
 
@@ -3113,7 +3423,7 @@
         renderNotifications();
         renderModuleCounters();
         try {
-          await fetch('/api/header/notifications/read-one', {
+          const response = await fetch('/api/header/notifications/read-one', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -3122,6 +3432,7 @@
             },
             body: JSON.stringify({ notification_id: id }),
           });
+          if (response.ok) loadNotifications();
         } catch (e) {}
       }
 
@@ -3131,7 +3442,7 @@
         renderNotifications();
         renderModuleCounters();
         try {
-          await fetch('/api/header/notifications/read-all', {
+          const response = await fetch('/api/header/notifications/read-all', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -3140,6 +3451,7 @@
             },
             body: JSON.stringify({ all: true }),
           });
+          if (response.ok) loadNotifications();
         } catch (e) {}
       }
 
@@ -5269,6 +5581,7 @@
         index: @json(route('api.ai.chats.index')),
         chat: @json(route('api.ai.chat')),
         execute: @json(route('api.ai.actions.execute')),
+        undo: @json(route('api.ai.actions.undo')),
         showBase: @json(url('/api/ia/chats')),
         deleteBase: @json(url('/api/ia/chats')),
       };
@@ -5805,6 +6118,55 @@
         return ok ? 'Acción aplicada en el CRM' : 'No pude ejecutar eso en el CRM. Intenta de nuevo o revisa tus permisos.';
       }
 
+      function appendUndoAction(node, undoAction) {
+        if (!node || !undoAction) return;
+        const actions = document.createElement('div');
+        actions.className = 'infocus-ai-confirm-actions';
+        actions.innerHTML = '<button type="button" class="infocus-ai-confirm-create" data-ai-undo-action>Deshacer</button>';
+        const button = actions.querySelector('[data-ai-undo-action]');
+        button?.addEventListener('click', () => undoAiAction(button, undoAction));
+        node.appendChild(actions);
+        scrollAiToBottom('smooth');
+      }
+
+      async function undoAiAction(button, undoAction) {
+        if (!button || button.disabled || !undoAction) return;
+        button.disabled = true;
+        button.textContent = 'Deshaciendo...';
+        try {
+          let result = null;
+          if (undoAction.scope === 'local_reminder') {
+            const ok = await window.__infocusAiUndoReminder?.(undoAction.id);
+            if (!ok) throw new Error('local_undo_failed');
+            result = { ok: true, store: 'recordatorios', id: undoAction.id, operation: 'delete' };
+          } else {
+            const response = await fetch(endpoints.undo, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': window.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+              },
+              body: JSON.stringify({ token: undoAction.token }),
+            });
+            result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.ok) throw new Error(result.message || 'undo_failed');
+          }
+
+          button.textContent = 'Deshecho';
+          button.classList.add('opacity-70');
+          window.dispatchEvent(new CustomEvent('infocus-ai-undo-applied', { detail: result }));
+          if (result?.store === 'proyectos' && /\/proyectos(?:$|[/?#])/.test(window.location.pathname + window.location.search)) {
+            setTimeout(() => window.location.reload(), 450);
+          }
+          if (window.showNotification) window.showNotification('Acción deshecha', 'success');
+        } catch (_) {
+          button.disabled = false;
+          button.textContent = 'Deshacer';
+          if (window.showNotification) window.showNotification('No pude deshacer esa acción', 'error');
+        }
+      }
+
       function pageContext(messageText = '') {
         const params = new URLSearchParams(window.location.search || '');
         const currentProject = window.__infocusAiCurrentProject || null;
@@ -6041,12 +6403,19 @@
           const json = await response.json().catch(() => ({}));
           currentChatId = json.chat_id || currentChatId;
           await revealAssistantMessage(thinking, json.message?.content || 'No pude ejecutar esa acción.');
+          let undoAction = json.undo_action || null;
           if (json.ok && json.note_update && window.__infocusAiApplyNoteUpdate) {
             await window.__infocusAiApplyNoteUpdate(json.note_update);
           } else if (json.ok && json.reminder_action && window.__infocusAiCreateReminder) {
-            await window.__infocusAiCreateReminder(json.reminder_action);
+            const reminderResult = await window.__infocusAiCreateReminder(json.reminder_action);
+            if (reminderResult?.id) {
+              undoAction = { scope: 'local_reminder', id: reminderResult.id };
+            }
           } else if (json.ok && actionContext.forced_intent === 'note_update') {
             throw new Error('La acción no devolvió la actualización de la nota abierta.');
+          }
+          if (json.ok && undoAction) {
+            appendUndoAction(thinking, undoAction);
           }
           actionsNode.remove();
           loadHistory();

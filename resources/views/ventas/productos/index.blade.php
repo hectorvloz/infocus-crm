@@ -6,8 +6,7 @@
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
     <div>
       <div class="flex items-center gap-2">
-        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Rendimiento <span class="text-slate-400">del negocio</span></h1>
-        <span class="bg-[#ecfe88] text-slate-900 text-xs font-bold px-2 py-0.5 rounded-md">BETA</span>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900">Productos o servicios</h1>
       </div>
     </div>
     <div>
@@ -20,7 +19,7 @@
 
   <div class="bg-white rounded-2xl shadow-soft border p-6 min-h-[600px]">
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold text-slate-900">Productos</h2>
+      <h2 class="text-xl font-bold text-slate-900">Productos o servicios</h2>
       <form method="GET" class="filter-bar">
         <div class="filter-pill w-64">
           <svg class="h-4 w-4 filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -39,8 +38,8 @@
                   {{ $p['tipo'] ?? 'Producto' }}
                 </span>
                 @if(!empty($p['service_expiry_reminder_enabled']))
-                <span class="px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-lime-100 text-lime-700">
-                  Recordatorio {{ (int)($p['service_expiry_reminder_days_before'] ?? 7) }}d
+                <span class="inline-flex items-center rounded-full border border-lime-200 bg-lime-50 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-lime-700">
+                  Record: {{ (int)($p['service_expiry_reminder_days_before'] ?? 7) }}D
                 </span>
                 @endif
               </div>

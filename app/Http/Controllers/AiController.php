@@ -197,7 +197,68 @@ class AiController extends Controller
             'project_id' => $result['project_id'] ?? null,
             'note_update' => $result['note_update'] ?? null,
             'reminder_action' => $result['reminder_action'] ?? null,
+            'undo_action' => $result['undo_action'] ?? null,
         ], ($result['ok'] ?? false) ? 200 : 422);
+    }
+
+    public function undoAction(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => 'required|string',
+        ]);
+
+        $undoStore = new FileStore('ai_undo_actions.json');
+        $undo = $undoStore->find((string) $data['token']);
+        if (!$undo || (string) ($undo['user_id'] ?? '') !== (string) Auth::id()) {
+            return response()->json(['ok' => false, 'message' => 'No encontré esa acción para deshacer.'], 404);
+        }
+
+        if ((string) ($undo['status'] ?? 'pending') !== 'pending') {
+            return response()->json(['ok' => false, 'message' => 'Esta acción ya fue deshecha.'], 422);
+        }
+
+        $action = is_array($undo['action'] ?? null) ? $undo['action'] : [];
+        $storeName = (string) ($action['store'] ?? '');
+        $operation = (string) ($action['operation'] ?? '');
+        $id = (string) ($action['id'] ?? '');
+        $allowedStores = [
+            'proyectos' => 'proyectos.json',
+            'mis_notas' => 'mis_notas.json',
+        ];
+
+        if ($id === '' || !isset($allowedStores[$storeName]) || !in_array($operation, ['restore', 'delete'], true)) {
+            return response()->json(['ok' => false, 'message' => 'Esta acción no se puede deshacer automáticamente.'], 422);
+        }
+
+        $targetStore = new FileStore($allowedStores[$storeName]);
+        $restoredRecord = null;
+        if ($operation === 'delete') {
+            $targetStore->delete($id);
+        } else {
+            $before = is_array($action['before'] ?? null) ? $action['before'] : [];
+            if (empty($before)) {
+                return response()->json(['ok' => false, 'message' => 'No hay copia anterior para restaurar.'], 422);
+            }
+
+            $restoredRecord = $targetStore->update($id, $before);
+            if (!$restoredRecord) {
+                $restoredRecord = $targetStore->create(['id' => $id, ...$before]);
+            }
+        }
+
+        $undoStore->update((string) $undo['id'], [
+            'status' => 'undone',
+            'undone_at' => now()->toISOString(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Acción deshecha.',
+            'store' => $storeName,
+            'id' => $id,
+            'operation' => $operation,
+            'record' => $restoredRecord,
+        ]);
     }
 
     private function lastUserMessage(array $history): string

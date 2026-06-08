@@ -124,7 +124,7 @@
       </div>
 
       @php
-        $rec = (array)($factura['recurrencia'] ?? []);
+        $rec = (array)(($recurrenceSource ?? $factura)['recurrencia'] ?? []);
         $recEnabled = old('recurrence_enabled', !empty($rec['enabled']));
         $recDay = old('recurrence_day', $rec['day_of_month'] ?? date('j'));
         $recEveryMonths = old('recurrence_every_months', $rec['every_months'] ?? 1);
@@ -460,6 +460,15 @@
       return candidate;
     }
 
+    function advanceRecurringDate(dateObj, day, everyMonths) {
+      const safeDay = Math.max(1, Math.min(31, Number(day) || 1));
+      const safeMonths = Math.max(1, Math.min(12, Number(everyMonths) || 1));
+      const next = new Date(dateObj.getFullYear(), dateObj.getMonth() + safeMonths, 1, 12, 0, 0);
+      const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+      next.setDate(Math.min(safeDay, lastDay));
+      return next;
+    }
+
     function selectedRecurringLeadDays() {
       if (!Array.isArray(availableProducts) || !availableProducts.length) return 0;
       let leadDays = 0;
@@ -488,16 +497,23 @@
       }
 
       const issueDate = document.getElementById('fecha')?.value || new Date().toISOString().slice(0, 10);
-      const dueDate = document.getElementById('vencimiento')?.value || issueDate;
       const leadDays = selectedRecurringLeadDays();
-      const issueObj = new Date(issueDate + 'T12:00:00');
-      const dueObj = new Date(dueDate + 'T12:00:00');
-      let nextDueDate = leadDays > 0 && !Number.isNaN(dueObj.getTime()) && dueObj > issueObj
-        ? dueObj
-        : computeNextRecurringDate(issueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
-      const nextDate = nextDueDate ? new Date(nextDueDate.getTime()) : null;
+      let nextDueDate = computeNextRecurringDate(issueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+      let nextDate = nextDueDate ? new Date(nextDueDate.getTime()) : null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       if (nextDate && leadDays > 0) {
         nextDate.setDate(nextDate.getDate() - leadDays);
+        while (nextDate < today) {
+          nextDueDate = advanceRecurringDate(nextDueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+          nextDate = new Date(nextDueDate.getTime());
+          nextDate.setDate(nextDate.getDate() - leadDays);
+        }
+      } else if (nextDate) {
+        while (nextDate < today) {
+          nextDueDate = advanceRecurringDate(nextDueDate, recurrenceDay?.value, recurrenceEveryMonths?.value);
+          nextDate = new Date(nextDueDate.getTime());
+        }
       }
       if (!nextDate) {
         recurrencePreview.textContent = 'Configura la fecha de emisión para calcular el próximo envío.';
@@ -676,11 +692,6 @@
     function autoResizeDesc(el) {
       if (!el) return;
       const resize = () => {
-        const val = String(el.value || '');
-        if (!val.includes('\n')) {
-          el.style.height = '54px';
-          return;
-        }
         el.style.height = 'auto';
         el.style.height = `${Math.max(el.scrollHeight, 54)}px`;
       };

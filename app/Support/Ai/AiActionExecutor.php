@@ -21,6 +21,7 @@ class AiActionExecutor
     private FileStore $contracts;
     private FileStore $personalNotes;
     private FileStore $actionLogs;
+    private FileStore $undoActions;
     private TimelineStore $timeline;
     private array $context = [];
 
@@ -35,6 +36,7 @@ class AiActionExecutor
         $this->contracts = new FileStore('contratos.json');
         $this->personalNotes = new FileStore('mis_notas.json');
         $this->actionLogs = new FileStore('ai_action_logs.json');
+        $this->undoActions = new FileStore('ai_undo_actions.json');
         $this->timeline = new TimelineStore();
     }
 
@@ -574,6 +576,7 @@ class AiActionExecutor
             'content' => "✅ **Proyecto creado realmente en el CRM:**\n\n- **Nombre:** {$project['titulo']}\n- **Estado:** {$project['etapa']}\n- **Prioridad:** {$project['prioridad']}\n- **Tareas:** {$taskLine}\n\n[Abrir proyecto]({$url})",
             'url' => $url,
             'project_id' => $project['id'],
+            'undo_action' => $this->deleteUndo('proyectos', (string) $project['id'], 'Deshacer creación del proyecto'),
         ];
     }
 
@@ -589,6 +592,7 @@ class AiActionExecutor
         if (!$project) {
             return $this->failure('No encontré el proyecto exacto para actualizar. Incluye una línea "Proyecto: nombre".');
         }
+        $projectBefore = $project;
 
         $updates = [];
         $title = $this->stripMarkdown($this->field($proposal, ['Nuevo nombre', 'Titulo nuevo', 'Título nuevo']));
@@ -729,6 +733,7 @@ class AiActionExecutor
             'content' => "✅ **Cambios aplicados al proyecto**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n- **Cambios:** " . implode(', ', $changes) . "\n\n[Abrir proyecto]({$url})",
             'url' => $url,
             'project_id' => $updated['id'] ?? null,
+            'undo_action' => $this->restoreUndo('proyectos', (string) ($updated['id'] ?? $project['id']), $projectBefore, 'Deshacer cambios del proyecto'),
         ];
     }
 
@@ -742,6 +747,7 @@ class AiActionExecutor
         if (!$project) {
             return $this->failure('No encontré el proyecto. Incluye una línea "Proyecto: nombre".');
         }
+        $projectBefore = $project;
 
         $taskItems = $this->extractListAfter($proposal, ['Tareas a agregar', 'Tareas sugeridas', 'Tareas', 'Lista de tareas']);
         $taskText = $this->stripMarkdown($this->field($proposal, ['Tarea', 'Nombre', 'Texto']));
@@ -771,6 +777,7 @@ class AiActionExecutor
             'content' => "✅ **Tareas agregadas**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n- **Tareas:** {$taskLine}\n\n[Abrir proyecto]({$url})",
             'url' => $url,
             'project_id' => $project['id'] ?? null,
+            'undo_action' => $this->restoreUndo('proyectos', (string) ($project['id'] ?? ''), $projectBefore, 'Deshacer tareas agregadas'),
         ];
     }
 
@@ -784,6 +791,7 @@ class AiActionExecutor
         if (!$project) {
             return $this->failure('No encontré el proyecto. Incluye una línea "Proyecto: nombre".');
         }
+        $projectBefore = $project;
 
         $noteText = $this->stripMarkdown($this->field($proposal, ['Nota', 'Texto', 'Contenido']));
         if ($noteText === '') {
@@ -826,6 +834,7 @@ class AiActionExecutor
             'content' => "✅ **Nota agregada**\n\n- **Proyecto:** " . ($project['titulo'] ?? 'Proyecto') . "\n- **Nota:** {$noteText}\n\n[Abrir proyecto]({$url})",
             'url' => $url,
             'project_id' => $project['id'] ?? null,
+            'undo_action' => $this->restoreUndo('proyectos', (string) ($project['id'] ?? ''), $projectBefore, 'Deshacer nota agregada'),
         ];
     }
 
@@ -839,6 +848,7 @@ class AiActionExecutor
         if (!$project) {
             return $this->failure('No encontré el proyecto. Incluye una línea "Proyecto: nombre".');
         }
+        $projectBefore = $project;
 
         $task = $this->matchTask($project, $this->field($proposal, ['Tarea']));
         if (!$task) {
@@ -868,6 +878,7 @@ class AiActionExecutor
             'content' => "✅ **Subtarea agregada**\n\n- **Proyecto:** " . ($project['titulo'] ?? 'Proyecto') . "\n- **Subtarea:** {$subtaskText}\n\n[Abrir proyecto]({$url})",
             'url' => $url,
             'project_id' => $project['id'] ?? null,
+            'undo_action' => $this->restoreUndo('proyectos', (string) ($project['id'] ?? ''), $projectBefore, 'Deshacer subtarea agregada'),
         ];
     }
 
@@ -936,6 +947,7 @@ class AiActionExecutor
             'ok' => true,
             'content' => "✅ **Nota creada en Mis Notas**\n\n- **Título:** {$note['title']}\n- **Color:** {$note['color']}\n\n[Abrir Mis Notas](/mis-notas)",
             'url' => '/mis-notas',
+            'undo_action' => $this->deleteUndo('mis_notas', (string) $note['id'], 'Deshacer creación de nota'),
         ];
     }
 
@@ -970,6 +982,7 @@ class AiActionExecutor
         if (! $this->canEditPersonalNoteRecord($all[$index], $ownerKey)) {
             return $this->failure('Esta nota es de solo lectura para tu usuario. Puedo sugerir una versión nueva, pero no reemplazarla.');
         }
+        $noteBefore = $all[$index];
 
         $title = $this->stripMarkdown($this->field($proposal, ['Título', 'Titulo', 'Nuevo título', 'Nuevo titulo']));
         $plain = $this->extractBody($proposal);
@@ -1017,6 +1030,7 @@ class AiActionExecutor
                 'plainText' => $plain,
                 'updatedAt' => $nowMs,
             ],
+            'undo_action' => $this->restoreUndo('mis_notas', (string) $all[$index]['id'], $noteBefore, 'Deshacer edición de nota'),
         ];
     }
 
@@ -1942,6 +1956,29 @@ class AiActionExecutor
         ];
     }
 
+    private function restoreUndo(string $store, string $id, array $before, string $label): array
+    {
+        return [
+            'scope' => 'server',
+            'operation' => 'restore',
+            'store' => $store,
+            'id' => $id,
+            'before' => $before,
+            'label' => $label,
+        ];
+    }
+
+    private function deleteUndo(string $store, string $id, string $label): array
+    {
+        return [
+            'scope' => 'server',
+            'operation' => 'delete',
+            'store' => $store,
+            'id' => $id,
+            'label' => $label,
+        ];
+    }
+
     private function withActionLog(array $result, string $type): array
     {
         if (! (bool) ($result['ok'] ?? false)) {
@@ -1960,6 +1997,21 @@ class AiActionExecutor
         ]);
 
         $result['action_log_title'] = $title;
+
+        if (!empty($result['undo_action']) && is_array($result['undo_action'])) {
+            $undo = $this->undoActions->create([
+                'user_id' => (string) Auth::id(),
+                'status' => 'pending',
+                'label' => (string) ($result['undo_action']['label'] ?? 'Deshacer acción'),
+                'action' => $result['undo_action'],
+                'created_at' => now()->toISOString(),
+            ]);
+            $result['undo_action'] = [
+                'scope' => 'server',
+                'token' => (string) ($undo['id'] ?? ''),
+                'label' => (string) ($undo['label'] ?? 'Deshacer'),
+            ];
+        }
 
         return $result;
     }
