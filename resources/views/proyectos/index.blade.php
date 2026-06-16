@@ -821,14 +821,15 @@
       gap: .8rem;
       overflow-x: auto;
       padding: .2rem .1rem 1rem;
-      min-height: 0;
+      min-height: calc(100vh - 205px);
       scroll-behavior: smooth;
+      user-select: none;
     }
 
     .project-board-column {
       width: min(292px, calc(100vw - 2rem));
       min-width: 276px;
-      max-height: calc(100vh - 245px);
+      max-height: min(980px, calc(100vh - 205px));
       display: flex;
       flex-direction: column;
       align-self: flex-start;
@@ -866,13 +867,23 @@
     }
 
     .project-board-column-body {
-      flex: 0 1 auto;
-      max-height: calc(100vh - 330px);
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       padding: .65rem;
       display: flex;
       flex-direction: column;
       gap: .55rem;
+    }
+
+    @media (max-width: 767px) {
+      .project-board-columns {
+        min-height: calc(100vh - 175px);
+      }
+
+      .project-board-column {
+        max-height: calc(100vh - 175px);
+      }
     }
 
     .project-task-card {
@@ -2295,6 +2306,7 @@
     ];
     let modalDescAutosaveTimer = null;
     let taskDescAutosaveTimer = null;
+    let taskDetailsAutosaveTimer = null;
     let projectDescriptionExpanded = false;
     const pendingProjectDescriptions = {};
     let currentTaskId = null; // For task detail modal
@@ -3439,7 +3451,7 @@
       };
     }
 
-    function renderProjectBoard(projectId) {
+    function renderProjectBoard(projectId, options = {}) {
       const project = projects.find((item) => String(item.id) === String(projectId));
       if (!project) {
         closeProjectBoard({ skipUrl: true });
@@ -3462,6 +3474,8 @@
 
       const container = document.getElementById('projectBoardColumns');
       if (!container) return;
+      const restoreScroll = options.preserveScroll !== false;
+      const previousScrollLeft = restoreScroll ? Number(options.scrollLeft ?? container.scrollLeft ?? 0) : 0;
       const boardStages = getProjectBoardStages(project);
       const tasks = (Array.isArray(project.tareas) ? project.tareas : []).slice().sort((a, b) => Number(a.board_order || 0) - Number(b.board_order || 0));
 
@@ -3491,6 +3505,11 @@
 
       enableProjectBoardDnD();
       initProjectBoardDragScroll();
+      if (restoreScroll && previousScrollLeft > 0) {
+        requestAnimationFrame(() => {
+          container.scrollLeft = previousScrollLeft;
+        });
+      }
       focusProjectBoardInlineControls();
     }
 
@@ -3687,14 +3706,16 @@
       const cleanStage = String(stage || '').trim();
       if (!cleanStage) return;
       boardStageEditingName = cleanStage;
-      renderProjectBoard(currentBoardProjectId);
+      const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+      renderProjectBoard(currentBoardProjectId, { scrollLeft });
     }
 
     function handleBoardStageNameKey(event, oldStage) {
       if (event.key === 'Escape') {
         event.preventDefault();
         boardStageEditingName = '';
-        renderProjectBoard(currentBoardProjectId);
+        const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+        renderProjectBoard(currentBoardProjectId, { scrollLeft });
         return;
       }
       if (event.key !== 'Enter' || event.isComposing) return;
@@ -3704,11 +3725,12 @@
 
     async function commitBoardStageName(oldStage, value) {
       if (boardStageEditingName !== oldStage) return;
+      const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
       boardStageEditingName = '';
-      await renameBoardStage(oldStage, value);
+      await renameBoardStage(oldStage, value, { scrollLeft });
     }
 
-    async function renameBoardStage(oldStage, nextStage = '') {
+    async function renameBoardStage(oldStage, nextStage = '', options = {}) {
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       if (!project) return;
       const oldName = String(oldStage || '').trim();
@@ -3716,14 +3738,14 @@
 
       const nextName = String(nextStage || '').trim();
       if (!nextName || nextName === oldName) {
-        renderProjectBoard(project.id);
+        renderProjectBoard(project.id, { scrollLeft: options.scrollLeft });
         return;
       }
 
       const currentStages = getProjectBoardStages(project);
       if (currentStages.some((stage) => stage !== oldName && stage.toLowerCase() === nextName.toLowerCase())) {
         if (window.showNotification) window.showNotification('Ya existe una columna con ese nombre.', 'warning');
-        renderProjectBoard(project.id);
+        renderProjectBoard(project.id, { scrollLeft: options.scrollLeft });
         return;
       }
 
@@ -3733,7 +3755,7 @@
 
       project.task_stages = taskStages;
       renamedTasks.forEach((task) => { task.board_stage = nextName; });
-      renderProjectBoard(project.id);
+      renderProjectBoard(project.id, { scrollLeft: options.scrollLeft });
 
       try {
         const updated = await updateProjectField('task_stages', taskStages, project.id);
@@ -3765,7 +3787,7 @@
         return;
       }
 
-      renderProjectBoard(project.id);
+      renderProjectBoard(project.id, { scrollLeft: options.scrollLeft });
     }
     window.renameBoardStage = renameBoardStage;
     window.startBoardStageNameEdit = startBoardStageNameEdit;
@@ -3954,13 +3976,14 @@
       if (nextStages.join('\n') === currentStages.join('\n')) return;
 
       project.task_stages = nextStages;
-      renderProjectBoard(project.id);
+      const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+      renderProjectBoard(project.id, { scrollLeft });
 
       try {
         const updated = await updateProjectField('task_stages', nextStages, project.id);
         const idx = projects.findIndex((item) => String(item.id) === String(project.id));
         if (idx >= 0 && updated) projects[idx] = {...projects[idx], ...updated};
-        renderProjectBoard(project.id);
+        renderProjectBoard(project.id, { scrollLeft });
       } catch (error) {
         console.error('Error moving board column', error);
         await loadData();
@@ -3985,7 +4008,7 @@
     function positionBoardDropIndicator(zone, event, indicator) {
       const order = getBoardDropOrder(zone, event, boardTaskDrag);
       const cards = getBoardDropCards(zone, boardTaskDrag);
-      const addButton = zone.querySelector('button[onclick^="addBoardTask"]');
+      const addButton = zone.querySelector('.project-board-card-composer');
       if (!cards.length) {
         zone.insertBefore(indicator, addButton || null);
         return;
@@ -4004,7 +4027,7 @@
 
       const isInteractiveTarget = (target) => {
         if (!target) return false;
-        return !!target.closest('button,a,input,select,textarea,[contenteditable="true"],[data-no-pan],[draggable="true"],.project-task-card');
+        return !!target.closest('button,a,input,select,textarea,[contenteditable="true"],[data-no-pan],.project-board-column-header,.project-task-card');
       };
 
       let active = false;
@@ -4054,8 +4077,9 @@
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       if (!project) return;
       const didMove = applyLocalBoardTaskMove(project, taskId, stage, order);
+      const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
       if (didMove) {
-        renderProjectBoard(project.id);
+        renderProjectBoard(project.id, { scrollLeft });
       }
       const response = await fetch('/api/proyectos/tareas/mover', {
         method: 'POST',
@@ -4071,7 +4095,7 @@
       if (response.ok && data.item) {
         const idx = projects.findIndex((item) => String(item.id) === String(project.id));
         if (idx >= 0) projects[idx] = data.item;
-        renderProjectBoard(project.id);
+        renderProjectBoard(project.id, { scrollLeft });
       } else {
         loadData();
       }
@@ -8485,6 +8509,7 @@
       const box = document.getElementById('taskOwnerSearchResults');
       if (input) input.value = '';
       if (box) box.classList.add('hidden');
+      queueTaskDetailsAutosave(150);
     }
 
     function removeTaskOwner(index) {
@@ -8498,6 +8523,7 @@
       task.owners = names;
       task.owner_ids = ids;
       renderTaskOwners(names, ids);
+      queueTaskDetailsAutosave(150);
     }
 
     function initSubtaskDuePicker() {
@@ -8538,6 +8564,7 @@
             altFormat: 'd M, Y',
             disableMobile: true,
             locale: 'es',
+            onChange: () => queueTaskDetailsAutosave(150),
           });
         }
 
@@ -8549,6 +8576,7 @@
             altFormat: 'd M, Y',
             disableMobile: true,
             locale: 'es',
+            onChange: () => queueTaskDetailsAutosave(150),
           });
         }
 
@@ -8606,6 +8634,7 @@
       });
     }
     window.setTaskModalTab = setTaskModalTab;
+    window.handleTaskPriorityChange = handleTaskPriorityChange;
 
     function setTaskDatePickerEditable(picker, inputId, editable) {
       const input = document.getElementById(inputId);
@@ -9327,7 +9356,25 @@
       if (window.showNotification) window.showNotification('Nota eliminada', 'success');
     }
 
-    async function saveTaskDetails() {
+    function handleTaskPriorityChange() {
+      const select = document.getElementById('taskModalPriority');
+      const task = getCurrentTask();
+      if (task && select?.value && select.value !== 'Vencido') {
+        task.priority = normalizeTaskPriority(select.value);
+      }
+      refreshTaskModalPriorityUI();
+      queueTaskDetailsAutosave(150);
+    }
+
+    function queueTaskDetailsAutosave(delay = 450) {
+      if (!currentProjectId || !currentTaskId) return;
+      clearTimeout(taskDetailsAutosaveTimer);
+      taskDetailsAutosaveTimer = setTimeout(() => {
+        saveTaskDetails({ silent: true, rerenderTaskDetail: false });
+      }, delay);
+    }
+
+    async function saveTaskDetails(options = {}) {
       if (!currentProjectId || !currentTaskId) return;
       const text = (document.getElementById('taskModalTitle')?.value || '').trim();
       if (!text) return;
@@ -9342,11 +9389,24 @@
         : selectedPriority;
       const owners = Array.isArray(task?.owners) ? task.owners : [];
       const owner_ids = parseTaskOwnerIds();
+      const board_stage = String(task?.board_stage || 'Por hacer').trim() || 'Por hacer';
+      const board_order = Number(task?.board_order || 0);
+
+      if (task) {
+        task.texto = text;
+        task.descripcion = descripcion;
+        task.start_date = start_date;
+        task.end_date = end_date;
+        task.due_date = due_date;
+        task.priority = normalizeTaskPriority(priority);
+        task.owners = owners;
+        task.owner_ids = owner_ids;
+      }
 
       const res = await fetch('/api/proyectos/tareas/actualizar', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
-        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto: text, descripcion, start_date, end_date, due_date, priority, owners, owner_ids})
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto: text, descripcion, start_date, end_date, due_date, priority, owners, owner_ids, board_stage, board_order})
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -9354,10 +9414,14 @@
         return;
       }
 
-      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+      syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: options.rerenderTaskDetail !== false });
+      if (String(currentBoardProjectId || '') === String(currentProjectId || '')) {
+        const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+        renderProjectBoard(currentBoardProjectId, { scrollLeft });
+      }
       currentTaskModalEditing = true;
       applyTaskModalEditState();
-      if (window.showNotification) window.showNotification('Tarea actualizada', 'success');
+      if (!options.silent && window.showNotification) window.showNotification('Tarea actualizada', 'success');
     }
 
     function setTaskDescriptionAutosaveStatus(state) {
@@ -10398,7 +10462,8 @@
     });
 
     initModalPrioritySelector();
-    document.getElementById('taskModalPriority')?.addEventListener('change', refreshTaskModalPriorityUI);
+    document.getElementById('taskModalPriority')?.addEventListener('change', handleTaskPriorityChange);
+    document.getElementById('taskModalTitle')?.addEventListener('input', () => queueTaskDetailsAutosave());
     document.addEventListener('keydown', (e) => {
       const quickProjectModal = document.getElementById('quickProjectActionModal');
       if (e.key === 'Escape' && quickProjectModal && !quickProjectModal.classList.contains('hidden')) {
