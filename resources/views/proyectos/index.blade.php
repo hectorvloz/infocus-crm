@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title','Proyectos')
 @section('content')
+  <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
   <style>
     #newProjectModal .ts-dropdown,
     #projectModal .ts-dropdown,
@@ -41,14 +42,293 @@
       position: relative;
     }
 
-    .project-desc-shell textarea {
-      min-height: 9.5rem;
-      overflow: hidden;
+    .project-desc-shell .compact-rich-editor {
+      min-height: 13rem;
+      overflow: visible;
       transition: height .18s ease, box-shadow .18s ease;
     }
 
-    .project-desc-shell.is-collapsed textarea {
-      resize: none;
+    .compact-rich-editor-shell {
+      position: relative;
+      border-radius: .9rem;
+      border: 1px solid #e2e8f0;
+      background: rgba(248, 250, 252, .6);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+      transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+      overflow: visible;
+    }
+
+    .compact-rich-editor-shell:focus-within,
+    .compact-rich-editor-shell.is-active {
+      border-color: #d9f99d;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(236, 254, 136, .55);
+    }
+
+    .compact-desc-toolbar {
+      display: none;
+      align-items: center;
+      gap: .25rem;
+      flex-wrap: nowrap;
+      overflow: visible;
+      white-space: nowrap;
+      border-bottom: 1px solid #e2e8f0;
+      padding: .35rem;
+      background: rgba(241, 245, 249, .8);
+      border-radius: .85rem .85rem 0 0;
+      scrollbar-width: none;
+    }
+
+    .compact-desc-toolbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .compact-rich-editor-shell.is-active .compact-desc-toolbar {
+      display: flex;
+    }
+
+    .compact-desc-toolbar > * {
+      flex: 0 0 auto;
+    }
+
+    .compact-desc-tool,
+    .compact-desc-format-trigger {
+      height: 1.85rem;
+      border-radius: .6rem;
+      border: 1px solid transparent;
+      background: transparent;
+      color: #334155;
+      font-size: .72rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    .compact-desc-tool {
+      min-width: 1.85rem;
+      padding: 0 .45rem;
+    }
+
+    .compact-desc-format-wrap {
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .compact-desc-format-trigger {
+      width: 6.8rem !important;
+      min-width: 6.8rem;
+      max-width: 6.8rem;
+      flex: 0 0 6.8rem;
+      background: #fff;
+      border-color: #dbe5f2;
+      padding: 0 .45rem;
+      outline: none;
+      justify-content: space-between;
+      gap: .35rem;
+    }
+
+    .compact-desc-format-menu {
+      position: absolute;
+      left: 0;
+      top: calc(100% + .35rem);
+      z-index: 2147482600;
+      width: 8.6rem;
+      border-radius: .85rem;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: #111827;
+      padding: .25rem;
+      box-shadow: 0 18px 38px rgba(15, 23, 42, .24);
+    }
+
+    .compact-desc-format-menu.hidden {
+      display: none !important;
+    }
+
+    .compact-desc-format-option {
+      width: 100%;
+      height: 1.85rem;
+      border-radius: .55rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      padding: 0 .55rem;
+      color: #f8fafc;
+      font-size: .78rem;
+      font-weight: 800;
+      text-align: left;
+    }
+
+    .compact-desc-format-option:hover {
+      background: rgba(255, 255, 255, .12);
+    }
+
+    .compact-desc-format-option.is-selected {
+      background: #d9f99d;
+      color: #111827;
+    }
+
+    .compact-desc-tool:hover {
+      background: #fff;
+      border-color: #dbe5f2;
+      color: #0f172a;
+    }
+
+    .compact-desc-tool.is-active {
+      background: rgba(17, 24, 39, .12);
+      border-color: rgba(17, 24, 39, .22);
+      color: #111827;
+    }
+
+    .compact-desc-tool.is-highlight.is-active {
+      background: #fef9c3;
+      color: #713f12;
+    }
+
+    .compact-rich-editor {
+      width: 100%;
+      min-height: 13rem;
+      max-height: 26rem;
+      padding: .85rem 1rem;
+      color: #1e293b;
+      font-size: 1rem;
+      line-height: 1.65;
+      outline: none;
+      resize: vertical;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .compact-rich-editor * {
+      text-transform: none !important;
+      letter-spacing: 0 !important;
+    }
+
+    .compact-rich-editor::-webkit-scrollbar {
+      width: .45rem;
+    }
+
+    .compact-rich-editor::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 999px;
+    }
+
+    .compact-desc-tool iconify-icon {
+      color: currentColor;
+      display: block;
+      pointer-events: none;
+    }
+
+    .compact-rich-editor:empty::before {
+      content: attr(data-placeholder);
+      color: #94a3b8;
+      pointer-events: none;
+    }
+
+    .compact-rich-editor h1,
+    .compact-rich-editor h2,
+    .compact-rich-editor h3 {
+      margin: 0 0 .35rem;
+      color: #0f172a;
+      line-height: 1.25;
+      font-weight: 900;
+    }
+
+    .compact-rich-editor h1 { font-size: 1.35rem; }
+    .compact-rich-editor h2 { font-size: 1.08rem; }
+    .compact-rich-editor p,
+    .compact-rich-editor div,
+    .compact-rich-editor li {
+      margin: 0 0 .3rem;
+      font-size: 1em;
+      font-weight: 400;
+    }
+
+    .compact-rich-editor ul,
+    .compact-rich-editor ol {
+      margin: .25rem 0 .35rem 1.2rem;
+      padding: 0;
+    }
+
+    .compact-rich-editor hr {
+      margin: .65rem 0;
+      border: 0;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .compact-rich-editor mark {
+      border-radius: .25rem;
+      background: #fef08a;
+      padding: 0 .12rem;
+    }
+
+    .compact-rich-editor .note-checkline {
+      display: flex;
+      align-items: flex-start;
+      gap: .55rem;
+      margin: 0 0 .35rem;
+    }
+
+    .compact-rich-editor .note-checkline span {
+      min-width: 1ch;
+      outline: none;
+    }
+
+    .compact-rich-editor .note-checkline.is-checked span {
+      color: #64748b;
+      text-decoration: line-through;
+    }
+
+    .compact-rich-editor .note-checkbox {
+      appearance: none;
+      width: 1.05rem;
+      height: 1.05rem;
+      flex: 0 0 auto;
+      margin-top: .25rem;
+      border-radius: .35rem;
+      border: 2px solid #cbd5e1;
+      background: #fff;
+      cursor: pointer;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .compact-rich-editor .note-checkbox:checked {
+      background: #d9f99d;
+      border-color: #a3e635;
+    }
+
+    .compact-rich-editor .note-checkbox:checked::after {
+      content: "✓";
+      color: #111827;
+      font-size: .78rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .compact-rich-editor .note-numberline {
+      display: flex;
+      align-items: flex-start;
+      gap: .55rem;
+      margin: 0 0 .35rem;
+    }
+
+    .compact-rich-editor .note-number-marker {
+      min-width: 1.2rem;
+      color: #64748b;
+      font-size: .82rem;
+      font-weight: 900;
+      line-height: 1.65;
+    }
+
+    .compact-rich-editor .note-number-content {
+      min-width: 1ch;
+      outline: none;
     }
 
     .project-desc-shell.is-collapsed.has-overflow::after {
@@ -975,7 +1255,29 @@
                            Descripción
                        </label>
                        <div id="projectDescShell" class="project-desc-shell is-collapsed">
-                         <textarea id="modalDesc" rows="4" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-sm bg-slate-50/50 px-4 py-3 leading-relaxed" placeholder="Añade una descripción detallada..."></textarea>
+                         <div class="compact-rich-editor-shell" data-desc-editor-shell>
+                           <div class="compact-desc-toolbar" aria-label="Herramientas de descripcion">
+                             <div class="compact-desc-format-wrap">
+                               <button type="button" class="compact-desc-format-trigger" onmousedown="event.preventDefault()" onclick="toggleCompactDescFormatMenu('modalDesc')">
+                                 <span data-compact-desc-format-label="modalDesc">Texto</span>
+                                 <iconify-icon icon="lucide:chevron-down" width="14" height="14" aria-hidden="true"></iconify-icon>
+                               </button>
+                               <div class="compact-desc-format-menu hidden" data-compact-desc-format-menu="modalDesc">
+                                 <button type="button" class="compact-desc-format-option is-selected" data-compact-desc-format-option="modalDesc" data-format="p" onmousedown="event.preventDefault()" onclick="applyCompactDescFormat('modalDesc','p')">Texto</button>
+                                 <button type="button" class="compact-desc-format-option" data-compact-desc-format-option="modalDesc" data-format="h1" onmousedown="event.preventDefault()" onclick="applyCompactDescFormat('modalDesc','h1')">Titulo</button>
+                                 <button type="button" class="compact-desc-format-option" data-compact-desc-format-option="modalDesc" data-format="h2" onmousedown="event.preventDefault()" onclick="applyCompactDescFormat('modalDesc','h2')">Subtitulo</button>
+                               </div>
+                             </div>
+                             <button type="button" class="compact-desc-tool" data-compact-desc-cmd="bold" title="Negrita" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'bold')"><iconify-icon icon="lucide:bold" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                             <button type="button" class="compact-desc-tool" data-compact-desc-cmd="italic" title="Cursiva" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'italic')"><iconify-icon icon="lucide:italic" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                             <button type="button" class="compact-desc-tool" data-compact-desc-cmd="strikeThrough" title="Tachado" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'strikeThrough')"><iconify-icon icon="lucide:strikethrough" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                             <button type="button" class="compact-desc-tool is-highlight" data-compact-desc-cmd="highlight" title="Resaltar" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'hiliteColor', '#fef08a')"><iconify-icon icon="lucide:highlighter" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                             <button type="button" class="compact-desc-tool" data-compact-desc-cmd="checkline" title="Checklist" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'checkline')"><iconify-icon icon="lucide:list-checks" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                             <button type="button" class="compact-desc-tool" data-compact-desc-cmd="numberline" title="Lista numerada" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'numberline')"><iconify-icon icon="lucide:list-ordered" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                             <button type="button" class="compact-desc-tool" title="Separador" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('modalDesc', 'insertHorizontalRule')"><iconify-icon icon="lucide:minus" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                           </div>
+                           <div id="modalDesc" class="compact-rich-editor" contenteditable="true" spellcheck="true" data-placeholder="Añade una descripción detallada..." onfocus="activateCompactDescEditor('modalDesc')" oninput="queueDescriptionAutosave()"></div>
+                         </div>
                          <button id="projectDescToggle" type="button" onclick="toggleProjectDescription()" class="project-desc-toggle">
                            <svg id="projectDescToggleIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                            <span id="projectDescToggleText">Mostrar más</span>
@@ -1443,7 +1745,29 @@
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
                     Descripción
                   </label>
-                  <textarea id="taskModalDescription" rows="5" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-lime-500 focus:ring-lime-500 text-sm bg-slate-50/50 px-4 py-3 leading-relaxed" placeholder="Añade una descripción detallada..." oninput="queueTaskDescriptionAutosave()"></textarea>
+                  <div class="compact-rich-editor-shell" data-desc-editor-shell>
+                    <div class="compact-desc-toolbar" aria-label="Herramientas de descripcion">
+                      <div class="compact-desc-format-wrap">
+                        <button type="button" class="compact-desc-format-trigger" onmousedown="event.preventDefault()" onclick="toggleCompactDescFormatMenu('taskModalDescription')">
+                          <span data-compact-desc-format-label="taskModalDescription">Texto</span>
+                          <iconify-icon icon="lucide:chevron-down" width="14" height="14" aria-hidden="true"></iconify-icon>
+                        </button>
+                        <div class="compact-desc-format-menu hidden" data-compact-desc-format-menu="taskModalDescription">
+                          <button type="button" class="compact-desc-format-option is-selected" data-compact-desc-format-option="taskModalDescription" data-format="p" onmousedown="event.preventDefault()" onclick="applyCompactDescFormat('taskModalDescription','p')">Texto</button>
+                          <button type="button" class="compact-desc-format-option" data-compact-desc-format-option="taskModalDescription" data-format="h1" onmousedown="event.preventDefault()" onclick="applyCompactDescFormat('taskModalDescription','h1')">Titulo</button>
+                          <button type="button" class="compact-desc-format-option" data-compact-desc-format-option="taskModalDescription" data-format="h2" onmousedown="event.preventDefault()" onclick="applyCompactDescFormat('taskModalDescription','h2')">Subtitulo</button>
+                        </div>
+                      </div>
+                      <button type="button" class="compact-desc-tool" data-compact-desc-cmd="bold" title="Negrita" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'bold')"><iconify-icon icon="lucide:bold" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                      <button type="button" class="compact-desc-tool" data-compact-desc-cmd="italic" title="Cursiva" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'italic')"><iconify-icon icon="lucide:italic" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                      <button type="button" class="compact-desc-tool" data-compact-desc-cmd="strikeThrough" title="Tachado" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'strikeThrough')"><iconify-icon icon="lucide:strikethrough" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                      <button type="button" class="compact-desc-tool is-highlight" data-compact-desc-cmd="highlight" title="Resaltar" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'hiliteColor', '#fef08a')"><iconify-icon icon="lucide:highlighter" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                      <button type="button" class="compact-desc-tool" data-compact-desc-cmd="checkline" title="Checklist" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'checkline')"><iconify-icon icon="lucide:list-checks" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                      <button type="button" class="compact-desc-tool" data-compact-desc-cmd="numberline" title="Lista numerada" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'numberline')"><iconify-icon icon="lucide:list-ordered" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                      <button type="button" class="compact-desc-tool" title="Separador" onmousedown="event.preventDefault()" onclick="runCompactDescCommand('taskModalDescription', 'insertHorizontalRule')"><iconify-icon icon="lucide:minus" width="15" height="15" aria-hidden="true"></iconify-icon></button>
+                    </div>
+                    <div id="taskModalDescription" class="compact-rich-editor" contenteditable="true" spellcheck="true" data-placeholder="Añade una descripción detallada..." onfocus="activateCompactDescEditor('taskModalDescription')" oninput="queueTaskDescriptionAutosave()"></div>
+                  </div>
                   <div class="mt-2 text-right">
                     <span id="taskModalDescAutosaveStatus" class="text-xs font-bold text-slate-400">Autoguardado</span>
                   </div>
@@ -1988,6 +2312,586 @@
     let modalDuePicker = null;
     let pipStreamReady = false;
     let pipRenderInterval = null;
+
+    function looksLikeHtml(value = '') {
+      return /<\/?[a-z][\s\S]*>/i.test(String(value || ''));
+    }
+
+    function plainTextToDescriptionHtml(value = '') {
+      const text = String(value || '').replace(/\r\n/g, '\n');
+      if (!text.trim()) return '';
+      const lines = text.split('\n');
+      const chunks = [];
+      let orderedBuffer = [];
+      let unorderedBuffer = [];
+      const flushLists = () => {
+        if (unorderedBuffer.length) {
+          chunks.push(`<ul>${unorderedBuffer.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`);
+          unorderedBuffer = [];
+        }
+        if (orderedBuffer.length) {
+          chunks.push(`<ol>${orderedBuffer.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol>`);
+          orderedBuffer = [];
+        }
+      };
+
+      lines.forEach((line) => {
+        const clean = line.trim();
+        const checklist = clean.match(/^\[(x|X|\s)?\]\s+(.+)$/);
+        const bullet = clean.match(/^[-*•]\s+(.+)$/);
+        const ordered = clean.match(/^\d+[.)]\s+(.+)$/);
+        if (checklist) {
+          flushLists();
+          chunks.push(`<div class="note-checkline${String(checklist[1] || '').toLowerCase() === 'x' ? ' is-checked' : ''}"><input type="checkbox" class="note-checkbox" contenteditable="false"${String(checklist[1] || '').toLowerCase() === 'x' ? ' checked' : ''}><span contenteditable="true">${escapeHtml(checklist[2])}</span></div>`);
+          return;
+        }
+        if (bullet) {
+          orderedBuffer = [];
+          unorderedBuffer.push(bullet[1]);
+          return;
+        }
+        if (ordered) {
+          unorderedBuffer = [];
+          orderedBuffer.push(ordered[1]);
+          return;
+        }
+        flushLists();
+        if (!clean) {
+          chunks.push('<div><br></div>');
+          return;
+        }
+        chunks.push(`<p>${escapeHtml(line)}</p>`);
+      });
+      flushLists();
+      return chunks.join('');
+    }
+
+    function normalizeClipboardDescriptionHtml(html = '', plainText = '') {
+      if (!String(html || '').trim()) return plainTextToDescriptionHtml(plainText);
+      const template = document.createElement('template');
+      template.innerHTML = String(html || '');
+      template.content.querySelectorAll('script,style,meta,link,iframe,object,embed,svg,canvas,img,video,audio,table,colgroup,thead,tbody,tfoot,tr,td,th').forEach((node) => {
+        if (['TD', 'TH'].includes(node.tagName)) {
+          node.replaceWith(document.createTextNode(`${node.textContent || ''} `));
+          return;
+        }
+        node.remove();
+      });
+      template.content.querySelectorAll('*').forEach((node) => {
+        const tag = node.tagName;
+        if (tag === 'H1') {
+          const paragraph = document.createElement('p');
+          paragraph.innerHTML = node.innerHTML;
+          node.replaceWith(paragraph);
+          return;
+        }
+        if (/^H[4-6]$/.test(tag)) {
+          const h2 = document.createElement('h2');
+          h2.innerHTML = node.innerHTML;
+          node.replaceWith(h2);
+          return;
+        }
+        if (tag === 'FONT') {
+          const span = document.createElement('span');
+          span.innerHTML = node.innerHTML;
+          node.replaceWith(span);
+          return;
+        }
+        Array.from(node.attributes).forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          const value = attr.value || '';
+          const isHighlight = name === 'style' && /background(?:-color)?\s*:\s*(?:rgb\(254,\s*240,\s*138\)|#?fef08a|yellow)/i.test(value);
+          if (isHighlight) {
+            node.setAttribute('style', 'background-color:#fef08a');
+          } else {
+            node.removeAttribute(attr.name);
+          }
+        });
+      });
+      return sanitizeDescriptionHtml(template.innerHTML);
+    }
+
+    function sanitizeDescriptionHtml(value = '') {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      const source = looksLikeHtml(raw) ? raw : plainTextToDescriptionHtml(raw);
+      const template = document.createElement('template');
+      template.innerHTML = source;
+      const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'S', 'STRIKE', 'U', 'MARK', 'P', 'DIV', 'BR', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'HR', 'SPAN', 'INPUT']);
+      const walk = (node) => {
+        Array.from(node.childNodes).forEach((child) => {
+          if (child.nodeType === Node.ELEMENT_NODE) {
+            if (!allowedTags.has(child.tagName)) {
+              child.replaceWith(document.createTextNode(child.textContent || ''));
+              return;
+            }
+            Array.from(child.attributes).forEach((attr) => {
+              const name = attr.name.toLowerCase();
+              const value = attr.value || '';
+              const isSafeStyle = name === 'style' && /background(?:-color)?\s*:\s*(?:rgb\(254,\s*240,\s*138\)|#?fef08a|yellow)/i.test(value);
+              const isSafeCheckboxAttr = child.tagName === 'INPUT' && ['type', 'checked', 'contenteditable'].includes(name);
+              if (name !== 'class' && !isSafeStyle && !isSafeCheckboxAttr) child.removeAttribute(attr.name);
+              if (child.tagName === 'INPUT' && child.getAttribute('type') !== 'checkbox') child.remove();
+              if (name === 'class' && !/^note-|^compact-/.test(value)) child.removeAttribute(attr.name);
+            });
+          }
+          walk(child);
+        });
+      };
+      walk(template.content);
+      return template.innerHTML.trim();
+    }
+
+    function getCompactDescValue(editorId) {
+      const editor = document.getElementById(editorId);
+      if (!editor) return '';
+      const html = sanitizeDescriptionHtml(editor.innerHTML || '');
+      return hasCompactDescMeaningfulContent(html) ? html : '';
+    }
+
+    function hasCompactDescMeaningfulContent(html = '') {
+      const template = document.createElement('template');
+      template.innerHTML = sanitizeDescriptionHtml(html);
+      template.content.querySelectorAll('br, input, hr').forEach((node) => node.remove());
+      const text = (template.content.textContent || '').replace(/\u00a0/g, ' ').trim();
+      return text.length > 0;
+    }
+
+    function setCompactDescValue(editorId, value = '') {
+      const editor = document.getElementById(editorId);
+      if (!editor) return;
+      editor.innerHTML = sanitizeDescriptionHtml(value);
+      syncCompactDescEditorState(editorId);
+    }
+
+    function activateCompactDescEditor(editorId) {
+      const editor = document.getElementById(editorId);
+      const shell = editor?.closest?.('[data-desc-editor-shell]');
+      shell?.classList.add('is-active');
+    }
+
+    function isCompactDescEditorFocused(editorId) {
+      const editor = document.getElementById(editorId);
+      return !!editor && (document.activeElement === editor || editor.contains(document.activeElement));
+    }
+
+    function setCompactDescEditable(editorId, editable = true) {
+      const editor = document.getElementById(editorId);
+      const shell = editor?.closest?.('[data-desc-editor-shell]');
+      if (!editor) return;
+      editor.contentEditable = editable ? 'true' : 'false';
+      editor.classList.toggle('cursor-not-allowed', !editable);
+      editor.classList.toggle('opacity-70', !editable);
+      shell?.querySelectorAll('button,select').forEach((control) => { control.disabled = !editable; });
+    }
+
+    function getCompactDescEditor(editorId) {
+      return document.getElementById(editorId);
+    }
+
+    function placeCompactDescCaret(target) {
+      if (!target) return;
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.selectNodeContents(target);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    function getCompactDescCurrentBlock(editorId) {
+      const editor = getCompactDescEditor(editorId);
+      const selection = window.getSelection();
+      if (!editor || !selection || !selection.rangeCount) return null;
+      let node = selection.anchorNode;
+      if (!node) return null;
+      if (node.nodeType === Node.TEXT_NODE && node.parentElement === editor) {
+        const wrapper = compactDescPlainLine(node.textContent ? escapeHtml(node.textContent) : '<br>');
+        editor.replaceChild(wrapper, node);
+        placeCompactDescCaret(wrapper);
+        return wrapper;
+      }
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      while (node && node !== editor) {
+        if (node.nodeType === Node.ELEMENT_NODE && (node.classList?.contains('note-checkline') || node.classList?.contains('note-numberline') || /^(P|DIV|H1|H2|H3|LI|UL|OL|HR)$/.test(node.tagName))) return node;
+        node = node.parentElement;
+      }
+      if (editor.childNodes.length && Array.from(editor.childNodes).some((child) => child.nodeType === Node.TEXT_NODE && String(child.textContent || '').trim())) {
+        const wrapper = compactDescPlainLine(editor.innerHTML || '<br>');
+        editor.innerHTML = '';
+        editor.appendChild(wrapper);
+        placeCompactDescCaret(wrapper);
+        return wrapper;
+      }
+      return null;
+    }
+
+    function compactDescPlainLine(html = '<br>') {
+      const line = document.createElement('div');
+      line.innerHTML = html || '<br>';
+      return line;
+    }
+
+    function compactDescCheckline(html = '<br>') {
+      const line = document.createElement('div');
+      line.className = 'note-checkline';
+      line.innerHTML = '<input type="checkbox" class="note-checkbox" contenteditable="false"><span contenteditable="true"></span>';
+      line.querySelector('span').innerHTML = html || '<br>';
+      return line;
+    }
+
+    function compactDescNumberline(number = 1, html = '<br>') {
+      const line = document.createElement('div');
+      line.className = 'note-numberline';
+      line.innerHTML = `<span class="note-number-marker" contenteditable="false">${number}.</span><span class="note-number-content" contenteditable="true"></span>`;
+      line.querySelector('.note-number-content').innerHTML = html || '<br>';
+      return line;
+    }
+
+    function extractCompactDescBlockHtml(block) {
+      if (!block) return '<br>';
+      const clone = block.cloneNode(true);
+      clone.querySelectorAll('input, .note-number-marker').forEach((node) => node.remove());
+      const content = clone.querySelector('.note-number-content') || clone.querySelector('.note-checkline span') || clone;
+      return content.innerHTML?.trim() || '<br>';
+    }
+
+    function insertCompactDescBlock(editorId, block) {
+      const editor = getCompactDescEditor(editorId);
+      if (!editor || !block) return;
+      const current = getCompactDescCurrentBlock(editorId);
+      if (current && current !== editor && editor.contains(current)) {
+        current.insertAdjacentElement('afterend', block);
+      } else {
+        editor.appendChild(block);
+      }
+      const target = block.querySelector('.note-number-content') || block.querySelector('.note-checkline span') || block;
+      placeCompactDescCaret(target);
+    }
+
+    function transformCompactDescBlock(editorId, kind) {
+      const editor = getCompactDescEditor(editorId);
+      if (!editor) return;
+      const current = getCompactDescCurrentBlock(editorId);
+      const sourceHtml = extractCompactDescBlockHtml(current);
+      let next;
+
+      if (kind === 'checkline') {
+        if (current?.classList?.contains('note-checkline')) next = compactDescPlainLine(sourceHtml);
+        else next = compactDescCheckline(sourceHtml);
+      } else if (kind === 'numberline') {
+        if (current?.classList?.contains('note-numberline')) next = compactDescPlainLine(sourceHtml);
+        else next = compactDescNumberline(1, sourceHtml);
+      }
+
+      if (!next) return;
+      if (current && current !== editor && editor.contains(current)) current.replaceWith(next);
+      else editor.appendChild(next);
+      syncCompactDescEditorState(editorId);
+      const target = next.querySelector('.note-number-content') || next.querySelector('.note-checkline span') || next;
+      placeCompactDescCaret(target);
+    }
+
+    function renumberCompactDescNumberLines(editorId) {
+      const editor = getCompactDescEditor(editorId);
+      if (!editor) return;
+      editor.querySelectorAll('.note-numberline').forEach((line, index) => {
+        let marker = line.querySelector('.note-number-marker');
+        if (!marker) {
+          marker = document.createElement('span');
+          marker.className = 'note-number-marker';
+          marker.contentEditable = 'false';
+          line.prepend(marker);
+        }
+        marker.textContent = `${index + 1}.`;
+      });
+    }
+
+    function syncCompactDescChecklistState(editorId) {
+      const editor = getCompactDescEditor(editorId);
+      if (!editor) return;
+      editor.querySelectorAll('.note-checkline').forEach((line) => {
+        const checkbox = line.querySelector('.note-checkbox');
+        line.classList.toggle('is-checked', !!checkbox?.checked);
+      });
+    }
+
+    function syncCompactDescEditorState(editorId) {
+      renumberCompactDescNumberLines(editorId);
+      syncCompactDescChecklistState(editorId);
+      updateCompactDescFormatState(editorId);
+    }
+
+    function queueCompactDescAutosave(editorId) {
+      if (editorId === 'modalDesc') {
+        queueDescriptionAutosave();
+        refreshProjectDescriptionClamp();
+      } else if (editorId === 'taskModalDescription') {
+        queueTaskDescriptionAutosave();
+      }
+    }
+
+    function closeCompactDescFormatMenus(exceptEditorId = '') {
+      document.querySelectorAll('[data-compact-desc-format-menu]').forEach((menu) => {
+        if (menu.getAttribute('data-compact-desc-format-menu') !== exceptEditorId) menu.classList.add('hidden');
+      });
+    }
+
+    function deactivateCompactDescEditors() {
+      document.querySelectorAll('[data-desc-editor-shell].is-active').forEach((shell) => {
+        const editor = shell.querySelector('.compact-rich-editor');
+        if (editor?.id) flushCompactDescEditor(editor.id);
+        const selection = window.getSelection?.();
+        if (selection && editor?.contains?.(selection.anchorNode)) selection.removeAllRanges();
+        if (document.activeElement === editor) editor.blur();
+        shell.classList.remove('is-active');
+      });
+      closeCompactDescFormatMenus();
+    }
+
+    function flushCompactDescEditor(editorId) {
+      const editor = getCompactDescEditor(editorId);
+      if (!editor) return;
+      const value = getCompactDescValue(editorId);
+      if (value === '' && editor.innerHTML !== '') {
+        editor.innerHTML = '';
+        syncCompactDescEditorState(editorId);
+      }
+
+      if (editorId === 'modalDesc') {
+        if (projectModalReadOnly || !currentProjectId) return;
+        const projectId = String(currentProjectId);
+        pendingProjectDescriptions[projectId] = value;
+        const project = projects.find((item) => String(item.id) === projectId);
+        if (project) project.descripcion = value;
+        refreshProjectDescriptionClamp();
+        clearTimeout(modalDescAutosaveTimer);
+        setDescriptionAutosaveStatus('saving');
+        saveDescriptionAutosave(projectId, value);
+        return;
+      }
+
+      if (editorId === 'taskModalDescription') {
+        if (!currentProjectId || !currentTaskId) return;
+        const task = getCurrentTask();
+        if (task) task.descripcion = value;
+        clearTimeout(taskDescAutosaveTimer);
+        setTaskDescriptionAutosaveStatus('saving');
+        saveTaskDescriptionAutosave(value);
+      }
+    }
+
+    function toggleCompactDescFormatMenu(editorId) {
+      activateCompactDescEditor(editorId);
+      const menu = document.querySelector(`[data-compact-desc-format-menu="${editorId}"]`);
+      if (!menu) return;
+      const willOpen = menu.classList.contains('hidden');
+      closeCompactDescFormatMenus(editorId);
+      menu.classList.toggle('hidden', !willOpen);
+      getCompactDescEditor(editorId)?.focus();
+    }
+
+    function applyCompactDescFormat(editorId, format) {
+      closeCompactDescFormatMenus();
+      runCompactDescCommand(editorId, 'formatBlock', format);
+    }
+
+    function updateCompactDescFormatState(editorId) {
+      const labels = { p: 'Texto', h1: 'Titulo', h2: 'Subtitulo' };
+      const block = getCompactDescCurrentBlock(editorId);
+      const tag = ['H1', 'H2'].includes(block?.tagName) ? block.tagName.toLowerCase() : 'p';
+      const label = document.querySelector(`[data-compact-desc-format-label="${editorId}"]`);
+      if (label) label.textContent = labels[tag] || 'Texto';
+      document.querySelectorAll(`[data-compact-desc-format-option="${editorId}"]`).forEach((option) => {
+        option.classList.toggle('is-selected', option.getAttribute('data-format') === tag);
+      });
+
+      let bold = false;
+      let italic = false;
+      let strike = false;
+      let highlight = false;
+      try {
+        bold = document.queryCommandState('bold');
+        italic = document.queryCommandState('italic');
+        strike = document.queryCommandState('strikeThrough');
+        const backColor = String(document.queryCommandValue('backColor') || '').toLowerCase();
+        highlight = backColor.includes('254') || backColor.includes('fef08a') || backColor.includes('yellow');
+      } catch (_) {}
+      const inChecklist = !!block?.classList?.contains('note-checkline');
+      const inNumberline = !!block?.classList?.contains('note-numberline');
+      document.querySelectorAll(`[data-desc-editor-shell] [data-compact-desc-cmd]`).forEach((button) => {
+        const toolbarEditor = button.closest('[data-desc-editor-shell]')?.querySelector('.compact-rich-editor')?.id;
+        if (toolbarEditor !== editorId) return;
+        const cmd = button.getAttribute('data-compact-desc-cmd');
+        const active = (cmd === 'bold' && bold)
+          || (cmd === 'italic' && italic)
+          || (cmd === 'strikeThrough' && strike)
+          || (cmd === 'highlight' && highlight)
+          || (cmd === 'checkline' && inChecklist)
+          || (cmd === 'numberline' && inNumberline);
+        button.classList.toggle('is-active', !!active);
+      });
+    }
+
+    function runCompactDescCommand(editorId, command, value = null) {
+      const editor = document.getElementById(editorId);
+      if (!editor || editor.contentEditable === 'false') return;
+      activateCompactDescEditor(editorId);
+      editor.focus();
+      try {
+        if (command === 'checkline' || command === 'numberline') {
+          transformCompactDescBlock(editorId, command);
+        } else if (command === 'formatBlock') {
+          document.execCommand('formatBlock', false, `<${value || 'p'}>`);
+        } else {
+          document.execCommand(command, false, value);
+        }
+      } catch (_) {
+        if (command === 'formatBlock') document.execCommand('formatBlock', false, value || 'p');
+      }
+      syncCompactDescEditorState(editorId);
+      queueCompactDescAutosave(editorId);
+    }
+
+    function insertCompactDescHtml(editorId, html = '') {
+      const editor = getCompactDescEditor(editorId);
+      if (!editor || editor.contentEditable === 'false') return;
+      activateCompactDescEditor(editorId);
+      editor.focus();
+      const safeHtml = sanitizeDescriptionHtml(html);
+      if (!safeHtml) return;
+      try {
+        document.execCommand('insertHTML', false, safeHtml);
+      } catch (_) {
+        const selection = window.getSelection();
+        const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+        if (!range) return;
+        const fragment = document.createRange().createContextualFragment(safeHtml);
+        range.deleteContents();
+        range.insertNode(fragment);
+      }
+      syncCompactDescEditorState(editorId);
+      queueCompactDescAutosave(editorId);
+    }
+
+    function clipboardFileName(file, index = 0) {
+      const cleanName = String(file?.name || '').trim();
+      if (cleanName) return cleanName;
+      const mime = String(file?.type || '').toLowerCase();
+      const ext = mime.includes('png') ? 'png'
+        : mime.includes('jpeg') || mime.includes('jpg') ? 'jpg'
+        : mime.includes('webp') ? 'webp'
+        : mime.includes('gif') ? 'gif'
+        : 'bin';
+      return `pegado-${new Date().toISOString().replace(/[:.]/g, '-')}-${index + 1}.${ext}`;
+    }
+
+    function getClipboardFiles(event) {
+      const clipboard = event.clipboardData || window.clipboardData;
+      if (!clipboard) return [];
+      const files = [];
+      Array.from(clipboard.items || []).forEach((item) => {
+        if (item.kind !== 'file') return;
+        const file = item.getAsFile?.();
+        if (file) files.push(file);
+      });
+      if (!files.length) {
+        Array.from(clipboard.files || []).forEach((file) => {
+          if (file) files.push(file);
+        });
+      }
+      return files.map((file, index) => {
+        if (String(file.name || '').trim()) return file;
+        try {
+          return new File([file], clipboardFileName(file, index), {
+            type: file.type || 'application/octet-stream',
+            lastModified: file.lastModified || Date.now(),
+          });
+        } catch (_) {
+          return file;
+        }
+      });
+    }
+
+    function isElementOpen(element) {
+      return !!element && !element.classList.contains('hidden');
+    }
+
+    function getClipboardUploadContext() {
+      const taskModal = document.getElementById('taskDetailModal');
+      if (isElementOpen(taskModal) && currentProjectId && currentTaskId) return 'task';
+      const projectModal = document.getElementById('projectModal');
+      if (isElementOpen(projectModal) && currentProjectId && !projectModalReadOnly) return 'project';
+      return '';
+    }
+
+    async function handleClipboardFilePaste(event) {
+      const files = getClipboardFiles(event);
+      if (!files.length) return false;
+      const context = getClipboardUploadContext();
+      if (!context) return false;
+      event.preventDefault();
+      if (window.showNotification) {
+        window.showNotification(files.length > 1 ? 'Subiendo archivos pegados...' : 'Subiendo archivo pegado...', 'info');
+      }
+      if (context === 'task') await handleTaskFileUpload(files);
+      else await handleModalFileUpload(files);
+      return true;
+    }
+
+    window.activateCompactDescEditor = activateCompactDescEditor;
+    window.runCompactDescCommand = runCompactDescCommand;
+    window.toggleCompactDescFormatMenu = toggleCompactDescFormatMenu;
+    window.applyCompactDescFormat = applyCompactDescFormat;
+
+    document.addEventListener('input', (event) => {
+      const editor = event.target?.closest?.('.compact-rich-editor');
+      if (!editor?.id) return;
+      syncCompactDescEditorState(editor.id);
+    });
+
+    document.addEventListener('keyup', (event) => {
+      const editor = event.target?.closest?.('.compact-rich-editor');
+      if (!editor?.id) return;
+      updateCompactDescFormatState(editor.id);
+    });
+
+    document.addEventListener('mouseup', (event) => {
+      const editor = event.target?.closest?.('.compact-rich-editor');
+      if (!editor?.id) return;
+      updateCompactDescFormatState(editor.id);
+    });
+
+    document.addEventListener('change', (event) => {
+      const checkbox = event.target?.closest?.('.compact-rich-editor .note-checkbox');
+      if (!checkbox) return;
+      const editor = checkbox.closest('.compact-rich-editor');
+      if (!editor?.id) return;
+      syncCompactDescChecklistState(editor.id);
+      queueCompactDescAutosave(editor.id);
+    });
+
+    document.addEventListener('paste', (event) => {
+      if (getClipboardFiles(event).length) {
+        handleClipboardFilePaste(event);
+        return;
+      }
+      const editor = event.target?.closest?.('.compact-rich-editor');
+      if (!editor?.id) return;
+      event.preventDefault();
+      const clipboard = event.clipboardData || window.clipboardData;
+      const html = clipboard?.getData('text/html') || '';
+      const text = clipboard?.getData('text/plain') || '';
+      const normalized = normalizeClipboardDescriptionHtml(html, text);
+      insertCompactDescHtml(editor.id, normalized);
+    });
+
+    document.addEventListener('mousedown', (event) => {
+      if (event.target?.closest?.('[data-desc-editor-shell]')) return;
+      deactivateCompactDescEditors();
+      if (event.target?.closest?.('.compact-desc-format-wrap')) return;
+      closeCompactDescFormatMenus();
+    });
     let pipVideoTrack = null;
     let pipLastDisplayValue = '00:00:00';
     let suppressPipPlaybackSync = false;
@@ -2114,6 +3018,8 @@
     let boardColumnDrag = null;
     let boardColumnPreviewEl = null;
     let boardColumnPreviewOrder = null;
+    let boardTaskComposerFocusStage = '';
+    let boardStageEditingName = '';
     const DEFAULT_PROJECT_TASK_STAGES = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
 
     // --- Dynamic Stages Logic ---
@@ -2562,17 +3468,18 @@
       container.innerHTML = boardStages.map((stage) => {
         const stageTasks = tasks.filter((task) => (String(task.board_stage || 'Por hacer').trim() || 'Por hacer') === stage);
         const safeStageArg = escapeHtml(JSON.stringify(stage));
+        const isEditingStage = boardStageEditingName === stage;
         return `<div class="project-board-column" draggable="true" data-board-stage="${escapeHtml(stage)}" data-board-column-stage="${escapeHtml(stage)}">
           <div class="project-board-column-header flex items-center justify-between gap-2 border-b border-slate-200/80 px-3 py-2.5" title="Arrastra para reorganizar columnas">
             <span class="shrink-0 text-slate-300" data-board-column-handle aria-hidden="true">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.2" d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg>
             </span>
-            <button type="button" onclick="renameBoardStage(${safeStageArg})" class="group min-w-0 flex-1 text-left" title="Renombrar columna">
+            ${isEditingStage ? `<input type="text" data-board-stage-name-input="${escapeHtml(stage)}" value="${escapeHtml(stage)}" class="min-w-0 flex-1 rounded-lg border border-lime-300 bg-white px-2 py-1 text-sm font-black text-slate-950 outline-none ring-4 ring-lime-100" onkeydown="handleBoardStageNameKey(event, ${safeStageArg})" onblur="commitBoardStageName(${safeStageArg}, this.value)">` : `<button type="button" onclick="startBoardStageNameEdit(${safeStageArg})" class="group min-w-0 flex-1 text-left" title="Renombrar columna">
               <span class="inline-flex max-w-full items-center gap-1.5">
                 <span class="min-w-0 truncate text-sm font-black text-slate-950">${escapeHtml(stage)}</span>
                 <svg class="h-3.5 w-3.5 shrink-0 text-slate-300 opacity-0 transition group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4Z"/></svg>
               </span>
-            </button>
+            </button>`}
             <span class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-500 shadow-sm">${stageTasks.length}</span>
           </div>
           <div class="project-board-column-body custom-scroll" data-board-drop-stage="${escapeHtml(stage)}">
@@ -2584,6 +3491,7 @@
 
       enableProjectBoardDnD();
       initProjectBoardDragScroll();
+      focusProjectBoardInlineControls();
     }
 
     function updateBoardTaskTrashCount(project) {
@@ -2713,21 +3621,24 @@
     }
 
     function projectBoardAddTaskButton(stage) {
-      const safeStage = String(stage || '').replace(/'/g, "\\'");
-      return `<button type="button" onclick="addBoardTask('${safeStage}')" class="w-full rounded-lg border border-dashed border-slate-300 bg-white/65 px-3 py-2.5 text-xs font-black text-slate-500 hover:border-lime-300 hover:bg-lime-50 hover:text-slate-900">
-        <span class="inline-flex items-center gap-2">
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14m7-7H5"/></svg>
-          Añadir tarjeta
-        </span>
-      </button>`;
+      const safeStageArg = escapeHtml(JSON.stringify(stage || 'Por hacer'));
+      return `<div class="project-board-card-composer" data-no-pan>
+        <input type="text"
+          data-board-composer-stage="${escapeHtml(stage || '')}"
+          class="w-full rounded-lg border border-dashed border-slate-300 bg-white/80 px-3 py-2.5 text-xs font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-lime-300 focus:bg-white focus:ring-4 focus:ring-lime-100"
+          placeholder="Añadir tarjeta"
+          autocomplete="off"
+          onkeydown="handleBoardTaskComposerKey(event, ${safeStageArg})">
+      </div>`;
     }
 
-    async function addBoardTask(stage) {
+    async function addBoardTask(stage, text = '') {
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       if (!project) return;
-      const texto = prompt('Nombre de la tarjeta:');
-      const clean = String(texto || '').trim();
+      const clean = String(text || '').trim();
       if (!clean) return;
+      const targetStage = stage || 'Por hacer';
+      boardTaskComposerFocusStage = targetStage;
 
       const response = await fetch('/api/proyectos/tareas/agregar', {
         method: 'POST',
@@ -2736,7 +3647,7 @@
           id: project.id,
           texto: clean,
           priority: 'Atención',
-          board_stage: stage || 'Por hacer',
+          board_stage: targetStage,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -2745,6 +3656,16 @@
         if (idx >= 0) projects[idx] = data.item;
         renderProjectBoard(project.id);
       }
+    }
+
+    function handleBoardTaskComposerKey(event, stage) {
+      if (event.key !== 'Enter' || event.isComposing) return;
+      event.preventDefault();
+      const input = event.currentTarget;
+      const clean = String(input?.value || '').trim();
+      if (!clean) return;
+      input.value = '';
+      addBoardTask(stage, clean);
     }
 
     async function addBoardStage() {
@@ -2762,18 +3683,47 @@
       renderProjectBoard(project.id);
     }
 
-    async function renameBoardStage(oldStage) {
+    function startBoardStageNameEdit(stage) {
+      const cleanStage = String(stage || '').trim();
+      if (!cleanStage) return;
+      boardStageEditingName = cleanStage;
+      renderProjectBoard(currentBoardProjectId);
+    }
+
+    function handleBoardStageNameKey(event, oldStage) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        boardStageEditingName = '';
+        renderProjectBoard(currentBoardProjectId);
+        return;
+      }
+      if (event.key !== 'Enter' || event.isComposing) return;
+      event.preventDefault();
+      event.currentTarget?.blur();
+    }
+
+    async function commitBoardStageName(oldStage, value) {
+      if (boardStageEditingName !== oldStage) return;
+      boardStageEditingName = '';
+      await renameBoardStage(oldStage, value);
+    }
+
+    async function renameBoardStage(oldStage, nextStage = '') {
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       if (!project) return;
       const oldName = String(oldStage || '').trim();
       if (!oldName) return;
 
-      const nextName = String(prompt('Nuevo nombre de la columna:', oldName) || '').trim();
-      if (!nextName || nextName === oldName) return;
+      const nextName = String(nextStage || '').trim();
+      if (!nextName || nextName === oldName) {
+        renderProjectBoard(project.id);
+        return;
+      }
 
       const currentStages = getProjectBoardStages(project);
       if (currentStages.some((stage) => stage !== oldName && stage.toLowerCase() === nextName.toLowerCase())) {
-        alert('Ya existe una columna con ese nombre.');
+        if (window.showNotification) window.showNotification('Ya existe una columna con ese nombre.', 'warning');
+        renderProjectBoard(project.id);
         return;
       }
 
@@ -2818,6 +3768,32 @@
       renderProjectBoard(project.id);
     }
     window.renameBoardStage = renameBoardStage;
+    window.startBoardStageNameEdit = startBoardStageNameEdit;
+    window.handleBoardStageNameKey = handleBoardStageNameKey;
+    window.commitBoardStageName = commitBoardStageName;
+    window.handleBoardTaskComposerKey = handleBoardTaskComposerKey;
+
+    function focusProjectBoardInlineControls() {
+      requestAnimationFrame(() => {
+        if (boardStageEditingName) {
+          const input = Array.from(document.querySelectorAll('[data-board-stage-name-input]'))
+            .find((item) => item.getAttribute('data-board-stage-name-input') === boardStageEditingName);
+          if (input) {
+            input.focus();
+            input.select();
+          }
+          return;
+        }
+
+        if (!boardTaskComposerFocusStage) return;
+        const input = Array.from(document.querySelectorAll('[data-board-composer-stage]'))
+          .find((item) => item.getAttribute('data-board-composer-stage') === boardTaskComposerFocusStage);
+        if (input) {
+          input.focus();
+          input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+      });
+    }
 
     function enableProjectBoardDnD() {
       const board = document.getElementById('projectBoardColumns');
@@ -4234,7 +5210,7 @@
       }
       if (clientSelect) clientSelect.disabled = projectModalReadOnly;
       if (stageSelect) stageSelect.disabled = projectModalReadOnly;
-      if (desc) desc.readOnly = projectModalReadOnly;
+      if (desc) setCompactDescEditable('modalDesc', !projectModalReadOnly);
       if (descAutosaveStatus) descAutosaveStatus.classList.toggle('hidden', projectModalReadOnly);
       if (taskInput) taskInput.disabled = projectModalReadOnly;
       if (taskAddWrap) taskAddWrap.classList.toggle('hidden', projectModalReadOnly);
@@ -4303,12 +5279,11 @@
         const hasPendingDesc = Object.prototype.hasOwnProperty.call(pendingProjectDescriptions, String(id));
         const nextDescription = hasPendingDesc ? pendingProjectDescriptions[String(id)] : (p.descripcion || '');
         if (descInput && document.activeElement !== descInput) {
-          descInput.value = nextDescription;
+          setCompactDescValue('modalDesc', nextDescription);
           projectDescriptionExpanded = false;
           document.getElementById('projectDescShell')?.classList.remove('toggle-dismissed');
         }
         if (descInput) {
-          descInput.oninput = queueDescriptionAutosave;
           setDescriptionAutosaveStatus(hasPendingDesc ? 'pending' : 'idle');
           requestAnimationFrame(refreshProjectDescriptionClamp);
         }
@@ -6265,23 +7240,29 @@
     
     function refreshProjectDescriptionClamp() {
       const shell = document.getElementById('projectDescShell');
-      const textarea = document.getElementById('modalDesc');
+      const editor = document.getElementById('modalDesc');
       const toggleText = document.getElementById('projectDescToggleText');
       const toggleIcon = document.getElementById('projectDescToggleIcon');
-      if (!shell || !textarea) return;
+      if (!shell || !editor) return;
+      if (isCompactDescEditorFocused('modalDesc')) {
+        shell.classList.remove('is-collapsed');
+        shell.classList.add('toggle-dismissed');
+        editor.style.height = '';
+        return;
+      }
 
-      const collapsedMaxHeight = 190;
-      textarea.style.height = 'auto';
-      const fullHeight = Math.max(textarea.scrollHeight, 152);
+      const collapsedMaxHeight = 320;
+      editor.style.height = 'auto';
+      const fullHeight = Math.max(editor.scrollHeight, 152);
       const hasOverflow = fullHeight > collapsedMaxHeight + 8;
 
       shell.classList.toggle('has-overflow', hasOverflow);
       shell.classList.toggle('is-collapsed', hasOverflow && !projectDescriptionExpanded);
 
       if (hasOverflow && !projectDescriptionExpanded) {
-        textarea.style.height = `${collapsedMaxHeight}px`;
+        editor.style.height = `${collapsedMaxHeight}px`;
       } else {
-        textarea.style.height = `${fullHeight}px`;
+        editor.style.height = `${fullHeight}px`;
       }
 
       if (toggleText) {
@@ -6319,7 +7300,7 @@
 
     function queueDescriptionAutosave() {
       if (projectModalReadOnly || !currentProjectId) return;
-      const desc = document.getElementById('modalDesc')?.value || '';
+      const desc = getCompactDescValue('modalDesc');
       const projectId = String(currentProjectId);
       pendingProjectDescriptions[projectId] = desc;
       const p = projects.find(x => String(x.id) === projectId);
@@ -7363,7 +8344,7 @@
         taskTimerInterval = null;
       }
       if (currentProjectId && currentTaskId) {
-        const pendingDesc = document.getElementById('taskModalDescription')?.value;
+        const pendingDesc = getCompactDescValue('taskModalDescription');
         if (typeof pendingDesc === 'string') {
           clearTimeout(taskDescAutosaveTimer);
           saveTaskDescriptionAutosave(pendingDesc);
@@ -7655,7 +8636,7 @@
         title.classList.remove('cursor-default');
       }
       if (description) {
-        description.readOnly = false;
+        setCompactDescEditable('taskModalDescription', true);
         description.classList.remove('cursor-default');
       }
       if (priority) {
@@ -7812,7 +8793,9 @@
       const meta = document.getElementById('taskModalMeta');
       const doneBtn = document.getElementById('taskModalDoneBtn');
       if (title) title.value = task.texto || '';
-      if (description) description.value = task.descripcion || '';
+      if (description && !isCompactDescEditorFocused('taskModalDescription')) {
+        setCompactDescValue('taskModalDescription', task.descripcion || '');
+      }
       if (doneBtn) {
         doneBtn.classList.toggle('border-lime-300', !!task.done);
         doneBtn.classList.toggle('bg-lime-200', !!task.done);
@@ -8348,7 +9331,7 @@
       if (!currentProjectId || !currentTaskId) return;
       const text = (document.getElementById('taskModalTitle')?.value || '').trim();
       if (!text) return;
-      const descripcion = (document.getElementById('taskModalDescription')?.value || '').trim();
+      const descripcion = getCompactDescValue('taskModalDescription');
       const start_date = document.getElementById('taskModalStart')?.value || null;
       const end_date = document.getElementById('taskModalEnd')?.value || null;
       const due_date = end_date || null;
@@ -8400,7 +9383,7 @@
       if (!currentProjectId || !currentTaskId) return;
       const task = getCurrentTask();
       if (!task) return;
-      const desc = document.getElementById('taskModalDescription')?.value || '';
+      const desc = getCompactDescValue('taskModalDescription');
       task.descripcion = desc;
       setTaskDescriptionAutosaveStatus('saving');
       clearTimeout(taskDescAutosaveTimer);
