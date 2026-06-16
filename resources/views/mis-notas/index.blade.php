@@ -988,11 +988,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function deleteCurrentNote() {
     if (editingNoteIndex < 0) return;
-    if ((allNotes[editingNoteIndex]?.permission || 'owner') !== 'owner') return;
+    const note = allNotes[editingNoteIndex];
+    if (!note) return;
+    if ((note?.permission || 'owner') !== 'owner') return;
     if (!confirm('Eliminar esta nota?')) return;
-    allNotes.splice(editingNoteIndex, 1);
+    const deletedId = String(note.id || '');
+    allNotes = allNotes.filter((item) => String(item.id || '') !== deletedId);
+    editingNoteIndex = -1;
+    window.__infocusAiCurrentNote = null;
     saveNotes();
-    backToList();
+    closeShareModal();
+    noteEditView.classList.add('hidden');
+    notesListView.classList.remove('hidden');
+    syncHeaderBackButton();
+    renderNotes();
   }
 
   function insertEmoji(emoji) {

@@ -670,10 +670,6 @@
       opacity: .45;
       transform: rotate(.4deg);
     }
-
-    .progress-fill-live {
-      transition: width .5s ease, background-color .2s ease;
-    }
   </style>
   <div id="stagesData" data-stages='{{ json_encode($stages) }}'></div>
   <div id="projectBoardsHeader" class="mb-4 flex items-center justify-between flex-wrap gap-3">
@@ -958,6 +954,7 @@
            <div class="bg-white px-6 py-3 border-b border-slate-100 flex-none">
              <div class="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
                <button type="button" data-project-tab="info" onclick="setProjectModalTab('info')" class="project-detail-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-600">Información</button>
+               <button type="button" data-project-tab="tasks" onclick="setProjectModalTab('tasks')" class="project-detail-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-600">Tareas</button>
                <button type="button" data-project-tab="notes" onclick="setProjectModalTab('notes')" class="project-detail-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-600">Notas</button>
              </div>
            </div>
@@ -1027,7 +1024,7 @@
                            <span id="modalTaskProgressLabel" class="text-[11px] font-bold text-lime-700">0%</span>
                          </div>
                          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                             <div id="modalTaskProgress" class="h-2 rounded-full" style="width: 0%; background-color: #f43f5e"></div>
+                             <div id="modalTaskProgress" class="progress-fill-anim h-2 rounded-full transition-all duration-500" style="width: 0%; background-color: #f43f5e"></div>
                          </div>
                        </div>
                        
@@ -1128,7 +1125,7 @@
                            <span>Iniciar</span>
                        </button>
                        <div class="mt-3 grid grid-cols-2 gap-2">
-                         <button id="modalTimerSaveBtn" type="button" onclick="saveCurrentTimerLog()" disabled class="px-2 py-1.5 rounded-lg border border-slate-600 bg-slate-700/40 text-[11px] font-bold text-slate-500 cursor-not-allowed transition-colors">Guardar</button>
+                         <button type="button" onclick="saveCurrentTimerLog()" class="px-2 py-1.5 rounded-lg border border-lime-400 bg-lime-100/20 text-[11px] font-bold text-lime-300 hover:bg-lime-100/30 transition-colors">Guardar</button>
                          <button type="button" onclick="resetCurrentTimer()" class="px-2 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 text-[11px] font-bold text-slate-200 hover:bg-slate-700 transition-colors">Reiniciar</button>
                        </div>
                    </div>
@@ -1178,23 +1175,6 @@
                    
                    <!-- Metadata -->
                    <div class="space-y-4">
-                         <div>
-                           <div class="mb-2 flex items-center justify-between gap-3">
-                             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Portada</div>
-                             <button type="button" onclick="document.getElementById('modalCoverImageInput')?.click()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50">
-                               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2 1.6-1.6a2 2 0 012.8 0L20 14m-9-6h.01M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
-                               Cambiar
-                             </button>
-                             <input id="modalCoverImageInput" type="file" accept="image/*" class="hidden" onchange="handleModalCoverImage(event)">
-                           </div>
-                           <div id="modalCoverPreview" class="project-cover-preview min-h-[92px]"></div>
-                           <div class="mt-2 flex items-center justify-between gap-2">
-                             <input id="modalCoverUrlInput" type="url" class="h-9 min-w-0 flex-1 rounded-lg border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500" placeholder="Pegar URL de imagen..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); updateModalCoverFromUrl(); }">
-                             <button type="button" onclick="updateModalCoverFromUrl()" class="h-9 rounded-lg border border-lime-200 bg-lime-100 px-3 text-[10px] font-bold text-slate-900 hover:bg-lime-200">Aplicar</button>
-                           </div>
-                           <button id="modalCoverClearBtn" type="button" onclick="clearModalCoverImage()" class="mt-2 hidden text-[11px] font-bold text-slate-500 hover:text-rose-600">Quitar imagen de portada</button>
-                         </div>
-
                          <div>
                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Responsables</div>
                              <div class="relative" id="responsibleSearchWrap">
@@ -1490,7 +1470,7 @@
                       <span id="taskSubtaskProgressLabel" class="text-[11px] font-bold text-lime-700">0%</span>
                     </div>
                     <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div id="taskSubtaskProgress" class="h-2 rounded-full" style="width:0%;background-color:#84cc16"></div>
+                      <div id="taskSubtaskProgress" class="progress-fill-anim h-2 rounded-full transition-all duration-500" style="width:0%;background-color:#84cc16"></div>
                     </div>
                   </div>
                   <div id="taskSubtasksList" class="space-y-2"></div>
@@ -1511,9 +1491,9 @@
                   <div id="taskFilesList" class="project-file-grid mb-3"></div>
                   <div id="taskFileDropzone" class="rounded-xl border-2 border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center transition-colors hover:bg-slate-50 cursor-pointer" onclick="document.getElementById('taskFileInput')?.click()">
                     <input type="file" id="taskFileInput" class="hidden" multiple onchange="handleTaskFileUpload(this.files); this.value='';">
-                    <svg class="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    <svg class="mx-auto h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01.88-7.903A5 5 0 1116.9 6L17 6a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3"/></svg>
                     <div class="mt-2 text-xs font-bold text-slate-500">Haz clic o arrastra archivos aquí</div>
-                    <div class="mt-1 text-[11px] font-semibold text-slate-400">La primera imagen será portada.</div>
+                    <div class="mt-1 text-[11px] font-semibold text-slate-400">La primera imagen será la portada de la tarjeta.</div>
                   </div>
                 </div>
               </div>
@@ -1550,7 +1530,7 @@
                   <span>Iniciar</span>
                 </button>
                 <div class="mt-3 grid grid-cols-2 gap-2">
-                  <button id="taskTimerSaveBtn" type="button" onclick="saveCurrentTimerLog()" disabled class="px-2 py-1.5 rounded-lg border border-slate-600 bg-slate-700/40 text-[11px] font-bold text-slate-500 cursor-not-allowed transition-colors">Guardar</button>
+                  <button type="button" onclick="saveCurrentTimerLog()" class="px-2 py-1.5 rounded-lg border border-lime-400 bg-lime-100/20 text-[11px] font-bold text-lime-300 hover:bg-lime-100/30 transition-colors">Guardar</button>
                   <button type="button" onclick="resetCurrentTimer()" class="px-2 py-1.5 rounded-lg border border-slate-600 bg-slate-700/50 text-[11px] font-bold text-slate-200 hover:bg-slate-700 transition-colors">Reiniciar</button>
                 </div>
               </div>
@@ -1713,7 +1693,17 @@
   <div id="proyectos-tareas" class="hidden bg-white rounded-2xl shadow border p-4 mt-4">
     <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50/95 px-3 py-2">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="ml-auto flex items-center gap-2 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="quickAddTaskFromCurrentView()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-lime-200 bg-lime-100 px-3 text-xs font-bold text-slate-900 hover:bg-lime-200">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>Tarea</span>
+          </button>
+          <button type="button" onclick="quickStartTimerFromCurrentView()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Iniciar timer</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
           <span id="tasksQuickFiltersStatus" class="font-bold text-slate-600">Filtros activos: 0</span>
           <button id="tasksQuickClearBtn" type="button" onclick="resetQuickFilters('tareas')" class="hidden h-7 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Limpiar</button>
           <span id="tasksQuickSimpleBadge" class="hidden rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">Modo simple activo</span>
@@ -1921,7 +1911,6 @@
     let openTaskFromQuery = urlParams.get('open_task') || '';
     let openNewProjectFromQuery = urlParams.get('new_project') === '1';
     let openHeaderTimerFromQuery = urlParams.get('header_timer') === '1';
-    let animateProgressBarsOnce = false;
 
     function clearOpenProjectQueryParam() {
       const nextUrl = new URL(window.location.href);
@@ -2098,7 +2087,6 @@
     const currentUserDisplayName = @json(optional(auth()->user())->name ?: session('user.name'));
     const TIMER_HISTORY_PREFIX = 'project_timer_history_v2_';
     const TIMER_RESET_PREFIX = 'project_timer_reset_v1_';
-    const TASK_TIMER_RESET_PREFIX = 'project_task_timer_reset_v1_';
     const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v1';
     const POMODORO_STATE_KEY = 'tdah_pomodoro_state_v2';
     const clientesData = @json($clientes);
@@ -4086,66 +4074,6 @@
     }
     window.handleNewProjectCoverImage = handleNewProjectCoverImage;
 
-    function renderModalCoverPicker(project = null) {
-      const p = project || projects.find(x => String(x.id) === String(currentProjectId)) || {};
-      const preview = document.getElementById('modalCoverPreview');
-      const input = document.getElementById('modalCoverUrlInput');
-      const clearBtn = document.getElementById('modalCoverClearBtn');
-      const coverImage = String(p.cover_image || '').trim();
-      const [from, to] = parseProjectCoverColor(p.cover_color) || boardCoverTone(p, 0);
-
-      if (preview) {
-        preview.style.setProperty('--cover-from', from);
-        preview.style.setProperty('--cover-to', to);
-        preview.style.backgroundImage = coverImage ? `url("${coverImage}")` : '';
-      }
-      if (input && document.activeElement !== input) input.value = coverImage;
-      clearBtn?.classList.toggle('hidden', !coverImage);
-    }
-
-    async function saveModalCoverImage(value) {
-      if (projectModalReadOnly || !currentProjectId) return;
-      const coverImage = String(value || '').trim();
-      const project = projects.find(x => String(x.id) === String(currentProjectId));
-      if (project) project.cover_image = coverImage;
-      renderModalCoverPicker(project);
-      const updated = await updateProjectField('cover_image', coverImage || null);
-      if (updated) renderModalCoverPicker(updated);
-      renderKanban(projects);
-      if (String(currentBoardProjectId || '') === String(currentProjectId || '')) {
-        renderProjectBoard(currentProjectId);
-      }
-    }
-
-    function updateModalCoverFromUrl() {
-      const input = document.getElementById('modalCoverUrlInput');
-      saveModalCoverImage(input?.value || '').catch(() => {
-        if (window.showNotification) window.showNotification('No se pudo actualizar la portada', 'error');
-      });
-    }
-    window.updateModalCoverFromUrl = updateModalCoverFromUrl;
-
-    function clearModalCoverImage() {
-      saveModalCoverImage('').catch(() => {
-        if (window.showNotification) window.showNotification('No se pudo quitar la portada', 'error');
-      });
-    }
-    window.clearModalCoverImage = clearModalCoverImage;
-
-    function handleModalCoverImage(event) {
-      const file = event?.target?.files?.[0];
-      if (!file || !file.type?.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        saveModalCoverImage(String(reader.result || '')).catch(() => {
-          if (window.showNotification) window.showNotification('No se pudo actualizar la portada', 'error');
-        });
-      };
-      reader.readAsDataURL(file);
-      if (event?.target) event.target.value = '';
-    }
-    window.handleModalCoverImage = handleModalCoverImage;
-
     function openNewProjectModal(stage = '') {
         const modal = document.getElementById('newProjectModal');
         newProjectCoverColor = `${PROJECT_COVER_PALETTES[0][0]}|${PROJECT_COVER_PALETTES[0][1]}`;
@@ -4319,7 +4247,6 @@
 
         // Files
         renderModalFiles(p.files || []);
-        renderModalCoverPicker(p);
         
         // Metadata
         initModalDuePicker();
@@ -4706,24 +4633,6 @@
       localStorage.setItem(TIMER_RESET_PREFIX + projectId, String(Math.max(0, Number(totalSeconds) || 0)));
     }
 
-    function taskTimerResetKey(projectId = currentProjectId, taskId = currentTaskId) {
-      if (!projectId || !taskId) return '';
-      return `${TASK_TIMER_RESET_PREFIX}${projectId}_${taskId}`;
-    }
-
-    function getTaskTimerResetBase(projectId = currentProjectId, taskId = currentTaskId) {
-      const key = taskTimerResetKey(projectId, taskId);
-      if (!key) return 0;
-      const val = Number(localStorage.getItem(key) || 0);
-      return Number.isFinite(val) ? Math.max(0, val) : 0;
-    }
-
-    function setTaskTimerResetBase(totalSeconds, projectId = currentProjectId, taskId = currentTaskId) {
-      const key = taskTimerResetKey(projectId, taskId);
-      if (!key) return;
-      localStorage.setItem(key, String(Math.max(0, Number(totalSeconds) || 0)));
-    }
-
     function persistGlobalTimerState(project, task, currentSeconds, isRunning) {
       if (!project?.id) return;
       const payload = {
@@ -4963,24 +4872,6 @@
       return Math.max(0, gross - base);
     }
 
-    function setTimerSaveButtonState(buttonId, enabled) {
-      const btn = document.getElementById(buttonId);
-      if (!btn) return;
-      btn.disabled = !enabled;
-      btn.className = enabled
-        ? 'px-2 py-1.5 rounded-lg border border-lime-400 bg-lime-100/20 text-[11px] font-bold text-lime-300 hover:bg-lime-100/30 transition-colors'
-        : 'px-2 py-1.5 rounded-lg border border-slate-600 bg-slate-700/40 text-[11px] font-bold text-slate-500 cursor-not-allowed transition-colors';
-    }
-
-    function setFullscreenTimerSaveButtonState(enabled) {
-      const btn = document.getElementById('timerFsSaveBtn');
-      if (!btn) return;
-      btn.disabled = !enabled;
-      btn.className = enabled
-        ? 'px-4 py-2 rounded-xl border border-white/20 bg-white/10 text-white text-sm font-bold hover:bg-white/20 flex items-center gap-2'
-        : 'px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-slate-500 text-sm font-bold cursor-not-allowed flex items-center gap-2';
-    }
-
     function updateInvestedDisplays(p) {
       const gross = getProjectGrossSeconds(p);
       const value = formatInvestedDh(gross);
@@ -5025,18 +4916,6 @@
       const p = projects.find(x => x.id === currentProjectId);
       if (!p) return;
 
-      const isTaskModalOpen = !document.getElementById('taskDetailModal')?.classList.contains('hidden');
-      const taskBeforeSave = isTaskModalOpen ? getCurrentTask() : null;
-      const pendingBeforeStop = taskBeforeSave
-        ? getTaskDisplayedSeconds(p, taskBeforeSave)
-        : getCurrentProjectTotalSeconds(p);
-      if (pendingBeforeStop <= 0) {
-        setTimerSaveButtonState('modalTimerSaveBtn', false);
-        setTimerSaveButtonState('taskTimerSaveBtn', false);
-        if (window.showNotification) window.showNotification('No hay tiempo para guardar.', 'info');
-        return;
-      }
-
       const logs = p.time_logs || [];
       const isRunning = logs.length > 0 && !logs[logs.length - 1].end;
       if (isRunning) {
@@ -5044,20 +4923,9 @@
       }
 
       const refreshed = projects.find(x => x.id === currentProjectId) || p;
-      const refreshedTask = taskBeforeSave ? getTaskFromProject(refreshed, taskBeforeSave.id) : null;
       const latestLogs = refreshed.time_logs || [];
       const lastLog = latestLogs.length ? latestLogs[latestLogs.length - 1] : null;
-      const pendingSeconds = refreshedTask
-        ? getTaskDisplayedSeconds(refreshed, refreshedTask)
-        : getCurrentProjectTotalSeconds(refreshed);
-      const secondsToSave = Math.max(0, pendingSeconds || pendingBeforeStop);
-      if (secondsToSave <= 0) {
-        setTimerSaveButtonState('modalTimerSaveBtn', false);
-        setTimerSaveButtonState('taskTimerSaveBtn', false);
-        if (window.showNotification) window.showNotification('No hay tiempo para guardar.', 'info');
-        return;
-      }
-      const display = formatTimer(secondsToSave);
+      const display = formatTimer(getCurrentProjectTotalSeconds(refreshed));
       const day = new Date().toLocaleDateString('es-ES');
       const entries = getSavedTimerHistory();
       entries.push({
@@ -5067,17 +4935,7 @@
         task_name: String(lastLog?.task_name || ''),
       });
       setSavedTimerHistory(entries);
-      setTimerResetBase(getProjectGrossSeconds(refreshed), refreshed.id);
-      if (refreshedTask?.id) {
-        setTaskTimerResetBase(Number(refreshedTask.total_seconds || 0), refreshed.id, refreshedTask.id);
-      }
       renderModalTimeLogs();
-      updateModalTimer(refreshed);
-      if (refreshedTask?.id && currentTaskId && String(refreshedTask.id) === String(currentTaskId)) {
-        updateTaskTimerPanels(refreshedTask);
-        renderTaskTimeHistory(refreshedTask.id);
-      }
-      syncPinnedTimerHud();
       if (window.showNotification) window.showNotification('Tiempo guardado en historial', 'success');
     }
 
@@ -5087,23 +4945,16 @@
       if (!p) return;
       const logs = p.time_logs || [];
       const isRunning = logs.length > 0 && !logs[logs.length - 1].end;
-      const isTaskModalOpen = !document.getElementById('taskDetailModal')?.classList.contains('hidden');
-      const taskBeforeReset = isTaskModalOpen ? getCurrentTask() : null;
 
       const applyReset = () => {
-        const freshProject = projects.find(x => x.id === currentProjectId) || p;
-        const freshTask = taskBeforeReset ? getTaskFromProject(freshProject, taskBeforeReset.id) : null;
-        const grossNow = getProjectGrossSeconds(freshProject);
+        const grossNow = logs.reduce((acc, log) => {
+          const end = log.end || Math.floor(Date.now()/1000);
+          return acc + (end - log.start);
+        }, 0);
         setTimerResetBase(grossNow);
-        if (freshTask?.id) {
-          setTaskTimerResetBase(Number(freshTask.total_seconds || 0), freshProject.id, freshTask.id);
-        }
         const display = document.getElementById('modalTimerDisplay');
         if (display) display.innerText = '00:00:00';
         syncTimerPanelsDisplay('00:00:00');
-        setTimerSaveButtonState('modalTimerSaveBtn', false);
-        setTimerSaveButtonState('taskTimerSaveBtn', false);
-        if (freshTask?.id) updateTaskTimerPanels(freshTask);
       };
 
       if (isRunning) {
@@ -5174,8 +5025,6 @@
       document.getElementById('timerFsDisplay').innerText = value;
       document.getElementById('timerPipDisplay').innerText = value;
       drawTimerPipCanvas(value);
-      const project = getPinnedTimerProject() || projects.find(x => String(x.id) === String(currentProjectId));
-      setFullscreenTimerSaveButtonState(project ? getCurrentProjectTotalSeconds(project) > 0 : false);
     }
 
     function getActiveTimerTaskLabel(p) {
@@ -5441,15 +5290,12 @@
 
     function syncTimerFullscreenActionButtons(isRunning) {
       const btn = document.getElementById('timerFsPauseBtn');
-      if (btn) {
-        btn.title = isRunning ? 'Pausar temporizador' : 'Reanudar temporizador';
-        btn.setAttribute('aria-label', isRunning ? 'Pausar temporizador' : 'Reanudar temporizador');
-        btn.innerHTML = isRunning
-          ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
-          : '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>';
-      }
-      const project = getPinnedTimerProject() || projects.find(x => String(x.id) === String(currentProjectId));
-      setFullscreenTimerSaveButtonState(project ? getCurrentProjectTotalSeconds(project) > 0 : false);
+      if (!btn) return;
+      btn.title = isRunning ? 'Pausar temporizador' : 'Reanudar temporizador';
+      btn.setAttribute('aria-label', isRunning ? 'Pausar temporizador' : 'Reanudar temporizador');
+      btn.innerHTML = isRunning
+        ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
+        : '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>';
     }
 
     function toggleTimerFsShowAllSubtasks() {
@@ -5656,12 +5502,7 @@
       const project = getPinnedTimerProject();
       if (!project) return;
       const task = getPinnedTimerTask(project);
-      const pendingBeforeStop = getCurrentProjectTotalSeconds(project);
-      if (pendingBeforeStop <= 0) {
-        setFullscreenTimerSaveButtonState(false);
-        if (window.showNotification) window.showNotification('No hay tiempo para guardar.', 'info');
-        return;
-      }
+      const display = formatTimer(getCurrentProjectTotalSeconds(project));
       // Stop timer on server first if running
       const running = getRunningLog(project);
       if (running) {
@@ -5670,28 +5511,15 @@
           patchProjectInState(stopped);
         } catch (_) {}
       }
-      const refreshedProject = projects.find(x => String(x.id) === String(project.id)) || project;
-      const refreshedTask = task?.id ? getTaskFromProject(refreshedProject, task.id) : null;
-      const pendingSeconds = getCurrentProjectTotalSeconds(refreshedProject) || pendingBeforeStop;
-      if (pendingSeconds <= 0) {
-        setFullscreenTimerSaveButtonState(false);
-        if (window.showNotification) window.showNotification('No hay tiempo para guardar.', 'info');
-        return;
-      }
-      const display = formatTimer(pendingSeconds);
       const day = new Date().toLocaleDateString('es-ES');
       const entries = getSavedTimerHistory(project.id);
       entries.push({
         time: display,
         day,
-        saved_by: resolveCurrentUserName(refreshedProject),
-        task_name: String(refreshedTask?.texto || task?.texto || ''),
+        saved_by: resolveCurrentUserName(project),
+        task_name: String(task?.texto || ''),
       });
       setSavedTimerHistory(entries, project.id);
-      setTimerResetBase(getProjectGrossSeconds(refreshedProject), refreshedProject.id);
-      if (refreshedTask?.id) {
-        setTaskTimerResetBase(Number(refreshedTask.total_seconds || 0), refreshedProject.id, refreshedTask.id);
-      }
       setPinnedTimerContext(null, null);
       clearGlobalTimerState();
       await loadData();
@@ -6807,7 +6635,7 @@
                 <span class="font-bold text-lime-700">${taskStats.done}/${taskStats.total} · ${taskStats.pct}%</span>
               </div>
               <div class="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
-                <div class="${animateProgressBarsOnce ? 'progress-fill-live ' : ''}h-2 rounded-full" style="width:${taskStats.pct}%; background-color:${progressBarColor(taskStats.pct)}"></div>
+                <div class="progress-fill-anim h-2 rounded-full transition-all duration-500" style="width:${taskStats.pct}%; background-color:${progressBarColor(taskStats.pct)}"></div>
               </div>
             </div>
           </div>
@@ -6933,7 +6761,7 @@
           <td class="px-4 py-4 min-w-[12rem]">
             <div class="flex items-center gap-2">
               <div class="h-2.5 w-24 rounded-full bg-slate-200 overflow-hidden">
-                <div class="${animateProgressBarsOnce ? 'progress-fill-live ' : ''}h-2.5 rounded-full bg-[#101729]" style="width:${prog}%"></div>
+                <div class="progress-fill-anim h-2.5 rounded-full bg-[#101729]" style="width:${prog}%"></div>
               </div>
               <span class="font-bold text-slate-700">${prog}%</span>
             </div>
@@ -7004,7 +6832,7 @@
           <td class="px-4 py-4 min-w-[12rem]">
             <div class="flex items-center gap-2">
               <div class="h-2.5 w-24 rounded-full bg-slate-200 overflow-hidden">
-                <div class="${animateProgressBarsOnce ? 'progress-fill-live ' : ''}h-2.5 rounded-full bg-[#101729]" style="width:${prog}%"></div>
+                <div class="progress-fill-anim h-2.5 rounded-full bg-[#101729]" style="width:${prog}%"></div>
               </div>
               <span class="font-bold text-slate-700">${prog}%</span>
             </div>
@@ -7259,7 +7087,6 @@
         const done = tasks.filter(t => t.done).length;
         const pct = total === 0 ? 0 : (done / total) * 100;
         const progressEl = document.getElementById('modalTaskProgress');
-        if (progressEl) progressEl.classList.toggle('progress-fill-live', animateProgressBarsOnce);
         progressEl.style.width = `${pct}%`;
         progressEl.style.backgroundColor = progressBarColor(Math.round(pct));
         const pctLabel = document.getElementById('modalTaskProgressLabel');
@@ -7325,7 +7152,6 @@
         });
         const data = await res.json();
         if (data.ok) {
-            animateProgressBarsOnce = true;
             const p = projects.find(x => String(x.id) === String(projectId));
             if (p) p.tareas = data.item.tareas || [];
             if (String(currentProjectId || '') === String(projectId)) {
@@ -7338,7 +7164,6 @@
             renderKanban(projects);
             renderGlobalTasksView(projects);
             renderProjectListView(projects);
-            animateProgressBarsOnce = false;
         }
     }
 
@@ -7592,12 +7417,12 @@
     }
 
     function setProjectModalTab(tab = 'info') {
-      currentProjectModalTab = ['info', 'notes'].includes(tab) ? tab : 'info';
+      currentProjectModalTab = ['info', 'tasks', 'notes'].includes(tab) ? tab : 'info';
       const infoTab = document.getElementById('projectModalInfoTab');
       const tasksTab = document.getElementById('projectModalTasksTab');
       const notesTab = document.getElementById('projectModalNotesTab');
       if (infoTab) infoTab.classList.toggle('hidden', currentProjectModalTab !== 'info');
-      if (tasksTab) tasksTab.classList.add('hidden');
+      if (tasksTab) tasksTab.classList.toggle('hidden', currentProjectModalTab !== 'tasks');
       if (notesTab) notesTab.classList.toggle('hidden', currentProjectModalTab !== 'notes');
 
       document.querySelectorAll('.project-detail-tab').forEach((btn) => {
@@ -7874,7 +7699,6 @@
       const total = Array.isArray(subtasks) ? subtasks.length : 0;
       const done = (Array.isArray(subtasks) ? subtasks : []).filter((item) => !!item.done).length;
       const pct = total ? Math.round((done / total) * 100) : 0;
-      if (progress) progress.classList.toggle('progress-fill-live', animateProgressBarsOnce);
       if (progress) progress.style.width = `${pct}%`;
       if (progressLabel) progressLabel.textContent = `${pct}%`;
       if (!subtasks.length) {
@@ -8182,11 +8006,10 @@
       if (!task) return 0;
       const base = Math.max(0, Number(task.total_seconds || 0));
       const running = getTaskRunningLog(project, task.id);
-      const resetBase = getTaskTimerResetBase(project?.id || currentProjectId, task.id);
-      if (!running) return Math.max(0, base - resetBase);
+      if (!running) return base;
       const start = Number(running.start || 0);
-      if (!start) return Math.max(0, base - resetBase);
-      return Math.max(0, base + Math.max(0, Math.floor(Date.now() / 1000) - start) - resetBase);
+      if (!start) return base;
+      return base + Math.max(0, Math.floor(Date.now() / 1000) - start);
     }
 
     function updateTaskTimerPanels(task = getCurrentTask()) {
@@ -8206,8 +8029,7 @@
         const seconds = getTaskDisplayedSeconds(project, task);
         const timerValue = formatTimer(seconds);
         if (display) display.textContent = timerValue;
-        if (invested) invested.textContent = formatInvestedDh(Math.max(0, Number(task.total_seconds || 0)));
-        setTimerSaveButtonState('taskTimerSaveBtn', seconds > 0);
+        if (invested) invested.textContent = formatInvestedDh(seconds);
       };
 
       if (btn) {
@@ -8686,11 +8508,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) return;
 
-      animateProgressBarsOnce = true;
       syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
-      renderGlobalTasksView(projects);
-      renderProjectListView(projects);
-      animateProgressBarsOnce = false;
     }
 
     async function removeSubtask(subtaskId) {
@@ -9202,7 +9020,6 @@
               const val = formatTimer(totalSeconds);
                 display.innerText = val;
                 syncTimerPanelsDisplay(val);
-                setTimerSaveButtonState('modalTimerSaveBtn', totalSeconds > 0);
                 updateInvestedDisplays(p);
             }, 1000);
         } else {
@@ -9213,7 +9030,6 @@
             const val = formatTimer(totalSeconds);
             display.innerText = val;
             syncTimerPanelsDisplay(val);
-            setTimerSaveButtonState('modalTimerSaveBtn', totalSeconds > 0);
             updateInvestedDisplays(p);
         }
     }

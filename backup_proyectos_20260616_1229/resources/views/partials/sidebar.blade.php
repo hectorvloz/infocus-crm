@@ -96,9 +96,13 @@
               <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="4" width="7" height="7" rx="1.5"/><rect x="3" y="13" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/></svg>
               <span class="text-sm">Kanban</span>
             </a>
-            <a href="{{ route('proyectos.index', ['view' => 'tareas']) }}" class="submenu-link flex items-center gap-3 px-3 py-2 rounded-xl text-white/60 hover:text-white hover:bg-white/5 {{ request()->routeIs('proyectos.*') && request('view') === 'tareas' ? 'is-active' : '' }}">
+            <a href="{{ route('proyectos.index', ['view' => 'lista']) }}" class="submenu-link flex items-center gap-3 px-3 py-2 rounded-xl text-white/60 hover:text-white hover:bg-white/5 {{ request()->routeIs('proyectos.*') && request('view') === 'lista' ? 'is-active' : '' }}">
               <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
               <span class="text-sm">Lista</span>
+            </a>
+            <a href="{{ route('proyectos.index', ['view' => 'tareas']) }}" class="submenu-link flex items-center gap-3 px-3 py-2 rounded-xl text-white/60 hover:text-white hover:bg-white/5 {{ request()->routeIs('proyectos.*') && request('view') === 'tareas' ? 'is-active' : '' }}">
+              <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 12l2.7 2.7L16.5 8.5"/></svg>
+              <span class="text-sm">Tareas</span>
             </a>
           </div>
         </div>

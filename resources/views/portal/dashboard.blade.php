@@ -126,6 +126,110 @@
     font-size: 2.15rem;
     line-height: 1;
   }
+  .portal-project-card {
+    min-height: 14.4rem;
+    border: 1px solid #dbe4f0;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  }
+  .portal-project-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.12);
+  }
+  .portal-project-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(15, 23, 42, 0.52);
+    backdrop-filter: blur(3px);
+  }
+  .portal-project-modal.is-open {
+    display: flex;
+  }
+  .portal-project-dialog {
+    width: min(76rem, 100%);
+    max-height: calc(100vh - 3rem);
+    overflow: hidden;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 26px 70px rgba(15, 23, 42, 0.28);
+  }
+  .portal-project-dialog-body {
+    max-height: calc(100vh - 11rem);
+    overflow: auto;
+  }
+  .portal-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 9999px;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .portal-task-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.8rem;
+    align-items: center;
+  }
+  .portal-project-kanban {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    overflow-x: auto;
+    padding: 0.15rem 0.15rem 0.65rem;
+    cursor: grab;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  .portal-project-kanban.is-dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+  .portal-project-kanban.is-dragging * {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+  .portal-kanban-column {
+    flex: 0 0 17.5rem;
+    max-height: 28rem;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid #dbe4f0;
+    background: linear-gradient(180deg, #f8fafc, #eef3f9);
+  }
+  .portal-kanban-column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid #dbe4f0;
+    padding: 0.85rem 0.95rem;
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 900;
+  }
+  .portal-kanban-column-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    max-height: 23.5rem;
+    overflow-y: auto;
+    padding: 0.75rem;
+  }
+  .portal-kanban-task {
+    border-radius: 0.9rem;
+    border: 1px solid #dbe4f0;
+    background: #fff;
+    padding: 0.85rem;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  }
   @media (max-width: 640px) {
     .portal-whatsapp-fab {
       width: 3.5rem;
@@ -136,6 +240,23 @@
     }
     .portal-whatsapp-fab i {
       font-size: 1.85rem;
+    }
+    .portal-project-modal {
+      padding: 0.75rem;
+      align-items: flex-end;
+    }
+    .portal-project-dialog {
+      max-height: calc(100vh - 1.5rem);
+      border-radius: 1rem 1rem 0.75rem 0.75rem;
+    }
+    .portal-project-dialog-body {
+      max-height: calc(100vh - 11rem);
+    }
+    .portal-task-row {
+      grid-template-columns: 1fr;
+    }
+    .portal-kanban-column {
+      flex-basis: min(17rem, calc(100vw - 3rem));
     }
   }
 </style>
@@ -417,68 +538,164 @@
           <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
           Proyectos Activos
         </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        @php
+          $portalClientName = $client['empresa'] ?? $client['contacto_nombre'] ?? 'Cliente';
+          $portalDate = function ($value, string $format = 'M d, Y') {
+            if (empty($value)) return null;
+            try { return \Carbon\Carbon::parse($value)->format($format); }
+            catch (\Throwable $e) { return null; }
+          };
+          $portalInitials = function (?string $name): string {
+            $clean = trim((string) $name);
+            if ($clean === '') return 'UP';
+            $parts = preg_split('/\s+/', $clean) ?: [];
+            return Str::upper(Str::substr($parts[0] ?? 'U', 0, 1) . Str::substr($parts[1] ?? ($parts[0] ?? 'P'), 0, 1));
+          };
+          $portalStatus = function (?string $due, ?string $priority, bool $done = false) {
+            if ($done) return ['label' => 'Completada', 'class' => 'bg-emerald-50 text-emerald-700 border border-emerald-200'];
+            if ($due) {
+              try {
+                if (\Carbon\Carbon::parse($due)->lt(\Carbon\Carbon::today())) {
+                  return ['label' => 'Vencido', 'class' => 'bg-slate-100 text-slate-700 border border-slate-300'];
+                }
+              } catch (\Throwable $e) {}
+            }
+            if (Str::lower((string) $priority) === 'atención' || Str::lower((string) $priority) === 'atencion') {
+              return ['label' => 'Atención', 'class' => 'bg-amber-50 text-amber-700 border border-amber-300'];
+            }
+            if (!$due) return ['label' => 'Sin fecha', 'class' => 'bg-slate-400 text-white border border-slate-400'];
+            return ['label' => (string) ($priority ?: 'En curso'), 'class' => 'bg-emerald-50 text-emerald-700 border border-emerald-200'];
+          };
+          $portalKanbanStages = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
+          $portalProjectsPayload = [];
+        @endphp
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           @forelse($projects as $p)
             @php
-              $riesgo = $p['riesgo'] ?? 'verde';
-              $riesgoColor = ['verde'=>'bg-emerald-500','amarillo'=>'bg-amber-400','rojo'=>'bg-rose-500'][$riesgo] ?? 'bg-slate-300';
-              $riesgoLabel = ['verde'=>'En curso','amarillo'=>'Atención','rojo'=>'En riesgo'][$riesgo] ?? 'Normal';
-              $hitos = $p['hitos'] ?? [];
-              $entregables = $p['entregables'] ?? [];
-              $pct = (int)($p['progreso'] ?? 0);
-              $barColor = $pct >= 75 ? 'bg-emerald-500' : ($pct >= 40 ? 'bg-amber-400' : 'bg-rose-400');
+              $tasks = collect($p['tareas'] ?? [])->filter(fn($task) => is_array($task))->values();
+              $taskCount = $tasks->count();
+              $doneCount = $tasks->filter(fn($task) => !empty($task['done'] ?? $task['completado'] ?? false))->count();
+              $pct = $taskCount > 0 ? (int) round(($doneCount / $taskCount) * 100) : (int)($p['progreso'] ?? 0);
+              $dateStart = $portalDate($p['inicio'] ?? null);
+              $dateEnd = $portalDate($p['vencimiento'] ?? null);
+              $dateRange = $dateStart && $dateEnd ? "{$dateStart} – {$dateEnd}" : ($dateStart ?: ($dateEnd ?: '— — —'));
+              $status = $portalStatus($p['vencimiento'] ?? null, $p['prioridad'] ?? $p['riesgo'] ?? null, $pct >= 100 && $taskCount > 0);
+              $owner = (string) ($p['miembro'] ?? $p['responsable'] ?? $tasks->pluck('owners.0')->filter()->first() ?? $portalClientName);
+              $avatar = $portalInitials($owner);
+              $barColor = $pct >= 100 ? 'bg-emerald-500' : ($pct >= 60 ? 'bg-lime-400' : ($pct > 0 ? 'bg-rose-500' : 'bg-slate-200'));
+              $projectTasksPayload = $tasks->map(function ($task) use ($portalDate, $portalStatus) {
+                $taskDone = (bool) ($task['done'] ?? $task['completado'] ?? false);
+                $due = $task['due_date'] ?? $task['end_date'] ?? $task['fecha'] ?? null;
+                $status = $portalStatus($due, $task['priority'] ?? $task['prioridad'] ?? null, $taskDone);
+                return [
+                  'title' => (string) ($task['texto'] ?? $task['titulo'] ?? $task['nombre'] ?? 'Tarea'),
+                  'stage' => (string) ($task['board_stage'] ?? 'Por hacer'),
+                  'due' => $portalDate($due, 'd M, Y'),
+                  'status' => $status['label'],
+                  'statusClass' => $status['class'],
+                  'done' => $taskDone,
+                ];
+              })->values()->all();
+              $projectStagesPayload = collect($portalKanbanStages)
+                ->merge($tasks->pluck('board_stage')->filter())
+                ->unique()
+                ->values()
+                ->map(function ($stage) use ($projectTasksPayload) {
+                  return [
+                    'title' => (string) $stage,
+                    'tasks' => collect($projectTasksPayload)->filter(fn($task) => (string)($task['stage'] ?? '') === (string)$stage)->values()->all(),
+                  ];
+                })
+                ->values()
+                ->all();
+              $portalProjectsPayload[$p['id'] ?? $loop->index] = [
+                'id' => (string) ($p['id'] ?? $loop->index),
+                'title' => (string) ($p['titulo'] ?? 'Proyecto'),
+                'client' => (string) $portalClientName,
+                'stage' => (string) ($p['etapa'] ?? 'INICIO'),
+                'dateRange' => $dateRange,
+                'progress' => $pct,
+                'doneCount' => $doneCount,
+                'taskCount' => $taskCount,
+                'status' => $status['label'],
+                'statusClass' => $status['class'],
+                'tasks' => $projectTasksPayload,
+                'columns' => $projectStagesPayload,
+              ];
             @endphp
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-              <div class="flex justify-between items-start mb-3">
-                <div>
-                  <h3 class="font-bold text-slate-900">{{ $p['titulo'] }}</h3>
-                  @if(!empty($p['miembro']))<div class="text-xs text-slate-400 mt-0.5">Responsable: {{ $p['miembro'] }}</div>@endif
+            <button type="button" class="portal-project-card group w-full rounded-2xl bg-white p-5 text-left transition-all" data-portal-project-id="{{ $p['id'] ?? $loop->index }}">
+              <div class="mb-5 flex items-start justify-between gap-4">
+                <span class="text-xs font-bold text-slate-400">{{ $dateRange }}</span>
+                <span class="text-slate-300">
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+                </span>
+              </div>
+              <h3 class="line-clamp-2 text-lg font-black leading-tight text-slate-950">{{ $p['titulo'] ?? 'Proyecto' }}</h3>
+              <p class="mt-1 text-sm font-bold uppercase text-slate-500">{{ $p['etapa'] ?? 'INICIO' }}</p>
+              <div class="mt-4">
+                <div class="mb-1.5 flex items-center justify-between text-xs font-black text-slate-700">
+                  <span>Progreso</span>
+                  <span>{{ $pct }}%</span>
                 </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <span class="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600 uppercase">{{ $p['etapa'] }}</span>
-                  <div class="flex items-center gap-1"><div class="w-2.5 h-2.5 rounded-full {{ $riesgoColor }}"></div><span class="text-xs text-slate-400">{{ $riesgoLabel }}</span></div>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div class="h-full rounded-full {{ $barColor }}" style="width: {{ $pct }}%"></div>
                 </div>
               </div>
-              <div class="mb-3">
-                <div class="flex justify-between text-xs text-slate-500 mb-1"><span>Progreso</span><span class="font-bold">{{ $pct }}%</span></div>
-                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div class="progress-fill-anim {{ $barColor }} h-2 rounded-full" style="width:{{ $pct }}%"></div></div>
+              <div class="mt-3 flex items-center justify-between text-xs font-bold text-slate-500">
+                <span>{{ $taskCount }} {{ $taskCount === 1 ? 'tarea' : 'tareas' }}</span>
+                <span>Vista Kanban</span>
               </div>
-              <div class="flex gap-4 text-xs text-slate-500 mb-3">
-                @if(!empty($p['inicio']))<span>Inicio: <span class="font-medium text-slate-700">{{ \Carbon\Carbon::parse($p['inicio'])->format('d M, Y') }}</span></span>@endif
-                @if(!empty($p['vencimiento']))<span>Vence: <span class="font-medium {{ \Carbon\Carbon::parse($p['vencimiento'])->isPast() ? 'text-rose-600' : 'text-slate-700' }}">{{ \Carbon\Carbon::parse($p['vencimiento'])->format('d M, Y') }}</span></span>@endif
+              <div class="mt-4 flex items-center justify-between gap-3">
+                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-black text-slate-600">{{ $avatar }}</span>
+                <span class="portal-status-pill {{ $status['class'] }}">{{ $status['label'] }}</span>
               </div>
-              @if(!empty($hitos))
-                <div class="mb-3">
-                  <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Hitos</div>
-                  <div class="space-y-1">
-                    @foreach($hitos as $hito)
-                      @php $hitoDone = !empty($hito['done'] ?? $hito['completado'] ?? false); @endphp
-                      <div class="flex items-center gap-2 text-sm">
-                        <div class="w-4 h-4 rounded-full border-2 flex-shrink-0 {{ $hitoDone ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300' }} flex items-center justify-center">
-                          @if($hitoDone)<svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>@endif
-                        </div>
-                        <span class="{{ $hitoDone ? 'line-through text-slate-400' : 'text-slate-700' }}">{{ is_array($hito) ? ($hito['titulo'] ?? '') : $hito }}</span>
-                        @if(is_array($hito) && !empty($hito['fecha']))<span class="text-xs text-slate-400 ml-auto">{{ \Carbon\Carbon::parse($hito['fecha'])->format('d M') }}</span>@endif
-                      </div>
-                    @endforeach
-                  </div>
-                </div>
-              @endif
-              @if(!empty($entregables))
-                <div>
-                  <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Entregables</div>
-                  <div class="flex flex-wrap gap-1.5">
-                    @foreach($entregables as $ent)
-                      @php $entDone = !empty($ent['done'] ?? $ent['completado'] ?? false); @endphp
-                      <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $entDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">{{ is_array($ent) ? ($ent['titulo'] ?? '') : $ent }}</span>
-                    @endforeach
-                  </div>
-                </div>
-              @endif
-            </div>
+            </button>
           @empty
             <div class="col-span-full bg-white rounded-2xl p-8 text-center text-slate-400 border border-dashed border-slate-200">No hay proyectos activos.</div>
           @endforelse
+        </div>
+        <script type="application/json" id="portal-projects-json">@json($portalProjectsPayload)</script>
+      </div>
+
+      <div id="portal-project-modal" class="portal-project-modal" aria-hidden="true">
+        <div class="portal-project-dialog" role="dialog" aria-modal="true" aria-labelledby="portal-project-title">
+          <div class="border-b border-slate-100 p-5 sm:p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p id="portal-project-dates" class="mb-2 text-xs font-black text-slate-400"></p>
+                <h3 id="portal-project-title" class="text-2xl font-black leading-tight text-slate-950"></h3>
+                <p id="portal-project-meta" class="mt-1 text-sm font-bold uppercase text-slate-500"></p>
+              </div>
+              <button type="button" class="rounded-full border border-slate-200 p-2.5 text-slate-400 hover:bg-slate-50 hover:text-slate-700" data-close-portal-project aria-label="Cerrar proyecto">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.4" d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="portal-project-dialog-body p-5 sm:p-6">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Progreso</p>
+                <p id="portal-project-progress" class="mt-2 text-2xl font-black text-slate-950"></p>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">Tareas</p>
+                <p id="portal-project-task-total" class="mt-2 text-2xl font-black text-slate-950"></p>
+              </div>
+            </div>
+            <div class="mt-4">
+              <span id="portal-project-status" class="portal-status-pill"></span>
+            </div>
+            <div class="mt-6">
+              <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Vista Kanban</p>
+                <p class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-500">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 7V3m4 4V3m4 5V4a2 2 0 114 0v8a8 8 0 01-8 8H9a6 6 0 01-6-6v-3a2 2 0 114 0v2"/></svg>
+                  Arrastra para moverte
+                </p>
+              </div>
+              <div id="portal-project-tasks" class="portal-project-kanban" aria-label="Vista previa Kanban del proyecto"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -769,6 +986,135 @@ if (window.flatpickr) {
   });
 }
 function scrollToId(id) { const el = document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth'}); }
+// Project preview modal for the client portal.
+(function () {
+  const raw = document.getElementById('portal-projects-json');
+  const modal = document.getElementById('portal-project-modal');
+  if (!raw || !modal) return;
+
+  let projects = {};
+  try {
+    projects = JSON.parse(raw.textContent || '{}');
+  } catch (error) {
+    projects = {};
+  }
+
+  const title = document.getElementById('portal-project-title');
+  const dates = document.getElementById('portal-project-dates');
+  const meta = document.getElementById('portal-project-meta');
+  const progress = document.getElementById('portal-project-progress');
+  const taskTotal = document.getElementById('portal-project-task-total');
+  const status = document.getElementById('portal-project-status');
+  const tasks = document.getElementById('portal-project-tasks');
+
+  const close = () => {
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+  };
+
+  const open = (project) => {
+    if (!project) return;
+    title.textContent = project.title || 'Proyecto';
+    dates.textContent = project.dateRange || '— — —';
+    meta.textContent = `${project.client || 'Cliente'} · ${project.stage || 'INICIO'}`;
+    progress.textContent = `${project.progress || 0}%`;
+    taskTotal.textContent = `${project.taskCount || 0} ${(project.taskCount || 0) === 1 ? 'tarea' : 'tareas'}`;
+    status.textContent = project.status || 'Sin fecha';
+    status.className = `portal-status-pill ${project.statusClass || 'bg-slate-100 text-slate-700 border border-slate-200'}`;
+
+    const columns = Array.isArray(project.columns) ? project.columns : [];
+    tasks.innerHTML = columns.length
+      ? columns.map((column) => {
+          const columnTasks = Array.isArray(column.tasks) ? column.tasks : [];
+          return `
+            <section class="portal-kanban-column" aria-label="${escapeAttribute(column.title || 'Columna')}">
+              <div class="portal-kanban-column-header">
+                <span class="truncate">${escapeHtml(column.title || 'Columna')}</span>
+                <span class="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-black text-slate-500 shadow-sm">${columnTasks.length}</span>
+              </div>
+              <div class="portal-kanban-column-body">
+                ${columnTasks.length ? columnTasks.map((task) => `
+                  <article class="portal-kanban-task">
+                    <div class="flex items-start gap-2">
+                      <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${task.done ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-300 text-transparent'}">
+                        <svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <p class="line-clamp-3 text-sm font-black leading-snug text-slate-950">${escapeHtml(task.title || 'Tarea')}</p>
+                        <p class="mt-1 text-xs font-semibold text-slate-400">${task.due ? `Vence: ${escapeHtml(task.due)}` : 'Sin fecha'}</p>
+                        <span class="portal-status-pill mt-2 ${escapeAttribute(task.statusClass || 'bg-slate-100 text-slate-700 border border-slate-200')}">${escapeHtml(task.status || 'Sin fecha')}</span>
+                      </div>
+                    </div>
+                  </article>
+                `).join('') : '<div class="rounded-xl border border-dashed border-slate-200 bg-white/70 p-4 text-center text-xs font-bold text-slate-400">Sin tareas</div>'}
+              </div>
+            </section>
+          `;
+        }).join('')
+      : '<div class="min-w-full rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm font-semibold text-slate-400">No hay tareas visibles para este proyecto.</div>';
+    enablePortalKanbanDrag(tasks);
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+  };
+
+  const escapeHtml = (value) => String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+
+  const escapeAttribute = (value) => escapeHtml(value).replaceAll('`', '&#096;');
+
+  const enablePortalKanbanDrag = (board) => {
+    if (!board || board.dataset.dragReady === '1') return;
+    board.dataset.dragReady = '1';
+    let active = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
+    board.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 && event.pointerType === 'mouse') return;
+      active = true;
+      startX = event.clientX;
+      scrollLeft = board.scrollLeft;
+      board.classList.add('is-dragging');
+      board.setPointerCapture?.(event.pointerId);
+    });
+
+    board.addEventListener('pointermove', (event) => {
+      if (!active) return;
+      event.preventDefault();
+      board.scrollLeft = scrollLeft - (event.clientX - startX);
+    });
+
+    const stop = (event) => {
+      if (!active) return;
+      active = false;
+      board.classList.remove('is-dragging');
+      board.releasePointerCapture?.(event.pointerId);
+    };
+
+    board.addEventListener('pointerup', stop);
+    board.addEventListener('pointercancel', stop);
+    board.addEventListener('pointerleave', stop);
+  };
+
+  document.querySelectorAll('[data-portal-project-id]').forEach((button) => {
+    button.addEventListener('click', () => open(projects[button.dataset.portalProjectId]));
+  });
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal || event.target.closest('[data-close-portal-project]')) close();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal.classList.contains('is-open')) close();
+  });
+})();
 // Close avatar dropdown on outside click
 document.addEventListener('click', function(e) {
   const wrap = document.getElementById('avatar-menu-wrap');

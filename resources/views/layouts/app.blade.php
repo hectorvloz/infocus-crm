@@ -1862,7 +1862,7 @@
           </button>
           <button id="headerRemindersBtn" type="button" class="relative inline-flex items-center justify-center h-11 w-11 rounded-full bg-[#111729] shadow-sm hover:shadow-md transition-all border border-[#111729] text-[#f2fda2] hover:text-[#f2fda2]" title="Recordatorios" aria-label="Recordatorios">
             <i class="fa-solid fa-list-check text-[18px] leading-none" aria-hidden="true"></i>
-            <span id="headerRemindersCount" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#f2fda2] text-slate-900 text-[10px] leading-[18px] text-center font-bold">0</span>
+            <span id="headerRemindersCount" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] leading-[18px] text-center font-bold">0</span>
           </button>
           <div class="relative">
             <button id="headerProfileBtn" type="button" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 font-bold shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-700 hover:text-slate-900" title="Mi perfil" aria-label="Mi perfil">
@@ -1881,14 +1881,6 @@
                     <div class="text-sm font-bold text-slate-900 truncate">{{ $headerUserName }}</div>
                     <div class="text-xs text-slate-500 truncate">{{ $headerUserEmail !== '' ? $headerUserEmail : 'Sin email' }}</div>
                   </div>
-                </div>
-              </div>
-              <div class="px-2 py-2">
-                <div class="text-[11px] uppercase tracking-wider font-bold text-slate-500 mb-2">Estado rápido</div>
-                <div class="grid grid-cols-3 gap-2">
-                  <button type="button" data-presence-status="available" class="profile-status-btn rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700">Disponible</button>
-                  <button type="button" data-presence-status="focus" class="profile-status-btn rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700">En foco</button>
-                  <button type="button" data-presence-status="away" class="profile-status-btn rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700">Ausente</button>
                 </div>
               </div>
               <div class="border-t border-slate-100 pt-1">
@@ -2327,6 +2319,7 @@
       const reminderAddSectionBtn = document.getElementById('reminderAddSectionBtn');
       const reminderLinkDropdown = document.getElementById('reminderLinkDropdown');
       const reminderComposerLinkPreview = document.getElementById('reminderComposerLinkPreview');
+      const remindersScrollArea = remindersList?.parentElement;
 
       const profileBtn = document.getElementById('headerProfileBtn');
       const profileMenu = document.getElementById('headerProfileMenu');
@@ -2356,6 +2349,8 @@
       let reminderPendingLink = null;
       let activeReminderCategoryId = 'default-cat';
       let activeReminderSectionId = 'default';
+      let reminderPopoverBusyUntil = 0;
+      let reminderDatePickerOpen = false;
       const ALL_REMINDERS_CATEGORY_ID = '__all__';
 
       function escapeHtml(value) {
@@ -2496,6 +2491,22 @@
         });
       }
 
+      function isReminderSectionCollapsed(sectionId) {
+        const section = reminderSections.find((item) => String(item.id) === String(sectionId));
+        if (!section) return false;
+        const title = String(section.title || '').trim();
+        const isImplicitSection = !title || title.toLowerCase() === 'recordatorios';
+        return !!section.collapsed && !isImplicitSection;
+      }
+
+      function syncReminderAddZonesVisibility(hiddenSectionId = '') {
+        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((zone) => {
+          const sectionId = zone.getAttribute('data-reminder-section-add') || '';
+          const shouldHide = String(sectionId) === String(hiddenSectionId) || isReminderSectionCollapsed(sectionId);
+          zone.classList.toggle('hidden', shouldHide);
+        });
+      }
+
       function openReminderComposer(sectionId = activeReminderSectionId, afterReminderId = '') {
         activeReminderSectionId = sectionId || activeReminderSectionId;
         const targetRow = afterReminderId
@@ -2513,21 +2524,38 @@
           reminderComposer.dataset.sectionId = activeReminderSectionId || '';
           reminderComposer.dataset.afterReminderId = afterReminderId || '';
         }
-        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((zone) => {
-          zone.classList.toggle('hidden', zone.getAttribute('data-reminder-section-add') === activeReminderSectionId);
-        });
+        syncReminderAddZonesVisibility(activeReminderSectionId);
         reminderShowComposerBtn?.classList.add('hidden');
         reminderComposer?.classList.remove('hidden');
         reminderComposer?.classList.add('flex');
-        setTimeout(() => reminderNewText?.focus(), 0);
+        setTimeout(() => {
+          scrollReminderComposerIntoView();
+          reminderNewText?.focus();
+        }, 0);
       }
 
-      function closeReminderComposerIfEmpty() {
+      function scrollReminderComposerIntoView() {
+        if (!reminderComposer || !remindersScrollArea) return;
+        const composerRect = reminderComposer.getBoundingClientRect();
+        const areaRect = remindersScrollArea.getBoundingClientRect();
+        const bottomGap = 28;
+        const topGap = 14;
+        if (composerRect.bottom > areaRect.bottom - bottomGap) {
+          remindersScrollArea.scrollTop += composerRect.bottom - areaRect.bottom + bottomGap;
+          return;
+        }
+        if (composerRect.top < areaRect.top + topGap) {
+          remindersScrollArea.scrollTop -= areaRect.top + topGap - composerRect.top;
+        }
+      }
+
+      function closeReminderComposerIfEmpty(options = {}) {
+        const force = !!options.force;
         if ((reminderNewText?.value || '').trim()) return;
         if ((reminderNewPriority?.value || '').trim()) return;
         if ((reminderNewDate?.value || '').trim()) return;
         if (reminderPendingLink) return;
-        if (reminderPriorityDropdown && !reminderPriorityDropdown.classList.contains('hidden')) return;
+        if (!force && isReminderPopoverActive()) return;
         reminderComposer?.classList.add('hidden');
         reminderComposer?.classList.remove('flex');
         if (reminderComposer) {
@@ -2535,7 +2563,7 @@
           reminderComposer.dataset.afterReminderId = '';
         }
         reminderShowComposerBtn?.classList.add('hidden');
-        remindersList?.querySelectorAll('[data-reminder-section-add]').forEach((zone) => zone.classList.remove('hidden'));
+        syncReminderAddZonesVisibility();
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
         clearReminderPendingLink();
@@ -2562,8 +2590,25 @@
         readyHandlers.push((_selectedDates, _dateStr, instance) => {
           if (instance?.altInput) {
             instance._positionElement = instance.altInput;
+            instance.altInput.classList.add('reminder-date-trigger');
+            instance.altInput.addEventListener('pointerdown', (event) => {
+              markReminderPopoverBusy(900);
+              event.stopPropagation();
+            });
+            instance.altInput.addEventListener('click', (event) => {
+              markReminderPopoverBusy(900);
+              event.stopPropagation();
+            });
           }
           instance?.calendarContainer?.classList.add('reminder-date-calendar');
+          instance?.calendarContainer?.addEventListener('pointerdown', (event) => {
+            markReminderPopoverBusy(900);
+            event.stopPropagation();
+          });
+          instance?.calendarContainer?.addEventListener('click', (event) => {
+            markReminderPopoverBusy(900);
+            event.stopPropagation();
+          });
         });
         return flatpickr(input, {
           dateFormat: 'Y-m-d',
@@ -2575,14 +2620,58 @@
           positionElement: input,
           onReady: readyHandlers,
           onOpen: () => {
+            reminderDatePickerOpen = true;
+            markReminderPopoverBusy(900);
             hideReminderLinkDropdown();
             hideReminderPriorityDropdown();
             hideReminderRowPriorityDropdowns();
+          },
+          onClose: () => {
+            markReminderPopoverBusy(900);
+            setTimeout(() => {
+              reminderDatePickerOpen = false;
+            }, 120);
           },
           onChange: (_selectedDates, dateStr) => {
             if (typeof onChange === 'function') onChange(dateStr || '');
           },
         });
+      }
+
+      function markReminderPopoverBusy(duration = 240) {
+        reminderPopoverBusyUntil = Date.now() + duration;
+      }
+
+      function isReminderPopoverActive() {
+        if (reminderDatePickerOpen) return true;
+        if (Date.now() < reminderPopoverBusyUntil) return true;
+        if (reminderPriorityDropdown && !reminderPriorityDropdown.classList.contains('hidden')) return true;
+        if (remindersList?.querySelector('[data-reminder-priority-menu]:not(.hidden)')) return true;
+        if (document.querySelector('.flatpickr-calendar.open')) return true;
+        return false;
+      }
+
+      function forceCloseEmptyReminderComposer() {
+        if (document.activeElement instanceof HTMLElement && reminderComposer?.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+        reminderDatePickerOpen = false;
+        reminderPopoverBusyUntil = 0;
+        closeReminderComposerIfEmpty({ force: true });
+      }
+
+      function settleReminderComposerOnExit(options = {}) {
+        const force = !!options.force;
+        if (!force && isReminderPopoverActive()) return;
+        if (document.activeElement instanceof HTMLElement && reminderComposer?.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+        const text = reminderNewText?.value || '';
+        if (String(text).trim()) {
+          addReminder(text, reminderNewPriority?.value || '', reminderNewDate?.value || '', null, { openNext: false });
+          return;
+        }
+        forceCloseEmptyReminderComposer();
       }
 
       function renderRemindersCounter() {
@@ -2785,7 +2874,7 @@
           const title = String(section.title || '').trim();
           const isImplicitSection = !title || title.toLowerCase() === 'recordatorios';
           const itemHtml = items.map((item) => reminderItemHtml(item, section.id)).join('');
-          return `<section class="${isImplicitSection ? '' : 'mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'}" data-reminder-section="${escapeHtml(section.id)}">
+          return `<section class="${isImplicitSection ? '' : 'mt-6 border-t-2 border-slate-100 pt-5 first:mt-0 first:border-t-0 first:pt-0'}" data-reminder-section="${escapeHtml(section.id)}">
             <div class="${isImplicitSection ? 'hidden' : 'flex'} items-center justify-between gap-2">
               <button type="button" data-reminder-section-collapse="${escapeHtml(section.id)}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-700" title="${collapsed ? 'Abrir lista' : 'Compactar lista'}" aria-label="${collapsed ? 'Abrir lista' : 'Compactar lista'}">
                 <svg class="h-3 w-3 transition-transform ${collapsed ? '-rotate-90' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
@@ -2795,8 +2884,9 @@
               <button type="button" data-reminder-section-delete="${escapeHtml(section.id)}" class="text-slate-300 hover:text-rose-500 text-sm font-bold ${siblingSections.length <= 1 ? 'hidden' : ''}">×</button>
             </div>
             <div class="${collapsed && !isImplicitSection ? 'hidden' : ''} ${isImplicitSection ? 'mt-0' : 'mt-2'} space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
-            <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="${collapsed && !isImplicitSection ? 'hidden' : ''} group mt-2 block h-8 w-full rounded-lg border-b border-slate-100 text-left transition hover:bg-slate-50/60" title="Añadir recordatorio" aria-label="Añadir recordatorio">
-              <span class="sr-only">Añadir recordatorio</span>
+            <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="${collapsed && !isImplicitSection ? 'hidden' : ''} group mt-1 flex h-8 w-full items-center gap-2.5 py-1 text-left" title="Añadir recordatorio" aria-label="Añadir recordatorio">
+              <span class="ml-0.5 inline-flex h-6 w-6 shrink-0 rounded-full border-2 border-dotted border-slate-300 bg-white/10 transition-colors group-hover:border-slate-400"></span>
+              <span class="pointer-events-none text-sm font-medium text-slate-300 opacity-0 group-hover:opacity-100">Nuevo recordatorio</span>
             </button>
           </section>`;
         };
@@ -2864,7 +2954,11 @@
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
         saveReminders();
-        openReminderComposer(targetSectionId, reminder.id);
+        if (options.openNext !== false) {
+          openReminderComposer(targetSectionId, reminder.id);
+        } else {
+          closeReminderComposerIfEmpty({ force: true });
+        }
         return reminder.id;
       }
 
@@ -3030,6 +3124,51 @@
 
       function bindReminderRows() {
         let draggedReminderId = '';
+        const clearReminderDropMarkers = () => {
+          remindersList?.querySelectorAll('[data-reminder-id]').forEach((row) => {
+            row.classList.remove('bg-[#f4fdac]/35');
+            row.style.boxShadow = '';
+          });
+          remindersList?.querySelectorAll('[data-reminder-section-items], [data-reminder-section-add]').forEach((node) => {
+            node.classList.remove('bg-[#f4fdac]/20', 'ring-2', 'ring-[#dff75f]/60');
+          });
+        };
+        const getReminderDropPlacement = (row, event) => {
+          const rect = row.getBoundingClientRect();
+          return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+        };
+        const showReminderDropMarker = (row, placement) => {
+          clearReminderDropMarkers();
+          row.style.boxShadow = placement === 'before'
+            ? 'inset 0 2px 0 #dff75f'
+            : 'inset 0 -2px 0 #dff75f';
+        };
+        const moveReminder = (sourceId, targetSectionId, targetId = '', placement = 'after') => {
+          if (!sourceId) return false;
+          const dragged = reminders.find((item) => String(item.id) === String(sourceId));
+          if (!dragged) return false;
+          const next = reminders.filter((item) => String(item.id) !== String(sourceId));
+          const moved = { ...dragged, sectionId: targetSectionId || dragged.sectionId || activeReminderSectionId, updatedAt: Date.now() };
+
+          if (targetId && String(targetId) !== String(sourceId)) {
+            const targetIndex = next.findIndex((item) => String(item.id) === String(targetId));
+            if (targetIndex >= 0) {
+              next.splice(placement === 'after' ? targetIndex + 1 : targetIndex, 0, moved);
+              reminders = next;
+              return true;
+            }
+          }
+
+          let lastSectionIndex = -1;
+          next.forEach((item, index) => {
+            if (String(item.sectionId || 'default') === String(moved.sectionId || 'default')) {
+              lastSectionIndex = index;
+            }
+          });
+          next.splice(lastSectionIndex >= 0 ? lastSectionIndex + 1 : next.length, 0, moved);
+          reminders = next;
+          return true;
+        };
         remindersList?.querySelectorAll('[data-reminder-category-collapse]').forEach((btn) => {
           btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-reminder-category-collapse') || '';
@@ -3052,21 +3191,46 @@
           btn.addEventListener('click', () => {
             openReminderComposer(btn.getAttribute('data-reminder-section-add') || activeReminderSectionId);
           });
+          btn.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            clearReminderDropMarkers();
+            btn.classList.add('bg-[#f4fdac]/20', 'ring-2', 'ring-[#dff75f]/60');
+          });
+          btn.addEventListener('dragleave', () => {
+            btn.classList.remove('bg-[#f4fdac]/20', 'ring-2', 'ring-[#dff75f]/60');
+          });
+          btn.addEventListener('drop', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const sourceId = draggedReminderId || event.dataTransfer?.getData('text/plain') || '';
+            const sectionId = btn.getAttribute('data-reminder-section-add') || activeReminderSectionId;
+            if (moveReminder(sourceId, sectionId)) {
+              draggedReminderId = '';
+              clearReminderDropMarkers();
+              saveReminders();
+            }
+          });
         });
         remindersList?.querySelectorAll('[data-reminder-section-items]').forEach((box) => {
           box.addEventListener('dragover', (event) => {
             event.preventDefault();
+            if (event.target?.closest?.('[data-reminder-id]')) return;
+            clearReminderDropMarkers();
+            box.classList.add('bg-[#f4fdac]/20');
+          });
+          box.addEventListener('dragleave', () => {
+            box.classList.remove('bg-[#f4fdac]/20');
           });
           box.addEventListener('drop', (event) => {
             event.preventDefault();
+            if (event.target?.closest?.('[data-reminder-id]')) return;
             if (!draggedReminderId) return;
             const sectionId = box.getAttribute('data-reminder-section-items') || activeReminderSectionId;
-            const dragged = reminders.find((item) => item.id === draggedReminderId);
-            if (!dragged) return;
-            reminders = reminders.filter((item) => item.id !== draggedReminderId);
-            reminders.push({ ...dragged, sectionId, updatedAt: Date.now() });
-            draggedReminderId = '';
-            saveReminders();
+            if (moveReminder(draggedReminderId, sectionId)) {
+              draggedReminderId = '';
+              clearReminderDropMarkers();
+              saveReminders();
+            }
           });
         });
         remindersList?.querySelectorAll('[data-reminder-id]').forEach((row) => {
@@ -3078,30 +3242,32 @@
           });
           row.addEventListener('dragend', () => {
             row.classList.remove('opacity-50', 'bg-slate-50');
+            clearReminderDropMarkers();
           });
           row.addEventListener('dragover', (event) => {
             event.preventDefault();
-            row.classList.add('bg-[#f4fdac]/35');
+            const sourceId = draggedReminderId || event.dataTransfer?.getData('text/plain') || '';
+            const targetId = row.getAttribute('data-reminder-id') || '';
+            if (!sourceId || sourceId === targetId) return;
+            showReminderDropMarker(row, getReminderDropPlacement(row, event));
           });
           row.addEventListener('dragleave', () => {
-            row.classList.remove('bg-[#f4fdac]/35');
+            row.style.boxShadow = '';
           });
           row.addEventListener('drop', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            row.classList.remove('bg-[#f4fdac]/35');
+            row.style.boxShadow = '';
             const sourceId = draggedReminderId || event.dataTransfer?.getData('text/plain') || '';
             const targetId = row.getAttribute('data-reminder-id') || '';
             const targetSectionId = row.getAttribute('data-reminder-section-id') || activeReminderSectionId;
             if (!sourceId || !targetId || sourceId === targetId) return;
-            const dragged = reminders.find((item) => item.id === sourceId);
-            if (!dragged) return;
-            const without = reminders.filter((item) => item.id !== sourceId);
-            const targetIndex = without.findIndex((item) => item.id === targetId);
-            without.splice(Math.max(0, targetIndex), 0, { ...dragged, sectionId: targetSectionId, updatedAt: Date.now() });
-            reminders = without;
-            draggedReminderId = '';
-            saveReminders();
+            const placement = getReminderDropPlacement(row, event);
+            if (moveReminder(sourceId, targetSectionId, targetId, placement)) {
+              draggedReminderId = '';
+              clearReminderDropMarkers();
+              saveReminders();
+            }
           });
         });
         remindersList?.querySelectorAll('[data-reminder-toggle]').forEach((btn) => {
@@ -3175,9 +3341,12 @@
         remindersList?.querySelectorAll('[data-reminder-priority-edit]').forEach((btn) => {
           btn.addEventListener('pointerdown', (event) => {
             event.preventDefault();
+            event.stopPropagation();
+            markReminderPopoverBusy();
           });
           btn.addEventListener('click', (event) => {
             event.stopPropagation();
+            markReminderPopoverBusy();
             const id = btn.getAttribute('data-reminder-priority-edit') || '';
             const menu = remindersList.querySelector(`[data-reminder-priority-menu="${CSS.escape(id)}"]`);
             const shouldOpen = menu?.classList.contains('hidden');
@@ -3188,9 +3357,27 @@
             if (menu) menu.classList.toggle('hidden', !shouldOpen);
           });
         });
-        remindersList?.querySelectorAll('[data-reminder-priority-set]').forEach((btn) => {
-          btn.addEventListener('click', (event) => {
+        remindersList?.querySelectorAll('[data-reminder-priority-menu]').forEach((menu) => {
+          menu.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
             event.stopPropagation();
+            markReminderPopoverBusy();
+          });
+          menu.addEventListener('click', (event) => {
+            event.stopPropagation();
+            markReminderPopoverBusy();
+          });
+        });
+        remindersList?.querySelectorAll('[data-reminder-priority-set]').forEach((btn) => {
+          btn.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            markReminderPopoverBusy();
+          });
+          btn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            markReminderPopoverBusy();
             const id = btn.getAttribute('data-reminder-priority-set') || '';
             const value = normalizeReminderPriority(btn.getAttribute('data-reminder-priority-value') || '');
             reminders = reminders.map((item) => item.id === id ? { ...item, priority: value, updatedAt: Date.now() } : item);
@@ -3200,9 +3387,10 @@
         });
         remindersList?.querySelectorAll('[data-reminder-date]').forEach((input) => {
           const picker = initReminderDatePicker(input, (dateStr) => {
+            markReminderPopoverBusy();
             const id = input.getAttribute('data-reminder-date');
             reminders = reminders.map((item) => item.id === id ? { ...item, dueDate: dateStr, updatedAt: Date.now() } : item);
-            saveReminders();
+            persistRemindersOnly();
           });
           if (picker) return;
           input.addEventListener('change', () => {
@@ -3601,7 +3789,7 @@
         setTimeout(() => {
           const active = document.activeElement;
           if (active && reminderComposer.contains(active)) return;
-          closeReminderComposerIfEmpty();
+          settleReminderComposerOnExit();
         }, 80);
       });
       reminderAddCategoryBtn?.addEventListener('click', () => {
@@ -3623,17 +3811,32 @@
       });
       reminderPriorityBtn?.addEventListener('pointerdown', (event) => {
         event.preventDefault();
+        event.stopPropagation();
+        markReminderPopoverBusy();
       });
       reminderPriorityBtn?.addEventListener('click', (event) => {
         event.stopPropagation();
+        markReminderPopoverBusy();
         closeReminderDatePickers();
         reminderPriorityDropdown?.classList.toggle('hidden');
         hideReminderLinkDropdown();
         hideReminderRowPriorityDropdowns();
       });
+      reminderPriorityDropdown?.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        markReminderPopoverBusy();
+      });
       reminderPriorityDropdown?.querySelectorAll('[data-reminder-priority-option]').forEach((btn) => {
-        btn.addEventListener('click', (event) => {
+        btn.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
           event.stopPropagation();
+          markReminderPopoverBusy();
+        });
+        btn.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          markReminderPopoverBusy();
           const value = normalizeReminderPriority(btn.getAttribute('data-reminder-priority-option') || '');
           updateReminderPriorityPicker(value);
           hideReminderPriorityDropdown();
@@ -3642,6 +3845,7 @@
       initReminderDatePicker(reminderNewDate);
       reminderNewText?.addEventListener('input', () => {
         maybeShowReminderLinkDropdown(reminderNewText);
+        scrollReminderComposerIntoView();
       });
       reminderNewText?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -3714,7 +3918,10 @@
         const target = event.target;
         const insidePriority = target?.closest?.('#reminderPriorityBtn, #reminderPriorityDropdown, [data-reminder-priority-edit], [data-reminder-priority-menu]');
         const insideLink = target?.closest?.('#reminderLinkDropdown, [data-reminder-text], #reminderNewText');
-        const insideDate = target?.closest?.('[data-reminder-date], #reminderNewDate, .flatpickr-input');
+        const insideDate = target?.closest?.('[data-reminder-date], #reminderNewDate, .flatpickr-input, .reminder-date-trigger, .flatpickr-calendar');
+        const insideComposer = reminderComposer?.contains(target);
+        const insideAddZone = target?.closest?.('[data-reminder-section-add]');
+        const insideComposerControl = target?.closest?.('#reminderNewText, #reminderAddBtn, #reminderPriorityBtn, #reminderPriorityDropdown, #reminderNewDate, .reminder-date-trigger, .flatpickr-calendar, #reminderLinkDropdown');
         if (!insidePriority) {
           hideReminderPriorityDropdown();
           hideReminderRowPriorityDropdowns();
@@ -3724,6 +3931,12 @@
         }
         if (!insideDate) {
           closeReminderDatePickers();
+        }
+        if ((!insideComposer || !insideComposerControl) && !insideAddZone && !insidePriority && !insideDate && !insideLink) {
+          if (document.activeElement instanceof HTMLElement && remindersPanel.contains(document.activeElement)) {
+            document.activeElement.blur();
+          }
+          setTimeout(() => settleReminderComposerOnExit({ force: true }), 0);
         }
         event.stopPropagation();
       });
@@ -3736,12 +3949,21 @@
         event.stopPropagation();
       });
 
-      document.addEventListener('click', () => {
+      document.addEventListener('click', (event) => {
+        const target = event?.target instanceof Element ? event.target : null;
+        if (target?.closest?.('.flatpickr-calendar, .reminder-date-trigger, #reminderPriorityDropdown, [data-reminder-priority-menu]')) {
+          markReminderPopoverBusy();
+          return;
+        }
         profileMenu.classList.add('hidden');
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
         hideReminderRowPriorityDropdowns();
         closeReminderDatePickers();
+        if (document.activeElement instanceof HTMLElement && reminderComposer?.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+        setTimeout(() => settleReminderComposerOnExit({ force: true }), 0);
       });
 
       logoutBtn?.addEventListener('click', () => logoutForm?.submit());
@@ -4191,8 +4413,16 @@
       let globalTimerState = null;
       let globalTimerInterval = null;
       let globalPipRenderInterval = null;
+      let globalPipWatchdogInterval = null;
+      let globalPipStream = null;
       let globalPipStreamReady = false;
       let globalPipVideoTrack = null;
+      let globalPipLastFrameAt = 0;
+      let globalPipRecovering = false;
+      let globalPipAudioContext = null;
+      let globalPipAudioSource = null;
+      let globalPipAudioTrack = null;
+      let globalPipAudioPrimed = false;
       let suppressGlobalPipPlaybackSync = false;
 
       function formatTimer(totalSeconds) {
@@ -4470,13 +4700,29 @@
       }
 
       async function ensureGlobalPipSource() {
-        if (globalPipStreamReady) return true;
         const canvas = document.getElementById('globalTimerPipCanvas');
         const video = document.getElementById('globalTimerPipVideo');
         if (!canvas || !video || !canvas.captureStream) return false;
+        if (globalPipTrackHealthy()) return true;
+        resetGlobalPipSource();
         const stream = canvas.captureStream(30);
+        globalPipStream = stream;
         globalPipVideoTrack = stream.getVideoTracks ? (stream.getVideoTracks()[0] || null) : null;
-        video.srcObject = stream;
+        const audioTrack = ensureGlobalPipSilentAudioTrack();
+        if (audioTrack && globalPipStream.addTrack) {
+          try { globalPipStream.addTrack(audioTrack); } catch (_) {}
+        }
+        if (globalPipVideoTrack) {
+          globalPipVideoTrack.addEventListener('ended', () => {
+            if (isGlobalNativePipOpen()) recoverGlobalPipSource();
+          });
+          globalPipVideoTrack.addEventListener('mute', () => {
+            setTimeout(() => {
+              if (isGlobalNativePipOpen()) recoverGlobalPipSource();
+            }, 350);
+          });
+        }
+        video.srcObject = globalPipStream;
         video.muted = true;
         video.playsInline = true;
         video.setAttribute('webkit-playsinline', 'true');
@@ -4485,6 +4731,91 @@
         try { await video.play(); } catch (_) {}
         globalPipStreamReady = true;
         return true;
+      }
+
+      function resetGlobalPipSource() {
+        if (globalPipStream?.getTracks) {
+          globalPipStream.getTracks().forEach((track) => {
+            try { track.stop(); } catch (_) {}
+          });
+        }
+        globalPipStream = null;
+        globalPipVideoTrack = null;
+        globalPipStreamReady = false;
+        const video = document.getElementById('globalTimerPipVideo');
+        if (video) {
+          try { video.srcObject = null; } catch (_) {}
+        }
+        stopGlobalPipSilentAudio();
+      }
+
+      function stopGlobalPipSilentAudio() {
+        try { globalPipAudioSource?.stop(); } catch (_) {}
+        try { globalPipAudioTrack?.stop(); } catch (_) {}
+        try { globalPipAudioContext?.close(); } catch (_) {}
+        globalPipAudioContext = null;
+        globalPipAudioSource = null;
+        globalPipAudioTrack = null;
+      }
+
+      function ensureGlobalPipSilentAudioTrack() {
+        if (!globalPipAudioPrimed) return null;
+        if (globalPipAudioTrack && globalPipAudioTrack.readyState !== 'ended') {
+          if (globalPipAudioContext?.state === 'suspended') globalPipAudioContext.resume().catch(() => {});
+          return globalPipAudioTrack;
+        }
+
+        const AudioCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtor) return null;
+        try {
+          globalPipAudioContext = new AudioCtor();
+          const destination = globalPipAudioContext.createMediaStreamDestination();
+          const oscillator = globalPipAudioContext.createOscillator();
+          const gain = globalPipAudioContext.createGain();
+          oscillator.frequency.value = 1;
+          gain.gain.value = 0.00001;
+          oscillator.connect(gain);
+          gain.connect(destination);
+          oscillator.start();
+          globalPipAudioSource = oscillator;
+          globalPipAudioTrack = destination.stream.getAudioTracks()[0] || null;
+          globalPipAudioContext.resume().catch(() => {});
+          return globalPipAudioTrack;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function globalPipTrackHealthy() {
+        const video = document.getElementById('globalTimerPipVideo');
+        const audioHealthy = !globalPipAudioPrimed || (globalPipAudioTrack && globalPipAudioTrack.readyState !== 'ended');
+        return !!globalPipStream
+          && !!globalPipVideoTrack
+          && !!audioHealthy
+          && globalPipVideoTrack.readyState !== 'ended'
+          && video?.srcObject === globalPipStream;
+      }
+
+      function isGlobalNativePipOpen() {
+        const video = document.getElementById('globalTimerPipVideo');
+        return document.pictureInPictureElement === video || video?.webkitPresentationMode === 'picture-in-picture';
+      }
+
+      async function recoverGlobalPipSource() {
+        if (globalPipRecovering) return;
+        const video = document.getElementById('globalTimerPipVideo');
+        if (!video) return;
+        globalPipRecovering = true;
+        try {
+          resetGlobalPipSource();
+          await ensureGlobalPipSource();
+          drawGlobalTimerPipCanvas(formatTimer(getDisplayedSeconds()));
+          suppressGlobalPipPlaybackSync = true;
+          await video.play().catch(() => {});
+          setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
+        } finally {
+          globalPipRecovering = false;
+        }
       }
 
       function setGlobalPipSourceVisible(show) {
@@ -4536,6 +4867,8 @@
 
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = (Math.floor(Date.now() / 250) % 2) ? '#10182b' : '#0f172a';
+        ctx.fillRect(canvas.width - 3, canvas.height - 3, 2, 2);
         ctx.fillStyle = '#e2e8f0';
         ctx.font = 'bold 24px system-ui';
         ctx.fillText(fitText(title, maxTextWidth, 'bold 24px system-ui'), left, 142);
@@ -4548,13 +4881,71 @@
         if (globalPipVideoTrack && typeof globalPipVideoTrack.requestFrame === 'function') {
           globalPipVideoTrack.requestFrame();
         }
+        globalPipLastFrameAt = Date.now();
       }
 
       function startGlobalPipRenderLoop() {
-        if (globalPipRenderInterval) clearInterval(globalPipRenderInterval);
-        globalPipRenderInterval = setInterval(() => {
+        if (globalPipRenderInterval) clearTimeout(globalPipRenderInterval);
+        if (globalPipWatchdogInterval) clearInterval(globalPipWatchdogInterval);
+
+        const pump = () => {
+          if (!isGlobalNativePipOpen()) {
+            globalPipRenderInterval = null;
+            return;
+          }
           syncGlobalTimerPanels();
+          const video = document.getElementById('globalTimerPipVideo');
+          if (isGlobalNativePipOpen() && video?.paused) {
+            suppressGlobalPipPlaybackSync = true;
+            video.play().catch(() => {}).finally(() => {
+              setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
+            });
+          }
+          globalPipRenderInterval = setTimeout(pump, 250);
+        };
+        pump();
+
+        globalPipWatchdogInterval = setInterval(() => {
+          const video = document.getElementById('globalTimerPipVideo');
+          if (!isGlobalNativePipOpen()) return;
+          syncGlobalTimerPanels();
+          const staleFrame = globalPipLastFrameAt && Date.now() - globalPipLastFrameAt > 2600;
+          if (!globalPipTrackHealthy() || video?.paused || video?.readyState < 2 || staleFrame) {
+            suppressGlobalPipPlaybackSync = true;
+            video.play().catch(() => {}).finally(() => {
+              setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
+            });
+            if (!globalPipTrackHealthy() || video?.readyState < 2 || staleFrame) {
+              recoverGlobalPipSource();
+            }
+          }
         }, 1000);
+      }
+
+      function stopGlobalPipRenderLoop() {
+        if (globalPipRenderInterval) {
+          clearTimeout(globalPipRenderInterval);
+          globalPipRenderInterval = null;
+        }
+        if (globalPipWatchdogInterval) {
+          clearInterval(globalPipWatchdogInterval);
+          globalPipWatchdogInterval = null;
+        }
+        if (!isGlobalNativePipOpen()) stopGlobalPipSilentAudio();
+      }
+
+      function refreshGlobalPipAfterResume() {
+        if (!isGlobalNativePipOpen() || !globalTimerState?.projectId) return;
+        syncGlobalTimerPanels();
+        ensureGlobalPipSource().then(() => {
+          const video = document.getElementById('globalTimerPipVideo');
+          if (!video) return;
+          suppressGlobalPipPlaybackSync = true;
+          video.play().catch(() => {}).finally(() => {
+            setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
+          });
+          if (!globalPipRenderInterval) startGlobalPipRenderLoop();
+        });
       }
 
       function setGlobalPipActionButtonState() {
@@ -4565,8 +4956,30 @@
           : '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
       }
 
+      function updateGlobalPipMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: String(globalTimerState?.taskName || 'Temporizador activo'),
+            artist: String(globalTimerState?.projectTitle || 'Proyecto'),
+            album: 'InFocus CRM',
+          });
+          navigator.mediaSession.playbackState = globalTimerState?.isRunning ? 'playing' : 'paused';
+          navigator.mediaSession.setActionHandler('play', () => {
+            if (!globalTimerState?.projectId || globalTimerState.isRunning) return;
+            toggleGlobalTimer().catch(() => {});
+          });
+          navigator.mediaSession.setActionHandler('pause', () => {
+            if (!globalTimerState?.projectId || !globalTimerState.isRunning) return;
+            toggleGlobalTimer().catch(() => {});
+          });
+          navigator.mediaSession.setActionHandler('previoustrack', () => { window.focus(); });
+        } catch (_) {}
+      }
+
       async function toggleGlobalTimerMiniPip() {
         if (!globalTimerState?.projectId) return;
+        globalPipAudioPrimed = true;
         syncGlobalTimerPanels();
         const video = document.getElementById('globalTimerPipVideo');
         const fallback = document.getElementById('globalTimerMiniPip');
@@ -4592,16 +5005,7 @@
             await video.play().catch(() => {});
             startGlobalPipRenderLoop();
             await video.requestPictureInPicture();
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.metadata = new MediaMetadata({
-                title: String(globalTimerState?.taskName || 'Temporizador activo'),
-                artist: String(globalTimerState?.projectTitle || 'Proyecto'),
-                album: 'InFocus CRM',
-              });
-              navigator.mediaSession.setActionHandler('play', () => { toggleGlobalTimer().catch(() => {}); });
-              navigator.mediaSession.setActionHandler('pause', () => { toggleGlobalTimer().catch(() => {}); });
-              navigator.mediaSession.setActionHandler('previoustrack', () => { window.focus(); });
-            }
+            updateGlobalPipMediaSession();
             return;
           } catch (_) {}
         }
@@ -4613,6 +5017,7 @@
             if (video.webkitSupportsPresentationMode('picture-in-picture')) {
               startGlobalPipRenderLoop();
               video.webkitSetPresentationMode('picture-in-picture');
+              updateGlobalPipMediaSession();
               return;
             }
           } catch (_) {}
@@ -4782,27 +5187,37 @@
 
       const globalPipVideo = document.getElementById('globalTimerPipVideo');
       globalPipVideo?.addEventListener('leavepictureinpicture', () => {
-        if (globalPipRenderInterval) clearInterval(globalPipRenderInterval);
+        stopGlobalPipRenderLoop();
         setGlobalPipSourceVisible(false);
       });
       globalPipVideo?.addEventListener('webkitpresentationmodechanged', () => {
-        if (globalPipVideo.webkitPresentationMode !== 'picture-in-picture' && globalPipRenderInterval) {
-          clearInterval(globalPipRenderInterval);
-        }
+        if (globalPipVideo.webkitPresentationMode !== 'picture-in-picture') stopGlobalPipRenderLoop();
+        if (globalPipVideo.webkitPresentationMode === 'picture-in-picture' && !globalPipRenderInterval) startGlobalPipRenderLoop();
         setGlobalPipSourceVisible(globalPipVideo.webkitPresentationMode === 'picture-in-picture');
+        refreshGlobalPipAfterResume();
       });
       globalPipVideo?.addEventListener('pause', () => {
         if (suppressGlobalPipPlaybackSync) return;
         const isNativePip = document.pictureInPictureElement === globalPipVideo || globalPipVideo.webkitPresentationMode === 'picture-in-picture';
-        if (!isNativePip || !globalTimerState?.projectId || !globalTimerState.isRunning) return;
-        toggleGlobalTimer().catch(() => {});
+        if (!isNativePip || !globalTimerState?.projectId) return;
+        suppressGlobalPipPlaybackSync = true;
+        globalPipVideo.play().catch(() => {}).finally(() => {
+          setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
+        });
+        syncGlobalTimerPanels();
       });
       globalPipVideo?.addEventListener('play', () => {
         if (suppressGlobalPipPlaybackSync) return;
         const isNativePip = document.pictureInPictureElement === globalPipVideo || globalPipVideo.webkitPresentationMode === 'picture-in-picture';
-        if (!isNativePip || !globalTimerState?.projectId || globalTimerState.isRunning) return;
-        toggleGlobalTimer().catch(() => {});
+        if (!isNativePip || !globalTimerState?.projectId) return;
+        syncGlobalTimerPanels();
       });
+      globalPipVideo?.addEventListener('emptied', refreshGlobalPipAfterResume);
+      globalPipVideo?.addEventListener('stalled', refreshGlobalPipAfterResume);
+      globalPipVideo?.addEventListener('waiting', refreshGlobalPipAfterResume);
+      document.addEventListener('visibilitychange', refreshGlobalPipAfterResume);
+      window.addEventListener('pageshow', refreshGlobalPipAfterResume);
+      window.addEventListener('focus', refreshGlobalPipAfterResume);
 
       window.addEventListener('storage', (event) => {
         if (event.key !== GLOBAL_TIMER_STATE_KEY && event.key !== POMODORO_STATE_KEY) return;
@@ -4942,6 +5357,38 @@
       background-clip: text;
       color: transparent;
       filter: drop-shadow(0 0 8px rgba(236, 254, 136, .28));
+    }
+    .infocus-ai-sparkle-icon {
+      width: 1.46rem;
+      height: 1.46rem;
+      display: inline-block;
+      color: #ecfe88;
+    }
+    .infocus-ai-sparkle-icon i {
+      position: absolute;
+      display: block;
+      color: currentColor;
+      line-height: 1;
+      transform-origin: center;
+    }
+    .infocus-ai-sparkle-icon .sparkle-main {
+      left: .36rem;
+      top: .22rem;
+      font-size: .72rem;
+      transform: rotate(45deg) scaleX(.82);
+    }
+    .infocus-ai-sparkle-icon .sparkle-side {
+      left: .88rem;
+      top: .78rem;
+      font-size: .46rem;
+      transform: rotate(45deg) scaleX(.82);
+    }
+    .infocus-ai-sparkle-icon .sparkle-small {
+      left: .12rem;
+      top: .66rem;
+      font-size: .34rem;
+      color: #c4b5fd;
+      transform: rotate(45deg) scaleX(.82);
     }
 
     .infocus-ai-shell {
@@ -5224,7 +5671,8 @@
       border-color: #c4b5fd;
       background: rgba(255, 255, 255, .88);
     }
-    .infocus-ai-recent-chat i {
+    .infocus-ai-recent-chat > i,
+    .infocus-ai-recent-chat > .infocus-ai-sparkle-icon {
       width: 1.42rem;
       height: 1.42rem;
       display: inline-flex;
@@ -5234,6 +5682,11 @@
       background: #ecfe88;
       color: #101729;
       font-size: .65rem;
+    }
+    .infocus-ai-recent-chat .infocus-ai-sparkle-icon {
+      position: relative;
+      color: #101729;
+      flex: none;
     }
     .infocus-ai-recent-chat span {
       min-width: 0;
@@ -5508,7 +5961,8 @@
       box-shadow: 0 0 18px rgba(236, 254, 136, .2), inset 0 0 0 1px rgba(148, 163, 184, .18);
       animation: infocusAiPulse 1.3s ease-in-out infinite;
     }
-    .infocus-ai-thinking-robot i {
+    .infocus-ai-thinking-robot > i,
+    .infocus-ai-thinking-robot > .infocus-ai-sparkle-icon {
       font-size: .82rem;
       color: #111729;
     }
@@ -6074,7 +6528,10 @@
         if (/actualizar|mover|cambiar/.test(text)) {
           return { accept: 'Aplicar cambios', reject: 'No aplicar', busy: 'Aplicando...' };
         }
-        if (/agregar|añadir|anadir|nota|subtarea|tarea/.test(text) && !/nuevo proyecto|proyecto propuesto/.test(text)) {
+        if (/tablero|kanban/.test(text) && /nuevo|crear|crea|propuesto|listo para crear/.test(text)) {
+          return { accept: 'Crear tablero', reject: 'No crear', busy: 'Creando tablero...' };
+        }
+        if (/agregar|añadir|anadir|nota|subtarea|tarea|columna|lista/.test(text) && !/nuevo proyecto|proyecto propuesto|nuevo tablero|tablero propuesto/.test(text)) {
           return { accept: 'Agregar ahora', reject: 'No agregar', busy: 'Agregando...' };
         }
         return { accept: 'Crear ahora', reject: 'No crear', busy: 'Creando...' };
@@ -6192,6 +6649,9 @@
         }
         if (isPersonalNoteProposal(content)) {
           return ok ? 'Nota creada en Mis Notas' : 'No pude crear la nota. Intenta de nuevo o revisa tus permisos.';
+        }
+        if (/tablero|kanban|columna/.test(normalizeAiText(content))) {
+          return ok ? 'Tablero actualizado en Proyectos' : 'No pude aplicar el cambio al tablero. Intenta de nuevo o revisa tus permisos.';
         }
         if (/recordatorio|recordar/.test(normalizeAiText(content))) {
           return ok ? 'Recordatorio creado en tu modal' : 'No pude crear el recordatorio. Intenta de nuevo.';

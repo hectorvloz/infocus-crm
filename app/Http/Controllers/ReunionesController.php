@@ -39,6 +39,7 @@ class ReunionesController extends Controller
         $weekEnd = $weekStart->copy()->addDays(6)->endOfDay();
         $rangeStart = $viewMode === 'dia' ? $focusDate->copy()->startOfDay() : $weekStart->copy();
         $rangeEnd = $viewMode === 'dia' ? $focusDate->copy()->endOfDay() : $weekEnd->copy();
+        $settings = $this->settings->find('settings') ?: [];
 
         $clientes = collect($this->clientes->all())
             ->sortBy(fn ($cliente) => Str::lower((string) ($cliente['empresa'] ?? '')))
@@ -48,6 +49,7 @@ class ReunionesController extends Controller
         $reuniones = collect($this->store->all())
             ->map(fn ($meeting) => $this->normalizeMeeting($meeting, $timezone))
             ->merge($this->leadMeetings($timezone))
+            ->merge($this->googleCalendarMeetings($settings, $rangeStart, $rangeEnd, $timezone))
             ->filter(fn ($meeting) => !empty($meeting['inicio_at']))
             ->filter(fn ($meeting) => $this->canCurrentUserSeeMeeting($meeting))
             ->sortBy('inicio_at')
@@ -88,7 +90,7 @@ class ReunionesController extends Controller
             'upcoming' => $upcoming,
             'monthCursor' => $monthCursor,
             'monthDays' => $monthDays,
-            'settings' => $this->settings->find('settings') ?: [],
+            'settings' => $settings,
             'teamUsers' => $this->teamUsers(),
             'hours' => range(8, 22),
             'timezone' => $timezone,
@@ -337,6 +339,82 @@ class ReunionesController extends Controller
             ->values();
     }
 
+    protected function googleCalendarMeetings(array $settings, Carbon $rangeStart, Carbon $rangeEnd, string $timezone): \Illuminate\Support\Collection
+    {
+        if (empty($settings['google_calendar_enabled'])) {
+            return collect();
+        }
+        if (empty($settings['google_calendar_access_token']) && empty($settings['google_calendar_refresh_token'])) {
+            return collect();
+        }
+
+        $token = $this->getGoogleCalendarAccessToken($settings);
+        if (!$token) {
+            return collect();
+        }
+
+        $calendarId = $settings['google_calendar_id'] ?? config('services.google_calendar.calendar_id', 'primary');
+        $calendarPath = rawurlencode($calendarId);
+        $response = Http::withToken($token)->get("https://www.googleapis.com/calendar/v3/calendars/{$calendarPath}/events", [
+            'timeMin' => $rangeStart->copy()->utc()->toRfc3339String(),
+            'timeMax' => $rangeEnd->copy()->utc()->toRfc3339String(),
+            'singleEvents' => 'true',
+            'orderBy' => 'startTime',
+            'maxResults' => 250,
+        ]);
+
+        if (!$response->ok()) {
+            return collect();
+        }
+
+        return collect($response->json('items') ?? [])
+            ->map(function (array $event) use ($timezone) {
+                $startRaw = $event['start']['dateTime'] ?? $event['start']['date'] ?? null;
+                $endRaw = $event['end']['dateTime'] ?? $event['end']['date'] ?? null;
+                if (!$startRaw) {
+                    return null;
+                }
+
+                try {
+                    $start = Carbon::parse($startRaw)->setTimezone($timezone);
+                    $end = $endRaw ? Carbon::parse($endRaw)->setTimezone($timezone) : $start->copy()->addMinutes(30);
+                    if ($end->lessThanOrEqualTo($start)) {
+                        $end = $start->copy()->addMinutes(30);
+                    }
+                } catch (\Throwable) {
+                    return null;
+                }
+
+                $videoEntry = collect($event['conferenceData']['entryPoints'] ?? [])->firstWhere('entryPointType', 'video');
+                $meetLink = $event['hangoutLink'] ?? ($videoEntry['uri'] ?? null);
+
+                return [
+                    'id' => 'google:' . (string) ($event['id'] ?? Str::ulid()),
+                    'source' => 'google',
+                    'titulo' => trim((string) ($event['summary'] ?? 'Evento de Google Calendar')) ?: 'Evento de Google Calendar',
+                    'cliente_id' => null,
+                    'cliente' => 'Google Calendar',
+                    'invitados' => collect($event['attendees'] ?? [])->pluck('email')->filter()->values()->all(),
+                    'responsables' => [],
+                    'responsable_ids' => [],
+                    'responsable_emails' => [],
+                    'fecha' => $start->toDateString(),
+                    'hora_inicio' => $start->format('H:i'),
+                    'hora_fin' => $end->format('H:i'),
+                    'ubicacion' => (string) ($event['location'] ?? ($meetLink ? 'Google Meet' : '')),
+                    'color' => 'sky',
+                    'inicio_at' => $start->toISOString(),
+                    'fin_at' => $end->toISOString(),
+                    'notas' => trim(strip_tags((string) ($event['description'] ?? ''))),
+                    'estado' => 'google',
+                    'meet_link' => $meetLink,
+                    'calendar_link' => $event['htmlLink'] ?? null,
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
     protected function currentUserIdentity(): array
     {
         $user = auth()->user();
@@ -458,7 +536,7 @@ class ReunionesController extends Controller
             return ['error' => 'No hay token valido de Google Calendar. Vuelve a conectar OAuth.'];
         }
 
-        $calendarId = $settings['google_calendar_id'] ?? 'primary';
+        $calendarId = $settings['google_calendar_id'] ?? config('services.google_calendar.calendar_id', 'primary');
         $calendarPath = rawurlencode($calendarId);
         $response = Http::withToken($token)
             ->post("https://www.googleapis.com/calendar/v3/calendars/{$calendarPath}/events?conferenceDataVersion=1&sendUpdates=all", $payload);
@@ -488,8 +566,8 @@ class ReunionesController extends Controller
         }
 
         $refreshToken = $settings['google_calendar_refresh_token'] ?? null;
-        $clientId = $settings['google_calendar_client_id'] ?? null;
-        $clientSecret = $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
+        $clientId = config('services.google_calendar.client_id') ?: ($settings['google_calendar_client_id'] ?? null);
+        $clientSecret = config('services.google_calendar.client_secret') ?: $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
         if (!$refreshToken || !$clientId || !$clientSecret) return $token;
 
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [

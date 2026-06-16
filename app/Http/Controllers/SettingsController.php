@@ -943,7 +943,15 @@ class SettingsController extends Controller
     public function integrations()
     {
         $settings = $this->store->find('settings') ?: [];
-        return view('settings.integrations', compact('settings'));
+        $googleCalendars = [];
+        $googleCalendarListError = null;
+
+        if (!empty($settings['google_calendar_access_token']) || !empty($settings['google_calendar_refresh_token'])) {
+            [$googleCalendars, $googleCalendarListError] = $this->fetchGoogleCalendarList($settings);
+        }
+        $timezones = \DateTimeZone::listIdentifiers();
+
+        return view('settings.integrations', compact('settings', 'googleCalendars', 'googleCalendarListError', 'timezones'));
     }
 
     public function updateIntegrations(Request $request)
@@ -962,8 +970,6 @@ class SettingsController extends Controller
             'google_calendar_enabled' => 'nullable|in:on,1,true',
             'google_calendar_id' => 'nullable|string',
             'google_calendar_embed_url' => 'nullable|string',
-            'google_calendar_client_id' => 'nullable|string',
-            'google_calendar_client_secret' => 'nullable|string',
             'google_meet_enabled' => 'nullable|in:on,1,true',
             'google_meet_timezone' => 'nullable|string|max:120',
             'google_meet_default_duration' => 'nullable|integer|min:5|max:240',
@@ -976,7 +982,7 @@ class SettingsController extends Controller
         ]);
         // Encrypt sensitive secrets — only overwrite if a new non-empty value was submitted
         $current = $this->store->find('settings') ?: [];
-        $secretFields = ['stripe_secret', 'paypal_secret', 'google_calendar_client_secret', 'wompi_integrity_secret'];
+        $secretFields = ['stripe_secret', 'paypal_secret', 'wompi_integrity_secret'];
         foreach ($secretFields as $field) {
             if (!empty($data[$field])) {
                 // Only re-encrypt if user typed something new (not the masked placeholder)
@@ -991,26 +997,30 @@ class SettingsController extends Controller
                 $data[$field] = $current[$field] ?? '';
             }
         }
+        $data['google_calendar_enabled'] = $request->boolean('google_calendar_enabled');
+        $data['google_meet_enabled'] = $request->boolean('google_meet_enabled');
         $this->saveSettings($data);
         return redirect()->route('settings.integrations')->with('success', 'Integraciones actualizadas.');
     }
 
     public function googleCalendarConnect(Request $request)
     {
-        $settings = $this->store->find('settings') ?: [];
-        $clientId = $settings['google_calendar_client_id'] ?? null;
-        $clientSecret = $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
+        $clientId = config('services.google_calendar.client_id');
+        $clientSecret = config('services.google_calendar.client_secret');
         if (!$clientId || !$clientSecret) {
-            return redirect()->route('settings.integrations')->with('error', 'Completa Client ID y Client Secret para conectar Google Calendar.');
+            return redirect()->route('settings.integrations')->with('error', 'Configura GOOGLE_CALENDAR_CLIENT_ID y GOOGLE_CALENDAR_CLIENT_SECRET en el archivo .env.');
         }
         $state = Str::random(32);
         $request->session()->put('google_calendar_oauth_state', $state);
-        $redirectUri = route('settings.integrations.google.callback');
+        $redirectUri = config('services.google_calendar.redirect') ?: route('settings.integrations.google.callback');
         $query = http_build_query([
             'client_id' => $clientId,
             'redirect_uri' => $redirectUri,
             'response_type' => 'code',
-            'scope' => 'https://www.googleapis.com/auth/calendar.events',
+            'scope' => implode(' ', [
+                'https://www.googleapis.com/auth/calendar.events',
+                'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+            ]),
             'access_type' => 'offline',
             'prompt' => 'consent',
             'state' => $state,
@@ -1029,9 +1039,9 @@ class SettingsController extends Controller
             return redirect()->route('settings.integrations')->with('error', 'No se recibió el código de autorización.');
         }
         $settings = $this->store->find('settings') ?: [];
-        $clientId = $settings['google_calendar_client_id'] ?? null;
-        $clientSecret = $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
-        $redirectUri = route('settings.integrations.google.callback');
+        $clientId = config('services.google_calendar.client_id');
+        $clientSecret = config('services.google_calendar.client_secret');
+        $redirectUri = config('services.google_calendar.redirect') ?: route('settings.integrations.google.callback');
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
             'code' => $code,
             'client_id' => $clientId,
@@ -1049,6 +1059,7 @@ class SettingsController extends Controller
         }
         $settings['google_calendar_expires_at'] = now()->addSeconds((int) ($payload['expires_in'] ?? 0))->toISOString();
         $settings['google_calendar_enabled'] = true;
+        $settings['google_meet_enabled'] = true;
         $this->store->update('settings', $settings);
         return redirect()->route('settings.integrations')->with('success', 'Google Calendar conectado correctamente.');
     }
@@ -1062,6 +1073,73 @@ class SettingsController extends Controller
         $settings['google_calendar_enabled'] = false;
         $this->store->update('settings', $settings);
         return redirect()->route('settings.integrations')->with('success', 'Google Calendar desconectado.');
+    }
+
+    protected function fetchGoogleCalendarList(array $settings): array
+    {
+        $token = $this->getGoogleCalendarAccessToken($settings);
+        if (!$token) {
+            return [[], 'Vuelve a conectar Google Calendar para cargar tus calendarios.'];
+        }
+
+        $response = Http::withToken($token)->get('https://www.googleapis.com/calendar/v3/users/me/calendarList', [
+            'minAccessRole' => 'writer',
+        ]);
+
+        if (!$response->ok()) {
+            return [[], 'No se pudo cargar la lista de calendarios de Google.'];
+        }
+
+        $items = collect($response->json('items') ?? [])
+            ->filter(fn ($calendar) => !empty($calendar['id']))
+            ->map(fn ($calendar) => [
+                'id' => (string) $calendar['id'],
+                'summary' => (string) ($calendar['summary'] ?? $calendar['id']),
+                'primary' => (bool) ($calendar['primary'] ?? false),
+            ])
+            ->sortBy([
+                ['primary', 'desc'],
+                ['summary', 'asc'],
+            ])
+            ->values()
+            ->all();
+
+        return [$items, null];
+    }
+
+    protected function getGoogleCalendarAccessToken(array $settings): ?string
+    {
+        $token = $settings['google_calendar_access_token'] ?? null;
+        $expiresAt = $settings['google_calendar_expires_at'] ?? null;
+
+        if ($token && $expiresAt && \Carbon\Carbon::parse($expiresAt)->subSeconds(60)->isFuture()) {
+            return $token;
+        }
+
+        $refreshToken = $settings['google_calendar_refresh_token'] ?? null;
+        $clientId = config('services.google_calendar.client_id') ?: ($settings['google_calendar_client_id'] ?? null);
+        $clientSecret = config('services.google_calendar.client_secret') ?: $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
+        if (!$refreshToken || !$clientId || !$clientSecret) {
+            return $token;
+        }
+
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+            'grant_type' => 'refresh_token',
+        ]);
+
+        if (!$response->ok()) {
+            return $token;
+        }
+
+        $payload = $response->json();
+        $settings['google_calendar_access_token'] = $payload['access_token'] ?? $token;
+        $settings['google_calendar_expires_at'] = now()->addSeconds((int) ($payload['expires_in'] ?? 0))->toISOString();
+        $this->store->update('settings', $settings);
+
+        return $settings['google_calendar_access_token'] ?? $token;
     }
 
     // --- Payment Methods ---

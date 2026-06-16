@@ -639,7 +639,7 @@ class LeadsController extends Controller
             return ['error' => 'No hay token válido de Google Calendar. Vuelve a conectar OAuth.'];
         }
 
-        $calendarId = $settings['google_calendar_id'] ?? 'primary';
+        $calendarId = $settings['google_calendar_id'] ?? config('services.google_calendar.calendar_id', 'primary');
         $calendarPath = rawurlencode($calendarId);
         $response = Http::withToken($token)
             ->post("https://www.googleapis.com/calendar/v3/calendars/{$calendarPath}/events?conferenceDataVersion=1", $payload);
@@ -669,8 +669,8 @@ class LeadsController extends Controller
         }
 
         $refreshToken = $settings['google_calendar_refresh_token'] ?? null;
-        $clientId = $settings['google_calendar_client_id'] ?? null;
-        $clientSecret = $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
+        $clientId = config('services.google_calendar.client_id') ?: ($settings['google_calendar_client_id'] ?? null);
+        $clientSecret = config('services.google_calendar.client_secret') ?: $this->decryptSetting($settings['google_calendar_client_secret'] ?? null);
         if (!$refreshToken || !$clientId || !$clientSecret) return $token;
 
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [

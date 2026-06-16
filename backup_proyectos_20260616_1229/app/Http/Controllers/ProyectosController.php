@@ -576,11 +576,7 @@ class ProyectosController extends Controller
         // enriquecer con nombre de cliente si existe
         $clientes = collect($this->clientes->all())->keyBy('id');
         $list = $list->map(function($p) use ($clientes){
-            if (!empty($p['cliente_id']) && isset($clientes[$p['cliente_id']])) {
-                $p['cliente'] = $clientes[$p['cliente_id']]['empresa'] ?? ($p['cliente'] ?? null);
-            } else {
-                $p['cliente'] = $p['cliente'] ?? null;
-            }
+            $p['cliente'] = $p['cliente'] ?? ($clientes[$p['cliente_id']]['empresa'] ?? null);
             return $p;
         })->values()->all();
         return response()->json(['data'=>$list]);
@@ -595,11 +591,7 @@ class ProyectosController extends Controller
             ->filter(fn($project) => (bool) ($project['archived'] ?? false))
             ->when($clienteId, fn($c) => $c->where('cliente_id', $clienteId))
             ->map(function ($p) use ($clientes) {
-                if (!empty($p['cliente_id']) && isset($clientes[$p['cliente_id']])) {
-                    $p['cliente'] = $clientes[$p['cliente_id']]['empresa'] ?? ($p['cliente'] ?? null);
-                } else {
-                    $p['cliente'] = $p['cliente'] ?? null;
-                }
+                $p['cliente'] = $p['cliente'] ?? ($clientes[$p['cliente_id']]['empresa'] ?? null);
                 return $p;
             })
             ->values()
@@ -758,8 +750,6 @@ class ProyectosController extends Controller
             'siguiente' => 'sometimes|string|nullable',
             'valor' => 'sometimes|numeric',
             'etapa' => 'sometimes|string',
-            'cover_image' => 'sometimes|nullable|string',
-            'cover_color' => 'sometimes|nullable|string',
             'task_stages' => 'sometimes|array',
             'task_stages.*' => 'string',
             'descripcion' => 'sometimes|string|nullable',
@@ -768,11 +758,6 @@ class ProyectosController extends Controller
         ]);
         $id = $data['id'];
         unset($data['id']);
-        if (array_key_exists('cliente_id', $data)) {
-            $clienteId = trim((string) ($data['cliente_id'] ?? ''));
-            $cliente = $clienteId !== '' ? $this->clientes->find($clienteId) : null;
-            $data['cliente'] = $cliente ? (string) ($cliente['empresa'] ?? 'Sin Cliente') : 'Sin Cliente';
-        }
         $updated = $this->store->update($id, $data);
         if (!empty($updated['cliente_id']) && array_key_exists('etapa', $data)) {
             $this->timeline->add($updated['cliente_id'], 'proyecto', [

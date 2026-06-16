@@ -109,20 +109,23 @@ class AiActionExecutor
             return $this->withActionLog($this->addProjectTask($text), 'tarea');
         }
 
-        if (str_contains($normalized, 'proyecto') && $this->isProjectCreateIntent($normalized)) {
+        if ((str_contains($normalized, 'proyecto') || str_contains($normalized, 'tablero')) && $this->isProjectCreateIntent($normalized)) {
             return $this->withActionLog($this->createProjectWithTasks($text), 'proyecto');
         }
 
-        if (str_contains($normalized, 'proyecto') && $this->isProjectUpdateIntent($normalized)) {
+        if ((str_contains($normalized, 'proyecto') || str_contains($normalized, 'tablero') || str_contains($normalized, 'columna')) && $this->isProjectUpdateIntent($normalized)) {
             return $this->withActionLog($this->updateProject($text), 'proyecto');
         }
 
-        if (str_contains($normalized, 'proyecto') && (
+        if ((str_contains($normalized, 'proyecto') || str_contains($normalized, 'tablero')) && (
             str_contains($normalized, 'nuevo proyecto')
+            || str_contains($normalized, 'nuevo tablero')
             || str_contains($normalized, 'proyecto propuesto')
+            || str_contains($normalized, 'tablero propuesto')
             || str_contains($normalized, 'tareas sugeridas')
             || str_contains($normalized, 'lista de tareas')
             || str_contains($normalized, 'crear proyecto')
+            || str_contains($normalized, 'crear tablero')
         )) {
             return $this->withActionLog($this->createProjectWithTasks($text), 'proyecto');
         }
@@ -143,7 +146,7 @@ class AiActionExecutor
             return $this->withActionLog($this->createReminderAction($text), 'recordatorio');
         }
 
-        if (str_contains($normalized, 'proyecto')) {
+        if (str_contains($normalized, 'proyecto') || str_contains($normalized, 'tablero')) {
             return $this->withActionLog($this->createProjectWithTasks($text), 'proyecto');
         }
 
@@ -159,7 +162,7 @@ class AiActionExecutor
             return $this->failure('Puedo preparar el gasto, pero necesito dejar cerrado el formulario automático de gastos antes de guardarlo en el CRM.');
         }
 
-        return $this->failure('Por ahora puedo ejecutar proyectos, tareas, notas, subtareas, recordatorios, reuniones, cotizaciones, contratos y correos desde el botón de confirmación.');
+        return $this->failure('Por ahora puedo ejecutar tableros/proyectos, columnas, tareas, notas, subtareas, recordatorios, reuniones, cotizaciones, contratos y correos desde el botón de confirmación.');
     }
 
     private function resolveProposalIntent(string $text, string $normalized): ?string
@@ -268,7 +271,8 @@ class AiActionExecutor
         $hasCurrentProject = trim((string) data_get($this->context, 'current_project.id', '')) !== '';
 
         $hasNote = preg_match('/\bnota(s)?\b/u', $directive) === 1;
-        $hasProject = preg_match('/\bproyecto(s)?\b/u', $directive) === 1;
+        $hasProject = preg_match('/\b(proyecto(s)?|tablero(s)?|kanban)\b/u', $directive) === 1;
+        $hasColumn = preg_match('/\b(columna(s)?|lista(s)?)\b/u', $directive) === 1;
         $hasTask = preg_match('/\btarea(s)?\b/u', $directive) === 1;
         $hasReminder = preg_match('/\b(recordatorio(s)?|recordar|recuerdame|recu[eé]rdame|reminder)\b/u', $directive) === 1;
         $hasEmail = preg_match('/\b(correo|email|e-mail)\b/u', $directive) === 1;
@@ -301,7 +305,7 @@ class AiActionExecutor
         };
         $notePos = $firstPosition(['nota', 'notas']);
         $emailPos = $firstPosition(['correo', 'email', 'e-mail']);
-        $projectPos = $firstPosition(['proyecto', 'proyectos']);
+        $projectPos = $firstPosition(['proyecto', 'proyectos', 'tablero', 'tableros', 'kanban']);
         $taskPos = $firstPosition(['tarea', 'tareas', 'subtarea', 'subtareas']);
         $meetingPos = $firstPosition(['reunion', 'reuniones', 'meeting']);
 
@@ -327,6 +331,10 @@ class AiActionExecutor
 
         if ($hasProject && $hasCreate && ! $hasProjectNotePhrase && ($notePos === null || ($projectPos !== null && $projectPos < $notePos))) {
             return 'project_create';
+        }
+
+        if ($hasColumn && ($hasCreate || $hasUpdate) && $hasCurrentProject) {
+            return 'project_update';
         }
 
         if (preg_match('/\bsubtarea(s)?\b/u', $directive) === 1 && ($hasCreate || $hasUpdate) && ! $hasProjectNotePhrase && ($notePos === null || ($taskPos !== null && $taskPos < $notePos))) {
@@ -366,7 +374,7 @@ class AiActionExecutor
         }
 
         if ($hasProject) {
-            if ($hasCreate || preg_match('/\bnuevo\s+proyecto\b/u', $directive) === 1) {
+            if ($hasCreate || preg_match('/\bnuevo\s+(proyecto|tablero)\b/u', $directive) === 1) {
                 return 'project_create';
             }
 
@@ -537,13 +545,17 @@ class AiActionExecutor
 
         $draft = $this->parseProjectDraft($proposal);
         if ($draft['title'] === '') {
-            return $this->failure('No pude identificar el nombre del proyecto. Escríbeme el nombre y las tareas para crearlo.');
+            return $this->failure('No pude identificar el nombre del tablero/proyecto. Escríbeme el nombre y las tareas para crearlo.');
         }
 
         $settings = $this->settings->find('settings') ?: [];
         $stages = array_values(array_filter($settings['project_stages'] ?? []));
         $fallbackStage = (string) ($stages[0] ?? 'INICIO');
         $stage = $this->normalizeStage($draft['stage'], $stages, $fallbackStage);
+        $taskStages = $draft['columns'];
+        if (empty($taskStages)) {
+            $taskStages = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
+        }
         $priority = $this->normalizePriority($draft['priority']);
         $client = $this->matchClient($draft['client']);
         $responsibles = $this->matchUsers($draft['responsibles']);
@@ -566,6 +578,7 @@ class AiActionExecutor
             'responsable_ids' => $responsibles['ids'],
             'siguiente' => null,
             'descripcion' => $draft['description'] ?: null,
+            'task_stages' => $taskStages,
             'tareas' => [],
             'time_logs' => [],
         ]);
@@ -574,12 +587,13 @@ class AiActionExecutor
         foreach ($draft['tasks'] as $taskDraft) {
             $taskText = is_array($taskDraft) ? (string) ($taskDraft['text'] ?? '') : (string) $taskDraft;
             $taskNote = is_array($taskDraft) ? trim((string) ($taskDraft['note'] ?? '')) : '';
+            $taskStage = is_array($taskDraft) ? trim((string) ($taskDraft['stage'] ?? '')) : '';
             $taskText = $this->normalizeTaskTitle($taskText);
             if ($taskText === '') {
                 continue;
             }
 
-            $task = $this->taskPayload($taskText, $start, $due, $priority, $responsibles);
+            $task = $this->taskPayload($taskText, $start, $due, $priority, $responsibles, $this->normalizeTaskStage($taskStage, $taskStages), count($tasks));
             if ($taskNote !== '') {
                 $task['notes'][] = $this->notePayload($taskNote);
             }
@@ -597,11 +611,12 @@ class AiActionExecutor
         }
 
         $taskLine = count($tasks) === 1 ? '1 tarea agregada' : count($tasks) . ' tareas agregadas';
+        $columnLine = count($taskStages) === 1 ? '1 columna' : count($taskStages) . ' columnas';
         $url = '/proyectos?open_project=' . rawurlencode((string) $project['id']);
 
         return [
             'ok' => true,
-            'content' => "✅ **Proyecto creado realmente en el CRM:**\n\n- **Nombre:** {$project['titulo']}\n- **Estado:** {$project['etapa']}\n- **Prioridad:** {$project['prioridad']}\n- **Tareas:** {$taskLine}\n\n[Abrir proyecto]({$url})",
+            'content' => "✅ **Tablero creado realmente en el CRM:**\n\n- **Nombre:** {$project['titulo']}\n- **Estado:** {$project['etapa']}\n- **Prioridad:** {$project['prioridad']}\n- **Columnas Kanban:** {$columnLine}\n- **Tareas:** {$taskLine}\n\n[Abrir tablero]({$url})",
             'url' => $url,
             'project_id' => $project['id'],
             'undo_action' => $this->deleteUndo('proyectos', (string) $project['id'], 'Deshacer creación del proyecto'),
@@ -628,12 +643,27 @@ class AiActionExecutor
         $stage = $this->stripMarkdown($this->field($proposal, ['Estado', 'Etapa']));
         $priority = $this->stripMarkdown($this->field($proposal, ['Prioridad']));
         $due = $this->parseDate($this->field($proposal, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']));
+        $taskStages = $this->projectTaskStages($project);
+        $columns = $this->extractColumns($proposal);
+        $renameColumnFrom = $this->stripMarkdown($this->field($proposal, ['Columna actual', 'Columna anterior', 'Renombrar columna', 'Lista actual']));
+        $renameColumnTo = $this->stripMarkdown($this->field($proposal, ['Nueva columna', 'Nuevo nombre de columna', 'Nuevo nombre', 'Lista nueva']));
 
         if ($title !== '') $updates['titulo'] = Str::limit($title, 140, '');
         if ($description !== '') $updates['descripcion'] = $description;
         if ($stage !== '') $updates['etapa'] = $stage;
         if ($priority !== '') $updates['prioridad'] = $this->normalizePriority($priority);
         if ($due) $updates['vencimiento'] = $due;
+        if ($renameColumnFrom !== '' && $renameColumnTo !== '') {
+            $nextStages = array_map(
+                fn ($item) => Str::lower(Str::ascii($item)) === Str::lower(Str::ascii($renameColumnFrom))
+                    ? Str::limit($renameColumnTo, 60, '')
+                    : $item,
+                $taskStages
+            );
+            $updates['task_stages'] = array_values(array_unique(array_filter($nextStages)));
+        } elseif (!empty($columns)) {
+            $updates['task_stages'] = array_values(array_unique(array_merge($taskStages, $columns)));
+        }
 
         $responsibles = $this->matchUsers($this->splitPeople($this->field($proposal, ['Responsables', 'Asignados', 'Encargados'])));
         if (!empty($responsibles['names'])) {
@@ -647,6 +677,14 @@ class AiActionExecutor
         }
 
         $tasks = array_values($project['tareas'] ?? []);
+        if ($renameColumnFrom !== '' && $renameColumnTo !== '') {
+            foreach ($tasks as &$task) {
+                if (Str::lower(Str::ascii((string) ($task['board_stage'] ?? ''))) === Str::lower(Str::ascii($renameColumnFrom))) {
+                    $task['board_stage'] = Str::limit($renameColumnTo, 60, '');
+                }
+            }
+            unset($task);
+        }
         $addedTasks = 0;
         $addedNotes = 0;
         $addedSubtasks = 0;
@@ -665,13 +703,17 @@ class AiActionExecutor
             $taskDue = $this->parseDate($this->field($proposal, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']));
             $taskStart = $this->parseDate($this->field($proposal, ['Fecha inicio', 'Inicio']));
             $taskPriority = $priority !== '' ? $this->normalizePriority($priority) : (string) ($project['prioridad'] ?? 'Atención');
+            $explicitTaskStage = $this->stripMarkdown($this->field($proposal, ['Columna', 'Lista', 'Estado de tarea']));
+            $activeTaskStages = $updates['task_stages'] ?? $taskStages;
             foreach (array_values(array_unique(array_filter($taskItems))) as $taskText) {
                 $taskText = trim((string) $taskText);
                 if ($taskText === '') {
                     continue;
                 }
 
-                $tasks[] = $this->taskPayload($taskText, $taskStart, $taskDue, $taskPriority, $responsibles);
+                $parsedTask = $this->taskLineWithStage($taskText, $activeTaskStages);
+                $taskStage = $parsedTask['stage'] ?: $explicitTaskStage;
+                $tasks[] = $this->taskPayload($parsedTask['text'], $taskStart, $taskDue, $taskPriority, $responsibles, $this->normalizeTaskStage($taskStage, $activeTaskStages), count($tasks));
                 $addedTasks++;
             }
         }
@@ -738,7 +780,7 @@ class AiActionExecutor
             unset($task);
         }
 
-        if ($addedTasks || $addedNotes || $addedSubtasks) {
+        if ($addedTasks || $addedNotes || $addedSubtasks || ($renameColumnFrom !== '' && $renameColumnTo !== '')) {
             $updates['tareas'] = $tasks;
         }
 
@@ -752,6 +794,8 @@ class AiActionExecutor
         if ($description !== '') $changes[] = 'descripción actualizada';
         if (!empty($responsibles['names'])) $changes[] = 'responsables actualizados';
         if ($stage !== '' || $priority !== '' || $due) $changes[] = 'datos del proyecto actualizados';
+        if ($renameColumnFrom !== '' && $renameColumnTo !== '') $changes[] = 'columna renombrada';
+        elseif (!empty($columns)) $changes[] = count($columns) === 1 ? '1 columna agregada' : count($columns) . ' columnas agregadas';
         if ($addedTasks) $changes[] = $addedTasks === 1 ? '1 tarea agregada' : "{$addedTasks} tareas agregadas";
         if ($addedNotes) $changes[] = $addedNotes === 1 ? '1 nota agregada' : "{$addedNotes} notas agregadas";
         if ($addedSubtasks) $changes[] = $addedSubtasks === 1 ? '1 subtarea agregada' : "{$addedSubtasks} subtareas agregadas";
@@ -791,9 +835,13 @@ class AiActionExecutor
         $due = $this->parseDate($this->field($proposal, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']));
         $start = $this->parseDate($this->field($proposal, ['Fecha inicio', 'Inicio']));
         $priority = $this->normalizePriority($this->field($proposal, ['Prioridad']));
+        $taskStages = $this->projectTaskStages($project);
+        $explicitTaskStage = $this->stripMarkdown($this->field($proposal, ['Columna', 'Lista', 'Estado de tarea']));
         $tasks = array_values($project['tareas'] ?? []);
         foreach ($taskItems as $item) {
-            $tasks[] = $this->taskPayload($item, $start, $due, $priority, $responsibles);
+            $parsedTask = $this->taskLineWithStage($item, $taskStages);
+            $taskStage = $parsedTask['stage'] ?: $explicitTaskStage;
+            $tasks[] = $this->taskPayload($parsedTask['text'], $start, $due, $priority, $responsibles, $this->normalizeTaskStage($taskStage, $taskStages), count($tasks));
         }
 
         $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
@@ -1487,6 +1535,12 @@ class AiActionExecutor
             'nota',
             'tarea nueva',
             'tareas a agregar',
+            'tablero',
+            'kanban',
+            'columna',
+            'columnas',
+            'lista',
+            'listas',
         ] as $needle) {
             if (str_contains($normalized, $needle)) {
                 return true;
@@ -1498,24 +1552,33 @@ class AiActionExecutor
 
     private function isProjectCreateIntent(string $normalized): bool
     {
-        if (! str_contains($normalized, 'proyecto')) {
+        if (! str_contains($normalized, 'proyecto') && ! str_contains($normalized, 'tablero') && ! str_contains($normalized, 'kanban')) {
             return false;
         }
 
         foreach ([
             'nuevo proyecto',
+            'nuevo tablero',
             'proyecto propuesto',
+            'tablero propuesto',
             'crear proyecto',
+            'crear tablero',
             'crea proyecto',
+            'crea tablero',
             'creame un proyecto',
+            'creame un tablero',
             'créame un proyecto',
+            'créame un tablero',
             'listo para crear',
             'crear ahora este proyecto',
+            'crear ahora este tablero',
             'crear ahora el proyecto',
+            'crear ahora el tablero',
             'confirmas la creacion',
             'confirmas crear',
             'tareas sugeridas',
             'lista de tareas',
+            'columnas kanban',
         ] as $needle) {
             if (str_contains($normalized, $needle)) {
                 return true;
@@ -1525,7 +1588,7 @@ class AiActionExecutor
         return false;
     }
 
-    private function taskPayload(string $taskText, ?string $start, ?string $due, string $priority, array $responsibles): array
+    private function taskPayload(string $taskText, ?string $start, ?string $due, string $priority, array $responsibles, string $boardStage = 'Por hacer', int $boardOrder = 0): array
     {
         return [
             'id' => (string) Str::ulid(),
@@ -1537,6 +1600,8 @@ class AiActionExecutor
             'priority' => $this->normalizePriority($priority),
             'owners' => $responsibles['names'] ?? [],
             'owner_ids' => $responsibles['ids'] ?? [],
+            'board_stage' => trim($boardStage) !== '' ? Str::limit(trim($boardStage), 60, '') : 'Por hacer',
+            'board_order' => $boardOrder,
             'total_seconds' => 0,
             'subtasks' => [],
             'notes' => [],
@@ -1570,6 +1635,7 @@ class AiActionExecutor
         $tasks = [];
         $inTasks = false;
         $currentTaskIndex = null;
+        $columns = $this->extractColumns($proposal);
 
         foreach ($lines as $line) {
             $clean = trim(preg_replace('/^\s*[-*•]\s*/u', '', $line) ?? $line);
@@ -1600,9 +1666,11 @@ class AiActionExecutor
                         $taskNote = trim((string) $match[2]);
                     }
 
+                    $parsedTask = $this->taskLineWithStage($taskText, $columns);
                     $tasks[] = [
-                        'text' => $this->normalizeTaskTitle($taskText),
+                        'text' => $this->normalizeTaskTitle($parsedTask['text']),
                         'note' => $this->stripMarkdown($taskNote),
+                        'stage' => $parsedTask['stage'],
                     ];
                     $currentTaskIndex = array_key_last($tasks);
                     continue;
@@ -1610,7 +1678,7 @@ class AiActionExecutor
             }
         }
 
-        $title = $this->field($proposal, ['Nombre', 'Proyecto', 'Título', 'Titulo']);
+        $title = $this->field($proposal, ['Nombre', 'Proyecto', 'Tablero', 'Título', 'Titulo']);
         if ($title === '') {
             $title = $this->fallbackTitle($proposal);
         }
@@ -1624,6 +1692,7 @@ class AiActionExecutor
             'due_date' => $this->stripMarkdown($this->field($proposal, ['Fecha fin', 'Vencimiento', 'Vence', 'Fecha de entrega'])),
             'responsibles' => $this->splitPeople($this->field($proposal, ['Responsables', 'Asignados', 'Encargados'])),
             'description' => $this->stripMarkdown($this->field($proposal, ['Descripción', 'Descripcion'])),
+            'columns' => $columns,
             'tasks' => $this->uniqueTaskDrafts($tasks),
         ];
     }
@@ -1647,6 +1716,120 @@ class AiActionExecutor
         }
 
         return $result;
+    }
+
+    private function extractColumns(string $proposal): array
+    {
+        $labels = ['Columnas', 'Columnas Kanban', 'Listas', 'Estados del tablero'];
+        $stopLabels = ['Tareas sugeridas', 'Tareas a agregar', 'Tareas', 'Lista de tareas', 'Descripción', 'Descripcion', 'Responsables', 'Vencimiento', 'Fecha inicio', 'Prioridad', 'Estado', 'Cliente'];
+        $items = [];
+        $capturing = false;
+
+        foreach (preg_split('/\R+/', $proposal) ?: [] as $line) {
+            $clean = trim((string) $line);
+            if ($clean === '') {
+                continue;
+            }
+
+            if ($capturing) {
+                foreach ($stopLabels as $stopLabel) {
+                    if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($stopLabel, '/') . '\**\s*:/iu', $clean)) {
+                        $capturing = false;
+                        continue 2;
+                    }
+                }
+
+                $items[] = $clean;
+                continue;
+            }
+
+            foreach ($labels as $label) {
+                if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($label, '/') . '\**\s*:\s*(.*)$/iu', $clean, $match)) {
+                    $capturing = true;
+                    $inline = trim((string) ($match[1] ?? ''));
+                    if ($inline !== '') {
+                        $items = array_merge($items, preg_split('/[,;|]/u', $inline) ?: []);
+                    }
+                    continue 2;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter(array_map(function ($item) {
+            $item = trim($this->stripMarkdown((string) $item));
+            $item = preg_replace('/^\d+[\.)]\s*/u', '', $item) ?? $item;
+            return $item !== '' ? Str::limit($item, 60, '') : '';
+        }, $items))));
+    }
+
+    private function projectTaskStages(array $project): array
+    {
+        $stages = array_values(array_filter(array_map(
+            fn ($stage) => trim((string) $stage),
+            (array) ($project['task_stages'] ?? [])
+        )));
+
+        if (!empty($stages)) {
+            return $stages;
+        }
+
+        $fromTasks = collect($project['tareas'] ?? [])
+            ->map(fn ($task) => trim((string) ($task['board_stage'] ?? '')))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return !empty($fromTasks) ? $fromTasks : ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
+    }
+
+    private function normalizeTaskStage(string $value, array $stages): string
+    {
+        $value = trim($this->stripMarkdown($value));
+        if ($value === '') {
+            return $stages[0] ?? 'Por hacer';
+        }
+
+        $needle = Str::lower(Str::ascii($value));
+        foreach ($stages as $stage) {
+            $stageNeedle = Str::lower(Str::ascii((string) $stage));
+            if ($stageNeedle === $needle || str_contains($stageNeedle, $needle) || str_contains($needle, $stageNeedle)) {
+                return (string) $stage;
+            }
+        }
+
+        return Str::limit($value, 60, '');
+    }
+
+    private function taskLineWithStage(string $text, array $stages): array
+    {
+        $clean = trim($this->stripMarkdown($text));
+        $stage = '';
+
+        if (preg_match('/^\[([^\]]+)\]\s*(.+)$/u', $clean, $match)) {
+            return [
+                'stage' => $this->normalizeTaskStage((string) $match[1], $stages),
+                'text' => trim((string) $match[2]),
+            ];
+        }
+
+        if (preg_match('/^([^:]{2,60})\s*:\s*(.+)$/u', $clean, $match)) {
+            $candidate = trim((string) $match[1]);
+            $normalized = $this->normalizeTaskStage($candidate, $stages);
+            if ($candidate !== '' && in_array($normalized, $stages, true)) {
+                $stage = $normalized;
+                $clean = trim((string) $match[2]);
+            }
+        } elseif (preg_match('/^(.{2,60}?)\s+[-–—]\s+(.+)$/u', $clean, $match)) {
+            $candidate = trim((string) $match[1]);
+            $normalized = $this->normalizeTaskStage($candidate, $stages);
+            if (in_array($normalized, $stages, true)) {
+                $stage = $normalized;
+                $clean = trim((string) $match[2]);
+            }
+        }
+
+        return ['stage' => $stage, 'text' => $clean];
     }
 
     private function parseEmailDraft(string $proposal): array
@@ -1821,7 +2004,7 @@ class AiActionExecutor
         });
     }
 
-    private function projectFromProposalOrContext(string $proposal, array $labels = ['Proyecto']): ?array
+    private function projectFromProposalOrContext(string $proposal, array $labels = ['Proyecto', 'Tablero']): ?array
     {
         $name = $this->field($proposal, $labels);
         if ($name !== '') {
@@ -2044,7 +2227,7 @@ class AiActionExecutor
 
     private function fallbackTitle(string $proposal): string
     {
-        if (preg_match('/(?:crear|crea|nuevo)\s+(?:un\s+)?proyecto\s+(?:llamado|para|de)?\s*["“]?([^"”\n.]+)/iu', $proposal, $match)) {
+        if (preg_match('/(?:crear|crea|nuevo)\s+(?:un\s+)?(?:proyecto|tablero)\s+(?:llamado|para|de)?\s*["“]?([^"”\n.]+)/iu', $proposal, $match)) {
             return trim((string) ($match[1] ?? ''));
         }
 

@@ -68,6 +68,17 @@
 
   <main class="flex-1 py-8">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      @if(session('msg_ok'))
+        <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">
+          {{ session('msg_ok') }}
+        </div>
+      @endif
+
+      @if($errors->any())
+        <div class="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-bold text-rose-800">
+          {{ $errors->first('pago') ?: $errors->first() }}
+        </div>
+      @endif
       
       <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
         <!-- Invoice Header -->

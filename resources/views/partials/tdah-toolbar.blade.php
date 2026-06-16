@@ -34,25 +34,7 @@
             <p id="tdah-one-thing-praise" class="text-xs text-lime-600 font-bold mt-1 hidden animate-bounce">¡Bien hecho! 🎉</p>
         </div>
 
-        <!-- 2. Focus Mode -->
-        <div class="mb-5">
-            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-indigo-200 transition-all cursor-pointer group" id="tdah-focus-trigger">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    </div>
-                    <div>
-                        <div class="font-bold text-sm text-slate-900">Modo Enfoque</div>
-                        <div class="text-[10px] text-slate-500">Ocultar interfaz</div>
-                    </div>
-                </div>
-                <div class="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-200 transition-colors" id="tdah-focus-toggle-bg">
-                    <span class="translate-x-1 inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm" id="tdah-focus-toggle-dot"></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 3. Pomodoro -->
+        <!-- 2. Pomodoro -->
         <div id="tdah-pomodoro-zone" class="mb-5">
             <!-- Tiempo Pomodoro Label -->
             <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Tiempo Pomodoro</div>
@@ -106,9 +88,6 @@
                 </div>
             </div>
 
-            <!-- Task Selection -->
-            <div id="tdah-pomodoro-task" class="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600 truncate">Selecciona o escribe una tarea en La unica cosa que haras</div>
-
         </div>
 
     </div>
@@ -122,19 +101,14 @@
 </div>
 
 <div id="quick-notes-toolkit" class="fixed bottom-32 right-4 md:bottom-6 md:right-6 z-[126] md:z-[10000]">
-    <div id="quick-notes-panel" class="fixed left-3 right-3 bottom-28 w-auto max-w-none md:left-auto md:right-6 md:bottom-24 md:w-[21.5rem] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden hidden">
+    <div id="quick-notes-panel" class="fixed left-3 right-3 bottom-28 w-auto max-w-none md:left-auto md:right-6 md:bottom-24 md:w-[21.5rem] bg-white rounded-3xl shadow-2xl border border-slate-200 hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
-            <div class="flex min-w-0 items-center gap-2 text-slate-900">
-                <button id="quick-note-back" type="button" class="hidden w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
-                    <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 19l-7-7 7-7"/></svg>
-                </button>
-                <h3 class="truncate font-bold text-slate-800 text-lg leading-none">Notas rápidas</h3>
+            <div class="flex items-center gap-2 text-slate-900">
+                <svg class="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 20h9"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                <h3 class="font-bold text-slate-800 text-lg leading-none">Notas rápidas</h3>
             </div>
             <div class="flex items-center gap-2">
                 <div id="quick-notes-count" class="text-slate-400 text-xs font-semibold">0 notas</div>
-                <button id="quick-note-delete" type="button" class="hidden w-8 h-8 rounded-full hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors">
-                    <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6V4h8v2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 6l-1 14H6L5 6"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11v6M14 11v6"/></svg>
-                </button>
                 <button id="quick-notes-close" type="button" class="w-8 h-8 rounded-full border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
                     <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -152,15 +126,18 @@
                 <button id="quick-notes-new" type="button" class="w-full rounded-2xl bg-[#ecfe88] hover:bg-[#d9ef60] text-slate-900 text-base font-extrabold py-2.5 transition-colors">+ Nueva nota</button>
             </div>
         </div>
-        <div id="quick-notes-editor-view" class="hidden min-h-0 flex-1 flex-col">
-            <div class="quick-note-toolbar shrink-0 overflow-x-auto px-3 py-2 border-b border-[#dde0e8] bg-[#f4f5f8]">
-                <div class="flex w-max min-w-full items-center gap-1.5">
-                    <div id="quick-note-format-menu-wrap" class="note-format-menu-wrap relative inline-flex shrink-0">
-                        <button id="quick-note-format-trigger" type="button" class="note-format-trigger" title="Estilo de texto" aria-haspopup="listbox" aria-expanded="false">
-                            <span id="quick-note-format-label">Texto normal</span>
-                            <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd"/></svg>
-                        </button>
-                    </div>
+        <div id="quick-notes-editor-view" class="hidden">
+            <div class="flex items-center justify-between px-3.5 py-2 border-b border-slate-200">
+                <button id="quick-note-back" type="button" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+                    <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <div class="text-base font-extrabold text-slate-800 leading-none">Editando nota</div>
+                <button id="quick-note-delete" type="button" class="w-8 h-8 rounded-full hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors">
+                    <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6V4h8v2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 6l-1 14H6L5 6"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11v6M14 11v6"/></svg>
+                </button>
+            </div>
+            <div class="quick-note-toolbar px-4 py-3 border-b border-[#dde0e8] bg-[#f4f5f8]">
+                <div class="flex items-center gap-2">
                     <button data-qn-cmd="checkline" type="button" class="qn-tool-btn" title="Checklist">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 11l3 3L22 4"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M2 20h14"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M2 12h4"/></svg>
                     </button>
@@ -170,9 +147,6 @@
                     <button data-qn-cmd="bold" type="button" class="qn-tool-btn qn-tool-text-btn">B</button>
                     <button data-qn-cmd="italic" type="button" class="qn-tool-btn qn-tool-text-btn italic">I</button>
                     <button data-qn-cmd="strikeThrough" type="button" class="qn-tool-btn qn-tool-text-btn line-through">S</button>
-                    <button data-qn-cmd="highlight" type="button" class="qn-tool-btn" title="Resaltar">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="m9 11 6-6 4 4-6 6"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="m5 19 4.5-1 8-8"/><path stroke-linecap="round" stroke-width="2.4" d="M4 21h8"/></svg>
-                    </button>
                     <button data-qn-cmd="divider" type="button" class="qn-tool-btn" title="Separador">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.4" d="M5 12h14"/></svg>
                     </button>
@@ -180,6 +154,21 @@
                     <button id="quick-note-image-btn" type="button" class="qn-tool-btn" title="Insertar imagen">
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 15-4.5-4.5L8 19"/></svg>
                     </button>
+                    <div class="relative">
+                        <button id="quick-note-color-toggle" type="button" class="qn-tool-btn qn-palette-toggle" title="Colores de fondo">
+                            <span class="qn-palette-swatch" aria-hidden="true"></span>
+                        </button>
+                        <div id="quick-note-color-popover" class="hidden absolute right-0 top-[calc(100%+0.45rem)] rounded-xl border border-slate-200 bg-white shadow-lg p-2 z-30">
+                            <div class="flex items-center gap-2">
+                                <button data-qn-color="yellow" type="button" class="qn-color-dot is-active" style="background:#f4dc38"></button>
+                                <button data-qn-color="green" type="button" class="qn-color-dot" style="background:#34c98d"></button>
+                                <button data-qn-color="blue" type="button" class="qn-color-dot" style="background:#31afe9"></button>
+                                <button data-qn-color="pink" type="button" class="qn-color-dot" style="background:#f46787"></button>
+                                <button data-qn-color="purple" type="button" class="qn-color-dot" style="background:#9b7df0"></button>
+                                <button data-qn-color="white" type="button" class="qn-color-dot" style="background:#c9d3e1"></button>
+                            </div>
+                        </div>
+                    </div>
                     <input id="quick-note-image-input" type="file" accept="image/*" class="hidden">
                 </div>
                 <div id="quick-note-emoji-popover" class="hidden mt-2 rounded-xl border border-slate-200 bg-white shadow-lg p-2 w-fit">
@@ -195,41 +184,29 @@
                     </div>
                 </div>
             </div>
-            <div id="quick-note-format-menu" class="note-format-menu hidden rounded-xl border border-white/15 bg-neutral-800 p-1 shadow-2xl" role="listbox">
-                <button type="button" class="note-format-option is-selected" data-qn-format="p">Texto normal</button>
-                <button type="button" class="note-format-option" data-qn-format="h1">Titulo</button>
-                <button type="button" class="note-format-option" data-qn-format="h2">Subtitulo</button>
-            </div>
-            <div id="quick-note-editor-canvas" class="relative min-h-0 flex-1 overflow-y-auto px-4 py-3 bg-[#f7f6dd] border-b border-slate-200">
-                <div id="quick-note-editor" class="min-h-[170px] text-[1.02rem] leading-snug text-[#1f2d49] outline-none" contenteditable="true" spellcheck="true"></div>
-            </div>
-            <div class="relative flex items-center justify-end gap-2 px-4 py-2 bg-slate-50 text-xs font-semibold">
-                <div class="relative">
-                    <button id="quick-note-color-toggle" type="button" class="qn-config-btn qn-palette-toggle" title="Colores de fondo">
-                        <span class="qn-palette-swatch" aria-hidden="true"></span>
+            <div id="quick-note-editor-canvas" class="relative px-4 py-4 pb-14 bg-[#f7f6dd] border-b border-slate-200">
+                <div id="quick-note-editor" class="min-h-[170px] text-[1.02rem] leading-snug font-medium text-[#1f2d49] outline-none" contenteditable="true" spellcheck="true"></div>
+                <div class="absolute bottom-3 right-3">
+                    <button id="quick-note-client-toggle" type="button" class="w-8 h-8 rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-500 transition-colors" title="Vincular cliente">
+                        <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14M5 12h14"/></svg>
                     </button>
-                    <div id="quick-note-color-popover" class="hidden absolute right-0 bottom-[calc(100%+0.45rem)] rounded-xl border border-slate-200 bg-white shadow-lg p-2 z-30">
-                        <div class="flex items-center gap-2">
-                            <button data-qn-color="yellow" type="button" class="qn-color-dot is-active" style="background:#f4dc38"></button>
-                            <button data-qn-color="green" type="button" class="qn-color-dot" style="background:#34c98d"></button>
-                            <button data-qn-color="blue" type="button" class="qn-color-dot" style="background:#31afe9"></button>
-                            <button data-qn-color="pink" type="button" class="qn-color-dot" style="background:#f46787"></button>
-                            <button data-qn-color="purple" type="button" class="qn-color-dot" style="background:#9b7df0"></button>
-                            <button data-qn-color="white" type="button" class="qn-color-dot" style="background:#c9d3e1"></button>
+                    <div id="quick-note-client-popover" class="hidden absolute bottom-10 right-0 w-52 rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-20">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Vincular cliente</div>
+                        <div class="relative">
+                            <button id="quick-note-client-select-trigger" type="button" class="w-full rounded-xl border border-slate-200 text-xs px-2.5 py-2 text-slate-700 bg-white inline-flex items-center justify-between gap-2">
+                                <span id="quick-note-client-selected-label" class="truncate">Sin cliente</span>
+                                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div id="quick-note-client-dropdown" class="hidden absolute left-0 right-0 bottom-[calc(100%+0.4rem)] rounded-xl border border-slate-200 bg-white shadow-xl p-1.5">
+                                <input id="quick-note-client-search" type="text" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700 mb-1.5" placeholder="Buscar cliente...">
+                                <div id="quick-note-client-options" class="max-h-36 overflow-y-auto space-y-1"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <button id="quick-note-client-toggle" type="button" class="inline-flex h-7 min-w-7 items-center justify-center gap-1 rounded-full bg-indigo-600 px-2.5 text-white shadow-sm hover:bg-indigo-500 transition-colors" title="Vincular cliente">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14M5 12h14"/></svg>
-                    <span id="quick-note-client-selected-label" class="max-w-[6rem] truncate text-[10px] font-bold">Sin cliente</span>
-                </button>
-                <div id="quick-note-client-popover" class="hidden absolute bottom-[calc(100%+0.45rem)] right-3 w-52 rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-20">
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Vincular cliente</div>
-                    <div id="quick-note-client-dropdown" class="space-y-1.5">
-                        <input id="quick-note-client-search" type="text" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700" placeholder="Buscar cliente...">
-                        <div id="quick-note-client-options" class="max-h-40 overflow-y-auto space-y-1"></div>
-                    </div>
-                </div>
+            </div>
+            <div class="px-4 py-3 bg-slate-50 text-slate-400 text-xs font-semibold">
+                Enter añade línea · Backspace en vacío cambia tipo
             </div>
         </div>
     </div>
@@ -249,7 +226,7 @@
         </button>
     </div>
     <button id="productivity-toggle" type="button" class="w-[3.1rem] h-[3.1rem] rounded-full bg-[#f0fe97] text-[#101729] shadow-2xl border-2 border-[#101729] flex items-center justify-center transition-transform hover:scale-105 hover:bg-[#e6f67f]">
-        <i id="productivity-toggle-plus" class="fa-solid fa-bolt text-[1.25rem]" aria-hidden="true"></i>
+        <svg id="productivity-toggle-plus" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.52 2.35a1 1 0 0 1 .43 1.1L12.3 9H18a1 1 0 0 1 .78 1.63l-9.2 11.35a1 1 0 0 1-1.73-.9L9.7 14H4.9a1 1 0 0 1-.82-1.57l8.2-11a1 1 0 0 1 1.24-.08Z"/></svg>
         <svg id="productivity-toggle-close" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
 </div>
@@ -431,9 +408,9 @@
     }
 
     .quick-note-toolbar .qn-tool-btn {
-        width: 1.85rem;
-        height: 1.85rem;
-        border-radius: 0.65rem;
+        width: 2.05rem;
+        height: 2.05rem;
+        border-radius: 0.75rem;
         border: 1px solid transparent;
         color: #60728b;
         font-weight: 700;
@@ -444,111 +421,15 @@
     }
     .quick-note-toolbar .qn-tool-btn:hover { background: #eef2f8; }
     .quick-note-toolbar .qn-tool-btn-active { background: #dfe3ff; color: #4f46e5; }
-    .quick-note-toolbar .qn-tool-text-btn { font-size: 1rem; line-height: 1; }
-    .quick-note-toolbar .qn-tool-btn svg {
-        width: 1rem;
-        height: 1rem;
-    }
-    .quick-note-toolbar {
-        flex: 0 0 auto;
-        scrollbar-width: none;
-    }
-    .quick-note-toolbar::-webkit-scrollbar {
-        display: none;
-    }
-    #quick-notes-panel .note-format-menu-wrap {
-        position: relative;
-        display: inline-flex;
-        flex: 0 0 auto;
-    }
-    #quick-notes-panel .note-format-trigger {
-        height: 1.85rem;
-        width: 7.45rem;
-        border-radius: .65rem;
-        border: 1px solid #d4dae3;
-        background: #fff;
-        color: #111728;
-        font-size: .76rem;
-        font-weight: 700;
-        padding: 0 .55rem 0 .7rem;
-        outline: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: .45rem;
-        box-shadow: 0 1px 2px rgba(15,23,42,.04);
-        white-space: nowrap;
-    }
-    #quick-notes-panel .note-format-trigger span {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    #quick-notes-panel .note-format-trigger:hover { background: #f8fafc; }
-    #quick-notes-panel .note-format-menu {
-        position: absolute;
-        left: .75rem;
-        top: 7rem;
-        width: 8rem;
-        z-index: 80;
-        display: flex;
-        flex-direction: column;
-        gap: .1rem;
-        border-radius: .85rem;
-        border: 1px solid rgba(255,255,255,.14);
-        background: rgba(31,31,34,.95);
-        box-shadow: 0 16px 34px rgba(15,23,42,.24);
-        padding: .25rem;
-        overflow: hidden;
-    }
-    #quick-notes-panel .note-format-menu.hidden {
-        display: none !important;
-    }
-    #quick-notes-panel .note-format-option {
-        width: 100%;
-        height: 1.65rem;
-        border-radius: .5rem;
-        display: flex;
-        align-items: center;
-        gap: .35rem;
-        padding: 0 .55rem;
-        color: #f8fafc;
-        font-size: .74rem;
-        font-weight: 750;
-        text-align: left;
-    }
-    #quick-notes-panel .note-format-option:hover { background: rgba(255,255,255,.12); }
-    #quick-notes-panel .note-format-option.is-selected {
-        background: #ff5f72;
-        color: #fff;
-    }
-    #quick-notes-panel .note-format-option.is-selected::before {
-        content: "✓";
-        font-weight: 900;
-    }
-    .qn-config-btn {
-        width: 1.75rem;
-        height: 1.75rem;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .qn-config-btn:hover {
-        background: #eef2f8;
-    }
-    .qn-palette-toggle {
+    .quick-note-toolbar .qn-tool-text-btn { font-size: 1.1rem; line-height: 1; }
+    .quick-note-toolbar .qn-palette-toggle {
         border-radius: 999px;
         border-color: #d4dae3;
         background: #ffffff;
-        border-width: 1px;
-        border-style: solid;
     }
-    .qn-palette-swatch {
-        width: 1rem;
-        height: 1rem;
+    .quick-note-toolbar .qn-palette-swatch {
+        width: 1.08rem;
+        height: 1.08rem;
         border-radius: 999px;
         border: 2px solid #ffffff;
         box-shadow: 0 0 0 1px rgba(96, 114, 139, 0.25);
@@ -566,42 +447,29 @@
     .qn-color-dot:hover { transform: scale(1.05); }
     .qn-color-dot.is-active { border-color: #4f46e5; }
 
-    .qn-checkline,
-    #quick-note-editor .note-checkline {
+    .qn-checkline {
         display: flex;
         align-items: center;
         gap: 0.45rem;
     }
     .qn-checkline span,
-    .qn-numberline .qn-number-content,
-    #quick-note-editor .note-checkline span,
-    #quick-note-editor .note-numberline .note-number-content {
+    .qn-numberline .qn-number-content {
         min-width: 1ch;
         outline: none;
     }
-    .qn-checkline .qn-checkbox,
-    #quick-note-editor .note-checkbox {
+    .qn-checkline .qn-checkbox {
         width: 1.05rem;
         height: 1.05rem;
         accent-color: #4f46e5;
         cursor: pointer;
         flex: 0 0 auto;
     }
-    .qn-checkline.is-checked span,
-    #quick-note-editor .note-checkline.is-checked span {
-        color: #64748b;
-        text-decoration: line-through;
-        text-decoration-thickness: 2px;
-        text-decoration-color: rgba(71,85,105,.75);
-    }
-    .qn-numberline,
-    #quick-note-editor .note-numberline {
+    .qn-numberline {
         display: flex;
         align-items: flex-start;
         gap: 0.5rem;
     }
-    .qn-number-marker,
-    #quick-note-editor .note-number-marker {
+    .qn-number-marker {
         min-width: 1.35rem;
         color: #60728b;
         font-weight: 800;
@@ -624,84 +492,6 @@
     .qn-card-client-badge { display: inline-flex; align-items: center; border-radius: 999px; border: 1px solid #c7d2fe; background: #eef2ff; color: #4f46e5; font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.42rem; max-width: 100%; }
     .qn-card-client-badge > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .qn-card-meta { margin-top: 0.42rem; padding-top: 0.38rem; border-top: 1px solid rgba(31,45,73,.14); display: flex; align-items: center; justify-content: space-between; color: #8da0b9; font-weight: 600; font-size: 0.72rem; }
-    .qn-card-preview {
-        max-height: calc(1.38em * 5);
-        overflow: hidden;
-        color: #1f2d49;
-        font-size: 0.84rem;
-        line-height: 1.38;
-    }
-    .qn-card-preview h1,
-    .qn-card-preview h2,
-    .qn-card-preview h3 {
-        display: none;
-    }
-    .qn-card-preview p,
-    .qn-card-preview div,
-    .qn-card-preview li {
-        margin: 0 0 0.22rem;
-    }
-    .qn-card-preview .note-checkline,
-    .qn-card-preview .note-numberline {
-        display: flex;
-        align-items: flex-start;
-        gap: .38rem;
-    }
-    .qn-card-preview .note-number-marker {
-        min-width: 1.15rem;
-        color: #64748b;
-        font-weight: 800;
-        text-align: right;
-        flex: 0 0 auto;
-    }
-    .qn-card-preview .note-number-content,
-    .qn-card-preview .note-checkline span:not(.note-preview-checkbox) {
-        min-width: 0;
-    }
-    .qn-card-preview .note-checkline.is-checked span:not(.note-preview-checkbox) {
-        color: #64748b;
-        text-decoration: line-through;
-        text-decoration-thickness: 2px;
-    }
-    .qn-card-preview .note-preview-checkbox {
-        width: .9rem;
-        height: .9rem;
-        margin-top: .12rem;
-        border: 2px solid #64748b;
-        border-radius: .25rem;
-        background: rgba(255,255,255,.72);
-        display: inline-grid;
-        place-content: center;
-        flex: 0 0 auto;
-    }
-    .qn-card-preview .note-preview-checkbox.is-checked {
-        border-color: #4f46e5;
-        background: #4f46e5;
-    }
-    .qn-card-preview .note-preview-checkbox.is-checked::after {
-        content: "";
-        width: .28rem;
-        height: .48rem;
-        border: solid #fff;
-        border-width: 0 2px 2px 0;
-        transform: translateY(-1px) rotate(45deg);
-    }
-    .qn-card-preview .note-divider {
-        border: 0;
-        border-top: 1px solid rgba(100,116,139,.25);
-        margin: .45rem 0;
-    }
-    .qn-card-preview .note-image-wrap {
-        margin: .28rem 0 .42rem;
-    }
-    .qn-card-preview .note-inline-image {
-        width: 100% !important;
-        max-height: 3.8rem;
-        object-fit: cover;
-        border-radius: .55rem;
-        border: 1px solid rgba(15,23,42,.12);
-        display: block;
-    }
 
     #quick-note-editor h1,
     #quick-note-editor h2,
@@ -717,37 +507,32 @@
     #quick-note-editor li {
         margin: 0 0 0.3rem;
         font-size: 0.86em;
-        font-weight: 400;
+        font-weight: 600;
         line-height: 1.45;
     }
     #quick-note-editor {
         caret-color: #101729;
         cursor: text;
-        font-weight: 400;
     }
     #quick-note-editor:focus {
         outline: none;
     }
-    #quick-note-editor h1.qn-title-placeholder,
-    #quick-note-editor h1.note-title-placeholder {
+    #quick-note-editor h1.qn-title-placeholder {
         position: relative;
         text-align: left;
     }
-    #quick-note-editor h1.qn-title-placeholder.is-empty::before,
-    #quick-note-editor h1.note-title-placeholder.is-empty::before {
+    #quick-note-editor h1.qn-title-placeholder.is-empty::before {
         content: attr(data-placeholder);
         color: #a8b3c4;
         pointer-events: none;
     }
-    #quick-note-editor .qn-divider,
-    #quick-note-editor .note-divider {
+    #quick-note-editor .qn-divider {
         border: 0;
         border-top: 2px solid rgba(96, 114, 139, 0.28);
         margin: 0.75rem 0;
     }
 
-    #quick-note-editor .qn-image-wrap,
-    #quick-note-editor .note-image-wrap {
+    #quick-note-editor .qn-image-wrap {
         margin: 0.5rem 0 0.75rem;
         border: 1px dashed rgba(15, 23, 42, 0.16);
         border-radius: 0.75rem;
@@ -755,8 +540,7 @@
         background: rgba(255, 255, 255, 0.38);
     }
 
-    #quick-note-editor .qn-inline-image,
-    #quick-note-editor .note-inline-image {
+    #quick-note-editor .qn-inline-image {
         display: block;
         max-width: 100%;
         height: auto;
@@ -790,25 +574,11 @@
         .qn-card-meta { font-size: 0.74rem; }
     }
 
-    #quick-notes-panel:not(.hidden) {
-        display: flex;
-        flex-direction: column;
-        max-height: min(32rem, calc(100vh - 9rem));
-    }
-
-    #quick-notes-editor-view:not(.hidden) {
-        display: flex;
-        flex: 1 1 auto;
-        min-height: 0;
-        flex-direction: column;
-    }
-
-    #quick-note-editor-canvas {
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-    }
+        #quick-notes-panel:not(.hidden) {
+            display: flex;
+            flex-direction: column;
+            max-height: min(32rem, calc(100vh - 9rem));
+        }
 </style>
 
 <script>
@@ -1029,6 +799,7 @@
         const quickNoteCanvas = document.getElementById('quick-note-editor-canvas');
         const quickNoteClientToggle = document.getElementById('quick-note-client-toggle');
         const quickNoteClientPopover = document.getElementById('quick-note-client-popover');
+        const quickNoteClientSelectTrigger = document.getElementById('quick-note-client-select-trigger');
         const quickNoteClientSelectedLabel = document.getElementById('quick-note-client-selected-label');
         const quickNoteClientDropdown = document.getElementById('quick-note-client-dropdown');
         const quickNoteClientSearch = document.getElementById('quick-note-client-search');
@@ -1040,11 +811,6 @@
         const quickNoteImageInput = document.getElementById('quick-note-image-input');
         const quickNoteColorToggle = document.getElementById('quick-note-color-toggle');
         const quickNoteColorPopover = document.getElementById('quick-note-color-popover');
-        const quickNoteFormatWrap = document.getElementById('quick-note-format-menu-wrap');
-        const quickNoteFormatTrigger = document.getElementById('quick-note-format-trigger');
-        const quickNoteFormatLabel = document.getElementById('quick-note-format-label');
-        const quickNoteFormatMenu = document.getElementById('quick-note-format-menu');
-        const quickNoteFormatOptions = Array.from(document.querySelectorAll('[data-qn-format]'));
         const quickToolbarButtons = Array.from(document.querySelectorAll('[data-qn-cmd]'));
         const quickColorButtons = Array.from(document.querySelectorAll('[data-qn-color]'));
 
@@ -1073,8 +839,6 @@
         let activeQuickLinkedClient = '';
         let quickNoteClientsCache = [];
         let isProductivityMenuOpen = false;
-        let quickNotesSyncTimer = null;
-        let isQuickNotesSavingToServer = false;
 
         function loadQuickNotes() {
             try {
@@ -1085,41 +849,8 @@
             }
         }
 
-        function broadcastQuickNotesUpdated(source = 'quick-notes') {
-            window.dispatchEvent(new CustomEvent('infocus-notes-updated', {
-                detail: { key: QUICK_NOTES_KEY, source },
-            }));
-        }
-
         function persistQuickNotes() {
             localStorage.setItem(QUICK_NOTES_KEY, JSON.stringify(quickNotes));
-            broadcastQuickNotesUpdated();
-            queueQuickNotesServerSync();
-        }
-
-        function queueQuickNotesServerSync() {
-            clearTimeout(quickNotesSyncTimer);
-            quickNotesSyncTimer = setTimeout(syncQuickNotesToServer, 500);
-        }
-
-        async function syncQuickNotesToServer() {
-            if (isQuickNotesSavingToServer) return;
-            isQuickNotesSavingToServer = true;
-            try {
-                await fetch('/api/mis-notas', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
-                    body: JSON.stringify({ notes: quickNotes }),
-                });
-            } catch (_) {
-                // Se conserva localmente; el siguiente cambio vuelve a intentar guardar.
-            } finally {
-                isQuickNotesSavingToServer = false;
-            }
         }
 
         function getQuickNoteById(id) {
@@ -1142,112 +873,7 @@
         }
 
         function getQuickTitlePlaceholderHtml() {
-            return '<h1 class="note-title-placeholder is-empty" data-placeholder="Nota sin titulo"><br></h1>';
-        }
-
-        function normalizeQuickEditorMarkup(root = quickNoteEditor) {
-            if (!root) return;
-            const doc = root.ownerDocument || document;
-            root.querySelectorAll('.qn-title-placeholder').forEach((node) => {
-                node.classList.remove('qn-title-placeholder');
-                node.classList.add('note-title-placeholder');
-                node.dataset.placeholder = node.dataset.placeholder || 'Nota sin titulo';
-            });
-            root.querySelectorAll('.qn-checkline').forEach((node) => {
-                node.classList.remove('qn-checkline');
-                node.classList.add('note-checkline');
-            });
-            root.querySelectorAll('.qn-checkbox').forEach((node) => {
-                node.classList.remove('qn-checkbox');
-                node.classList.add('note-checkbox');
-            });
-            root.querySelectorAll('.qn-numberline').forEach((node) => {
-                node.classList.remove('qn-numberline');
-                node.classList.add('note-numberline');
-                node.dataset.noteNumber = node.dataset.noteNumber || node.dataset.qnNumber || '1';
-                delete node.dataset.qnNumber;
-            });
-            root.querySelectorAll('.qn-number-marker').forEach((node) => {
-                node.classList.remove('qn-number-marker');
-                node.classList.add('note-number-marker');
-            });
-            root.querySelectorAll('.qn-number-content').forEach((node) => {
-                node.classList.remove('qn-number-content');
-                node.classList.add('note-number-content');
-            });
-            root.querySelectorAll('.qn-divider').forEach((node) => {
-                node.classList.remove('qn-divider');
-                node.classList.add('note-divider');
-            });
-            root.querySelectorAll('.qn-image-wrap').forEach((node) => {
-                node.classList.remove('qn-image-wrap');
-                node.classList.add('note-image-wrap');
-            });
-            root.querySelectorAll('.qn-inline-image').forEach((node) => {
-                node.classList.remove('qn-inline-image');
-                node.classList.add('note-inline-image');
-                node.dataset.noteScale = node.dataset.noteScale || node.dataset.qnScale || '100';
-                delete node.dataset.qnScale;
-            });
-            root.querySelectorAll('ol').forEach((list) => {
-                const created = [];
-                Array.from(list.children).forEach((item, index) => {
-                    if (item.tagName?.toLowerCase() !== 'li') return;
-                    const line = doc.createElement('div');
-                    const number = index + 1;
-                    line.className = 'note-numberline';
-                    line.dataset.noteNumber = String(number);
-                    line.innerHTML = `<span class="note-number-marker" contenteditable="false">${number}.</span><span class="note-number-content">${item.innerHTML.trim() || '<br>'}</span>`;
-                    created.push(line);
-                });
-                if (created.length) list.replaceWith(...created);
-            });
-            root.querySelectorAll('ul').forEach((list) => {
-                const created = [];
-                Array.from(list.children).forEach((item) => {
-                    if (item.tagName?.toLowerCase() !== 'li') return;
-                    const checkbox = item.querySelector('input[type="checkbox"]');
-                    if (checkbox) {
-                        const line = doc.createElement('div');
-                        line.className = 'note-checkline' + (checkbox.checked ? ' is-checked' : '');
-                        const clone = item.cloneNode(true);
-                        clone.querySelector('input[type="checkbox"]')?.remove();
-                        line.innerHTML = `<input type="checkbox" class="note-checkbox" contenteditable="false" ${checkbox.checked ? 'checked' : ''}> <span>${clone.innerHTML.trim() || '<br>'}</span>`;
-                        created.push(line);
-                    } else {
-                        const line = doc.createElement('p');
-                        line.innerHTML = item.innerHTML.trim() || '<br>';
-                        created.push(line);
-                    }
-                });
-                if (created.length) list.replaceWith(...created);
-            });
-            Array.from(root.querySelectorAll('p,div')).forEach((block) => {
-                if (block.matches('h1,h2,h3,.note-checkline,.note-numberline,.note-image-wrap,.qn-checkline,.qn-numberline,.qn-image-wrap')) return;
-                if (block.querySelector('.note-number-marker,.note-checkbox,input[type="checkbox"],img')) return;
-                const text = (block.textContent || '').replace(/\u00a0/g, ' ').trim();
-                const match = text.match(/^(\d+)\.\s*(.+)$/);
-                if (!match) return;
-                const line = doc.createElement('div');
-                line.className = 'note-numberline';
-                line.dataset.noteNumber = match[1];
-                const html = block.innerHTML.replace(/^\s*\d+\.\s*/, '').trim() || match[2];
-                line.innerHTML = `<span class="note-number-marker" contenteditable="false">${match[1]}.</span><span class="note-number-content">${html}</span>`;
-                block.replaceWith(line);
-            });
-            renumberQuickNumberLineRoot(root);
-        }
-
-        function renumberQuickNumberLineRoot(root = quickNoteEditor) {
-            if (!root) return;
-            const lines = Array.from(root.querySelectorAll('.note-numberline'));
-            let currentNumber = 1;
-            lines.forEach((line) => {
-                line.dataset.noteNumber = String(currentNumber);
-                const marker = line.querySelector('.note-number-marker,.qn-number-marker');
-                if (marker) marker.textContent = `${currentNumber}.`;
-                currentNumber += 1;
-            });
+            return '<h1 class="qn-title-placeholder is-empty" data-placeholder="Nota sin título"><br></h1>';
         }
 
         function updateQuickTitlePlaceholder() {
@@ -1277,18 +903,16 @@
             }
             const title = quickNoteEditor.firstElementChild;
             if (title?.tagName?.toLowerCase() === 'h1' && (title.textContent || '').trim() === '') {
-                title.classList.add('note-title-placeholder');
-                title.dataset.placeholder = 'Nota sin titulo';
+                title.classList.add('qn-title-placeholder');
+                title.dataset.placeholder = 'Nota sin título';
             }
-            normalizeQuickEditorMarkup();
             updateQuickTitlePlaceholder();
         }
 
         function htmlToPlainText(html) {
             const temp = document.createElement('div');
             temp.innerHTML = html || '';
-            normalizeQuickEditorMarkup(temp);
-            temp.querySelectorAll('.note-title-placeholder.is-empty,.qn-title-placeholder.is-empty').forEach((titleEl) => {
+            temp.querySelectorAll('.qn-title-placeholder.is-empty').forEach((titleEl) => {
                 titleEl.textContent = '';
             });
             temp.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
@@ -1305,14 +929,8 @@
         function syncQuickChecklistStateForSave() {
             if (!quickNoteEditor) return;
             quickNoteEditor.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
-                const line = checkbox.closest('.note-checkline,.qn-checkline');
-                if (checkbox.checked) {
-                    checkbox.setAttribute('checked', 'checked');
-                    line?.classList.add('is-checked');
-                } else {
-                    checkbox.removeAttribute('checked');
-                    line?.classList.remove('is-checked');
-                }
+                if (checkbox.checked) checkbox.setAttribute('checked', 'checked');
+                else checkbox.removeAttribute('checked');
             });
         }
 
@@ -1337,28 +955,28 @@
             let node = selection.getRangeAt(0).startContainer;
             if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
             if (!node || !quickNoteEditor.contains(node)) return null;
-            return node.closest?.('.note-checkline, .note-numberline, .qn-checkline, .qn-numberline, h1, h2, h3, p, div') || null;
+            return node.closest?.('.qn-checkline, .qn-numberline, h1, h2, h3, p, div') || null;
         }
 
         function isQuickEditorBlockEmpty(block) {
             if (!block) return true;
             const clone = block.cloneNode(true);
-            clone.querySelectorAll('input, .note-number-marker, .qn-number-marker').forEach((node) => node.remove());
+            clone.querySelectorAll('input, .qn-number-marker').forEach((node) => node.remove());
             return (clone.textContent || '').replace(/\u00a0/g, ' ').trim() === '';
         }
 
         function createQuickChecklistLine() {
             const line = document.createElement('div');
-            line.className = 'note-checkline';
-            line.innerHTML = '<input type="checkbox" class="note-checkbox" contenteditable="false"> <span><br></span>';
+            line.className = 'qn-checkline';
+            line.innerHTML = '<input type="checkbox" class="qn-checkbox" contenteditable="false"> <span><br></span>';
             return line;
         }
 
         function createQuickNumberLine(number = 1) {
             const line = document.createElement('div');
-            line.className = 'note-numberline';
-            line.dataset.noteNumber = String(number);
-            line.innerHTML = `<span class="note-number-marker" contenteditable="false">${number}.</span><span class="note-number-content"><br></span>`;
+            line.className = 'qn-numberline';
+            line.dataset.qnNumber = String(number);
+            line.innerHTML = `<span class="qn-number-marker" contenteditable="false">${number}.</span><span class="qn-number-content"><br></span>`;
             return line;
         }
 
@@ -1370,7 +988,7 @@
             } else {
                 quickNoteEditor.appendChild(block);
             }
-            const contentTarget = block.querySelector('.note-number-content,.qn-number-content') || block.querySelector('span') || block;
+            const contentTarget = block.querySelector('.qn-number-content') || block.querySelector('span') || block;
             placeQuickEditorCaret(contentTarget);
         }
 
@@ -1380,70 +998,23 @@
             return line;
         }
 
-        function moveQuickEditableContent(source, target) {
-            const contentTarget = target.querySelector('.note-number-content,.qn-number-content') || target.querySelector('span') || target;
-            const clone = source.cloneNode(true);
-            clone.querySelectorAll('input, .note-number-marker, .qn-number-marker').forEach((node) => node.remove());
-            const html = clone.innerHTML.trim();
-            const text = clone.textContent.replace(/\u00a0/g, ' ').trim();
-            contentTarget.innerHTML = text || html ? html : '<br>';
-        }
-
-        function transformQuickEditorCurrentBlock(kind) {
-            if (!quickNoteEditor) return;
-            const current = getQuickEditorCurrentBlock();
-            const next = kind === 'checkline' ? createQuickChecklistLine() : createQuickNumberLine(1);
-
-            if (!current || current === quickNoteEditor) {
-                insertQuickEditorBlock(next);
-                if (kind === 'numberline') renumberQuickNumberLines();
-                return;
-            }
-
-            const isChecklist = current.classList.contains('note-checkline') || current.classList.contains('qn-checkline');
-            const isNumberline = current.classList.contains('note-numberline') || current.classList.contains('qn-numberline');
-
-            if (kind === 'checkline' && isChecklist) {
-                const plain = createPlainQuickEditorLine();
-                moveQuickEditableContent(current, plain);
-                current.replaceWith(plain);
-                placeQuickEditorCaret(plain);
-                return;
-            }
-
-            if (kind === 'numberline' && isNumberline) {
-                const plain = createPlainQuickEditorLine();
-                moveQuickEditableContent(current, plain);
-                current.replaceWith(plain);
-                renumberQuickNumberLines();
-                placeQuickEditorCaret(plain);
-                return;
-            }
-
-            moveQuickEditableContent(current, next);
-            current.replaceWith(next);
-            if (kind === 'numberline') renumberQuickNumberLines();
-            const target = next.querySelector('.note-number-content,.qn-number-content') || next.querySelector('span') || next;
-            placeQuickEditorCaret(target);
-        }
-
         function insertQuickChecklistLine() {
             if (!quickNoteEditor) return;
             quickNoteEditor.focus();
-            transformQuickEditorCurrentBlock('checkline');
+            insertQuickEditorBlock(createQuickChecklistLine());
         }
 
         function insertQuickNumberedLine() {
             if (!quickNoteEditor) return;
             quickNoteEditor.focus();
-            transformQuickEditorCurrentBlock('numberline');
+            insertQuickEditorBlock(createQuickNumberLine(1));
         }
 
         function insertQuickDivider() {
             if (!quickNoteEditor) return;
             quickNoteEditor.focus();
             const divider = document.createElement('hr');
-            divider.className = 'note-divider';
+            divider.className = 'qn-divider';
             const nextLine = createPlainQuickEditorLine();
             const reference = getQuickEditorCurrentBlock();
             if (reference && reference !== quickNoteEditor) {
@@ -1465,9 +1036,9 @@
             if (!quickNoteEditor || !dataUrl) return;
             quickNoteEditor.focus();
             const wrapper = document.createElement('div');
-            wrapper.className = 'note-image-wrap';
+            wrapper.className = 'qn-image-wrap';
             wrapper.contentEditable = 'false';
-            wrapper.innerHTML = `<img src="${dataUrl}" class="note-inline-image" data-note-scale="100" alt="imagen nota">`;
+            wrapper.innerHTML = `<img src="${dataUrl}" class="qn-inline-image" data-qn-scale="100" alt="imagen nota">`;
             const reference = getQuickEditorCurrentBlock();
             if (reference && reference !== quickNoteEditor) {
                 reference.insertAdjacentElement('afterend', wrapper);
@@ -1481,73 +1052,37 @@
 
         function handleQuickImageInteraction(imageElement) {
             if (!imageElement) return;
-            const raw = prompt('Imagen: escribe "del" para eliminar o porcentaje (20-250) para escalar.', String(imageElement.dataset.noteScale || imageElement.dataset.qnScale || '100'));
+            const raw = prompt('Imagen: escribe "del" para eliminar o porcentaje (20-250) para escalar.', String(imageElement.dataset.qnScale || '100'));
             if (raw === null) return;
             const value = raw.trim().toLowerCase();
             if (value === 'del') {
-                imageElement.closest('.note-image-wrap,.qn-image-wrap')?.remove();
+                imageElement.closest('.qn-image-wrap')?.remove();
                 return;
             }
             const percentage = Number(value);
             if (!Number.isFinite(percentage)) return;
             const clamped = Math.max(20, Math.min(250, percentage));
-            imageElement.dataset.noteScale = String(clamped);
-            delete imageElement.dataset.qnScale;
+            imageElement.dataset.qnScale = String(clamped);
             imageElement.style.width = `${clamped}%`;
             imageElement.style.maxWidth = '100%';
         }
 
         function renumberQuickNumberLines(startLine = null) {
             if (!quickNoteEditor) return;
-            normalizeQuickEditorMarkup();
-            renumberQuickNumberLineRoot(quickNoteEditor);
+            const lines = Array.from(quickNoteEditor.querySelectorAll('.qn-numberline'));
+            let currentNumber = 1;
+            lines.forEach((line) => {
+                const previous = line.previousElementSibling;
+                if (!previous?.classList?.contains('qn-numberline')) currentNumber = 1;
+                line.dataset.qnNumber = String(currentNumber);
+                const marker = line.querySelector('.qn-number-marker');
+                if (marker) marker.textContent = `${currentNumber}.`;
+                currentNumber += 1;
+            });
             if (startLine) {
-                const contentTarget = startLine.querySelector('.note-number-content,.qn-number-content') || startLine;
+                const contentTarget = startLine.querySelector('.qn-number-content') || startLine;
                 placeQuickEditorCaret(contentTarget);
             }
-        }
-
-        function getQuickFormatLabel(tag) {
-            if (tag === 'h1') return 'Titulo';
-            if (tag === 'h2') return 'Subtitulo';
-            return 'Texto normal';
-        }
-
-        function setQuickFormatMenuState(tag = 'p') {
-            const selected = ['p', 'h1', 'h2'].includes(tag) ? tag : 'p';
-            if (quickNoteFormatLabel) quickNoteFormatLabel.textContent = getQuickFormatLabel(selected);
-            quickNoteFormatOptions.forEach((option) => {
-                option.classList.toggle('is-selected', option.dataset.qnFormat === selected);
-            });
-        }
-
-        function closeQuickFormatMenu() {
-            quickNoteFormatMenu?.classList.add('hidden');
-            quickNoteFormatTrigger?.setAttribute('aria-expanded', 'false');
-        }
-
-        function positionQuickFormatMenu() {
-            if (!quickNoteFormatMenu || !quickNoteFormatTrigger || !quickNotesPanel) return;
-            const triggerRect = quickNoteFormatTrigger.getBoundingClientRect();
-            const panelRect = quickNotesPanel.getBoundingClientRect();
-            const left = Math.max(8, Math.min(triggerRect.left - panelRect.left, panelRect.width - 136));
-            const top = triggerRect.bottom - panelRect.top + 6;
-            quickNoteFormatMenu.style.left = `${left}px`;
-            quickNoteFormatMenu.style.top = `${top}px`;
-        }
-
-        function applyQuickTextFormat(blockTag) {
-            if (!quickNoteEditor) return;
-            const tag = ['p', 'h1', 'h2'].includes(blockTag) ? blockTag : 'p';
-            quickNoteEditor.focus();
-            try {
-                document.execCommand('formatBlock', false, `<${tag}>`);
-            } catch (_) {
-                document.execCommand('formatBlock', false, tag);
-            }
-            ensureQuickNoteHeadingStructure();
-            setQuickFormatMenuState(tag);
-            updateQuickToolbarActiveStates();
         }
 
         function handleQuickEditorEnter(event) {
@@ -1555,10 +1090,7 @@
             const currentBlock = getQuickEditorCurrentBlock();
             if (!currentBlock) return;
 
-            const isChecklist = currentBlock.classList?.contains('note-checkline') || currentBlock.classList?.contains('qn-checkline');
-            const isNumberline = currentBlock.classList?.contains('note-numberline') || currentBlock.classList?.contains('qn-numberline');
-
-            if (isChecklist) {
+            if (currentBlock.classList?.contains('qn-checkline')) {
                 event.preventDefault();
                 if (isQuickEditorBlockEmpty(currentBlock)) {
                     const plainLine = createPlainQuickEditorLine();
@@ -1570,7 +1102,7 @@
                 return;
             }
 
-            if (isNumberline) {
+            if (currentBlock.classList?.contains('qn-numberline')) {
                 event.preventDefault();
                 if (isQuickEditorBlockEmpty(currentBlock)) {
                     const plainLine = createPlainQuickEditorLine();
@@ -1579,7 +1111,7 @@
                     placeQuickEditorCaret(plainLine);
                     return;
                 }
-                const nextNumber = Number(currentBlock.dataset.noteNumber || currentBlock.dataset.qnNumber || 1) + 1;
+                const nextNumber = Number(currentBlock.dataset.qnNumber || 1) + 1;
                 const nextLine = createQuickNumberLine(nextNumber);
                 insertQuickEditorBlock(nextLine, currentBlock);
                 renumberQuickNumberLines(nextLine);
@@ -1661,7 +1193,8 @@
                 button.addEventListener('click', () => {
                     setActiveQuickLinkedClient(button.dataset.qnClientValue || '');
                     syncQuickClientLabel();
-                    closeQuickClientPopover();
+                    renderQuickNoteClientOptions(quickNoteClientSearch?.value || '');
+                    closeQuickClientDropdown();
                 });
             });
         }
@@ -1693,6 +1226,7 @@
         async function openQuickClientPopover() {
             await loadQuickNoteClients();
             syncQuickClientLabel();
+            renderQuickNoteClientOptions('');
             quickNoteClientPopover?.classList.remove('hidden');
             openQuickClientDropdown();
         }
@@ -1712,37 +1246,6 @@
             quickNotesCount.textContent = `${count} ${count === 1 ? 'nota' : 'notas'}`;
         }
 
-        function buildQuickNotePreviewHtml(noteHtml) {
-            const holder = document.createElement('div');
-            holder.innerHTML = String(noteHtml || '');
-            normalizeQuickEditorMarkup(holder);
-            holder.querySelector('h1,h2,h3,[data-placeholder]')?.remove();
-            holder.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
-            holder.querySelectorAll('.note-checkline').forEach((line) => {
-                const checkbox = line.querySelector('input[type="checkbox"]');
-                const checked = !!checkbox?.checked;
-                line.classList.toggle('is-checked', checked);
-                const marker = document.createElement('span');
-                marker.className = 'note-preview-checkbox' + (checked ? ' is-checked' : '');
-                marker.setAttribute('aria-hidden', 'true');
-                checkbox?.replaceWith(marker);
-            });
-
-            const meaningful = Array.from(holder.children)
-                .filter((node) => {
-                    if (node.matches?.('hr, .note-divider, .note-image-wrap')) return true;
-                    if (node.querySelector?.('img')) return true;
-                    return (node.textContent || '').replace(/\u00a0/g, ' ').trim() !== '';
-                })
-                .slice(0, 5);
-
-            if (!meaningful.length) return '<span class="text-slate-400">Sin contenido</span>';
-
-            const preview = document.createElement('div');
-            meaningful.forEach((node) => preview.appendChild(node.cloneNode(true)));
-            return preview.innerHTML;
-        }
-
         function renderQuickNotesList() {
             if (!quickNotesList) return;
             setQuickNotesCount();
@@ -1756,7 +1259,19 @@
                 const palette = quickNotePalette[note.color] || quickNotePalette.yellow;
                 const plain = String(note.plainText || '');
                 const title = escapeHtml(note.title || 'Nota sin título');
-                const body = buildQuickNotePreviewHtml(note.html || '');
+                // Extraer cuerpo desde HTML para no mezclar titulo y contenido
+                const bodyDiv = document.createElement('div');
+                bodyDiv.innerHTML = note.html || '';
+                const titleElQn = bodyDiv.querySelector('h1,h2,h3,[data-placeholder]');
+                if (titleElQn) titleElQn.remove();
+                bodyDiv.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+                    cb.replaceWith(document.createTextNode(cb.checked ? '☑ ' : '□ '));
+                });
+                const bodyLinesQn = Array.from(bodyDiv.querySelectorAll('p,div,li'))
+                    .map((el) => el.textContent?.replace(/\u00a0/g, ' ').trim())
+                    .filter(Boolean)
+                    .slice(0, 3);
+                const body = escapeHtml(bodyLinesQn.join('\n')).replace(/\n/g, '<br>');
                 const stats = getChecklistStats(plain);
                 const progress = stats.total > 0 ? `${stats.done}/${stats.total}` : '';
                 const linkedClient = getQuickClientNameValue(note.linkedClient || '');
@@ -1767,7 +1282,7 @@
                         <div class="qn-card-wrapper">
                             <button type="button" data-qn-open="${escapeHtml(note.id)}" class="qn-card w-full text-left" style="background:${palette.cardBg}; border-color:${palette.cardBorder}; padding-right:2.2rem;">
                                 <div class="qn-card-title">${title}</div>
-                                <div class="qn-card-body qn-card-preview">${body}</div>
+                                <div class="qn-card-body">${body}</div>
                                 ${linkedClientMarkup}
                                 <div class="qn-card-meta">
                                     <span>${formatQuickDate(note.updatedAt)}</span>
@@ -1804,56 +1319,22 @@
             return !!quickNotesEditorView && !quickNotesEditorView.classList.contains('hidden');
         }
 
-        function isQuickNoteEditorFocused() {
-            const active = document.activeElement;
-            return !!(active && quickNoteEditor && quickNoteEditor.contains(active));
-        }
-
-        function refreshQuickNotesFromSharedStore() {
-            const activeId = activeQuickNoteId ? String(activeQuickNoteId) : '';
-            const keepTyping = isQuickNoteEditorFocused();
-            quickNotes = loadQuickNotes();
-
-            if (isQuickNotesEditorVisible() && activeId) {
-                const fresh = getQuickNoteById(activeId);
-                if (fresh && !keepTyping) {
-                    activeQuickNoteId = String(fresh.id);
-                    setActiveQuickLinkedClient(fresh.linkedClient || '');
-                    if (quickNoteEditor) {
-                        quickNoteEditor.innerHTML = fresh.html || `${getQuickTitlePlaceholderHtml()}<p><br></p>`;
-                        ensureQuickNoteHeadingStructure();
-                        normalizeQuickEditorMarkup();
-                        updateQuickTitlePlaceholder();
-                    }
-                    applyQuickEditorColor(fresh.color || 'yellow');
-                } else if (!fresh && !keepTyping) {
-                    showQuickNotesListView();
-                }
-            }
-
-            renderQuickNotesList();
-        }
-
         function showQuickNotesListView() {
             quickNotesListView?.classList.remove('hidden');
             quickNotesEditorView?.classList.add('hidden');
-            quickNoteBack?.classList.add('hidden');
-            quickNoteDelete?.classList.add('hidden');
             activeQuickNoteId = null;
         }
 
         function showQuickNotesEditorView() {
             quickNotesListView?.classList.add('hidden');
             quickNotesEditorView?.classList.remove('hidden');
-            quickNoteBack?.classList.remove('hidden');
-            quickNoteDelete?.classList.remove('hidden');
         }
 
         function openQuickNotesPanel() {
             closeTdahPanel();
             if (!quickNotesPanel) return;
             quickNotesPanel.classList.remove('hidden');
-            refreshQuickNotesFromSharedStore();
+            renderQuickNotesList();
             showQuickNotesListView();
             syncProductivityToggleIcon();
         }
@@ -1864,7 +1345,6 @@
             }
             closeQuickClientPopover();
             closeQuickColorPopover();
-            closeQuickFormatMenu();
             quickNotesPanel?.classList.add('hidden');
             showQuickNotesListView();
             syncProductivityToggleIcon();
@@ -1885,21 +1365,18 @@
                     quickNoteEditor.innerHTML = `${getQuickTitlePlaceholderHtml()}<p><br></p>`;
                 }
                 ensureQuickNoteHeadingStructure();
-                normalizeQuickEditorMarkup();
                 updateQuickTitlePlaceholder();
                 quickNoteEditor.focus();
             }
             applyQuickEditorColor(color);
             closeQuickClientPopover();
             closeQuickColorPopover();
-            closeQuickFormatMenu();
             showQuickNotesEditorView();
         }
 
         function saveQuickNoteFromEditor({ returnToList = true } = {}) {
             if (!quickNoteEditor) return;
             ensureQuickNoteHeadingStructure();
-            normalizeQuickEditorMarkup();
             syncQuickChecklistStateForSave();
             const html = normalizeQuickNoteHtml(quickNoteEditor.innerHTML || '');
             const plain = htmlToPlainText(html);
@@ -1966,10 +1443,8 @@
             const italicState = insideEditor ? document.queryCommandState('italic') : false;
             const strikeState = insideEditor ? document.queryCommandState('strikeThrough') : false;
             const currentBlock = insideEditor ? getQuickEditorCurrentBlock() : null;
-            const inChecklist = !!(currentBlock && (currentBlock.classList?.contains('note-checkline') || currentBlock.classList?.contains('qn-checkline')));
-            const inNumberList = !!(currentBlock && (currentBlock.classList?.contains('note-numberline') || currentBlock.classList?.contains('qn-numberline')));
-            const currentTag = currentBlock?.tagName?.toLowerCase?.() || 'p';
-            setQuickFormatMenuState(['h1', 'h2'].includes(currentTag) ? currentTag : 'p');
+            const inChecklist = !!(currentBlock && currentBlock.classList?.contains('qn-checkline'));
+            const inNumberList = !!(currentBlock && currentBlock.classList?.contains('qn-numberline'));
 
             quickToolbarButtons.forEach((button) => {
                 const cmd = button.dataset.qnCmd || '';
@@ -1977,7 +1452,6 @@
                 if (cmd === 'bold') active = !!boldState;
                 if (cmd === 'italic') active = !!italicState;
                 if (cmd === 'strikeThrough') active = !!strikeState;
-                if (cmd === 'highlight') active = insideEditor && document.queryCommandValue('backColor') !== 'rgba(0, 0, 0, 0)' && document.queryCommandValue('backColor') !== 'transparent';
                 if (cmd === 'checkline') active = inChecklist;
                 if (cmd === 'numberline') active = inNumberList;
                 button.classList.toggle('qn-tool-btn-active', active);
@@ -1999,11 +1473,6 @@
             }
             if (command === 'divider') {
                 insertQuickDivider();
-                updateQuickToolbarActiveStates();
-                return;
-            }
-            if (command === 'highlight') {
-                document.execCommand('backColor', false, '#fff59d');
                 updateQuickToolbarActiveStates();
                 return;
             }
@@ -2035,9 +1504,6 @@
         function setProductivityMenuState(open) {
             isProductivityMenuOpen = !!open;
             productivityActions?.classList.toggle('hidden', !isProductivityMenuOpen);
-            if (isProductivityMenuOpen && typeof window.closeInfocusAiShell === 'function') {
-                window.closeInfocusAiShell();
-            }
             syncProductivityToggleIcon();
         }
 
@@ -2078,22 +1544,16 @@
             }
             await openQuickClientPopover();
         });
+        quickNoteClientSelectTrigger?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (quickNoteClientDropdown?.classList.contains('hidden')) {
+                openQuickClientDropdown();
+            } else {
+                closeQuickClientDropdown();
+            }
+        });
         quickNoteClientSearch?.addEventListener('input', () => {
             renderQuickNoteClientOptions(quickNoteClientSearch.value || '');
-        });
-        quickNoteFormatTrigger?.addEventListener('click', (event) => {
-            event.stopPropagation();
-            const isHidden = quickNoteFormatMenu?.classList.contains('hidden');
-            if (isHidden) positionQuickFormatMenu();
-            quickNoteFormatMenu?.classList.toggle('hidden', !isHidden);
-            quickNoteFormatTrigger.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
-        });
-        quickNoteFormatOptions.forEach((button) => {
-            button.addEventListener('click', (event) => {
-                event.stopPropagation();
-                applyQuickTextFormat(button.dataset.qnFormat || 'p');
-                closeQuickFormatMenu();
-            });
         });
 
         quickToolbarButtons.forEach((button) => {
@@ -2135,15 +1595,10 @@
         });
         quickNoteEditor?.addEventListener('click', (event) => {
             const target = event.target;
-            if (target instanceof HTMLImageElement && (target.classList.contains('note-inline-image') || target.classList.contains('qn-inline-image'))) {
+            if (target instanceof HTMLImageElement && target.classList.contains('qn-inline-image')) {
                 event.preventDefault();
                 handleQuickImageInteraction(target);
             }
-        });
-        quickNoteEditor?.addEventListener('change', (event) => {
-            const target = event.target;
-            if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
-            target.closest('.note-checkline,.qn-checkline')?.classList.toggle('is-checked', target.checked);
         });
         quickNoteEditor?.addEventListener('keydown', handleQuickEditorEnter);
         quickNoteEditor?.addEventListener('keyup', updateQuickToolbarActiveStates);
@@ -2153,9 +1608,6 @@
             updateQuickTitlePlaceholder();
             updateQuickToolbarActiveStates();
         });
-
-        document.querySelector('#quick-notes-editor-view .quick-note-toolbar')?.addEventListener('scroll', closeQuickFormatMenu);
-        window.addEventListener('resize', closeQuickFormatMenu);
 
         document.addEventListener('selectionchange', () => {
             if (!isQuickNotesEditorVisible()) return;
@@ -2183,10 +1635,6 @@
                     const insideColorPopup = quickNoteColorPopover.contains(target) || quickNoteColorToggle?.contains(target);
                     if (!insideColorPopup) closeQuickColorPopover();
                 }
-                if (quickNoteFormatMenu && !quickNoteFormatMenu.classList.contains('hidden')) {
-                    const insideFormatMenu = quickNoteFormatWrap?.contains(target) || quickNoteFormatMenu.contains(target);
-                    if (!insideFormatMenu) closeQuickFormatMenu();
-                }
             }
         });
 
@@ -2196,22 +1644,6 @@
             } else if (event.key === 'Escape' && !quickNotesPanel?.classList.contains('hidden')) {
                 closeQuickNotesPanel();
             }
-        });
-
-        window.addEventListener('infocus-notes-updated', (event) => {
-            if (event.detail?.key && event.detail.key !== QUICK_NOTES_KEY) return;
-            if (String(event.detail?.source || '').startsWith('quick-notes')) return;
-            refreshQuickNotesFromSharedStore();
-        });
-
-        window.addEventListener('storage', (event) => {
-            if (event.key !== QUICK_NOTES_KEY) return;
-            refreshQuickNotesFromSharedStore();
-        });
-
-        window.addEventListener('beforeunload', () => {
-            clearTimeout(quickNotesSyncTimer);
-            syncQuickNotesToServer();
         });
 
         quickNotes = loadQuickNotes();
@@ -2275,7 +1707,14 @@
         let pomodoroTransitioning = false;
         let nativePipStream = null;
         let nativePipRenderInterval = null;
+        let nativePipWatchdogInterval = null;
         let nativePipVideoTrack = null;
+        let nativePipLastFrameAt = 0;
+        let nativePipRecovering = false;
+        let nativePipAudioContext = null;
+        let nativePipAudioSource = null;
+        let nativePipAudioTrack = null;
+        let nativePipAudioPrimed = false;
         let nativePipOpening = false;
         let nativePipLastErrorAt = 0;
         let syncingNativePipPlayback = false;
@@ -2887,26 +2326,19 @@
             const desiredPlaybackState = pomodoroState.isRunning ? 'playing' : 'paused';
             if (nativePipLastPlaybackState === desiredPlaybackState) return;
             nativePipLastPlaybackState = desiredPlaybackState;
-            if (pomodoroState.isRunning) {
-                playNativePipVideoSilently();
-            } else {
-                pauseNativePipVideoSilently();
-            }
+            playNativePipVideoSilently();
         }
 
         async function handleNativePipVideoPlay() {
             if (syncingNativePipPlayback || !isNativePomodoroPipOpen()) return;
-            if (!pomodoroState.isRunning) {
-                await startOrPausePomodoro();
-            }
+            renderNativePipFrame();
             syncNativePipPlaybackState();
         }
 
         async function handleNativePipVideoPause() {
             if (syncingNativePipPlayback || !isNativePomodoroPipOpen()) return;
-            if (pomodoroState.isRunning) {
-                await startOrPausePomodoro();
-            }
+            await playNativePipVideoSilently();
+            renderNativePipFrame();
             syncNativePipPlaybackState();
         }
 
@@ -2923,6 +2355,8 @@
 
             ctx.fillStyle = '#111729';
             ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = (Math.floor(Date.now() / 250) % 2) ? '#11182a' : '#111729';
+            ctx.fillRect(width - 3, height - 3, 2, 2);
 
             const left = 34;
             const maxTextWidth = width - (left * 2);
@@ -2960,17 +2394,106 @@
             if (nativePipVideoTrack && typeof nativePipVideoTrack.requestFrame === 'function') {
                 nativePipVideoTrack.requestFrame();
             }
+            nativePipLastFrameAt = Date.now();
+        }
+
+        function resetNativePipSource() {
+            if (nativePipStream?.getTracks) {
+                nativePipStream.getTracks().forEach((track) => {
+                    try { track.stop(); } catch (_) {}
+                });
+            }
+            nativePipStream = null;
+            nativePipVideoTrack = null;
+            if (nativePipVideo) {
+                try { nativePipVideo.srcObject = null; } catch (_) {}
+            }
+            stopNativePipSilentAudio();
+        }
+
+        function stopNativePipSilentAudio() {
+            try { nativePipAudioSource?.stop(); } catch (_) {}
+            try { nativePipAudioTrack?.stop(); } catch (_) {}
+            try { nativePipAudioContext?.close(); } catch (_) {}
+            nativePipAudioContext = null;
+            nativePipAudioSource = null;
+            nativePipAudioTrack = null;
+        }
+
+        function ensureNativePipSilentAudioTrack() {
+            if (!nativePipAudioPrimed) return null;
+            if (nativePipAudioTrack && nativePipAudioTrack.readyState !== 'ended') {
+                if (nativePipAudioContext?.state === 'suspended') nativePipAudioContext.resume().catch(() => {});
+                return nativePipAudioTrack;
+            }
+
+            const AudioCtor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtor) return null;
+            try {
+                nativePipAudioContext = new AudioCtor();
+                const destination = nativePipAudioContext.createMediaStreamDestination();
+                const oscillator = nativePipAudioContext.createOscillator();
+                const gain = nativePipAudioContext.createGain();
+                oscillator.frequency.value = 1;
+                gain.gain.value = 0.00001;
+                oscillator.connect(gain);
+                gain.connect(destination);
+                oscillator.start();
+                nativePipAudioSource = oscillator;
+                nativePipAudioTrack = destination.stream.getAudioTracks()[0] || null;
+                nativePipAudioContext.resume().catch(() => {});
+                return nativePipAudioTrack;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function nativePipTrackHealthy() {
+            const audioHealthy = !nativePipAudioPrimed || (nativePipAudioTrack && nativePipAudioTrack.readyState !== 'ended');
+            return !!nativePipStream
+                && !!nativePipVideoTrack
+                && !!audioHealthy
+                && nativePipVideoTrack.readyState !== 'ended'
+                && nativePipVideo?.srcObject === nativePipStream;
+        }
+
+        async function recoverNativePipSource() {
+            if (nativePipRecovering || !nativePipVideo || !nativePipCanvas) return;
+            nativePipRecovering = true;
+            try {
+                resetNativePipSource();
+                prepareNativePipSource();
+                renderNativePipFrame();
+                await playNativePipVideoSilently();
+            } finally {
+                nativePipRecovering = false;
+            }
         }
 
         function prepareNativePipSource() {
             if (!nativePipVideo || !nativePipCanvas || !nativePipCanvas.captureStream) return false;
             nativePipVideo.classList.remove('hidden');
             setNativePipVideoPosition(false);
-            if (nativePipStream) return true;
+            if (nativePipTrackHealthy()) return true;
+            resetNativePipSource();
             
             renderNativePipFrame();
             nativePipStream = nativePipCanvas.captureStream(30);
             nativePipVideoTrack = nativePipStream.getVideoTracks ? (nativePipStream.getVideoTracks()[0] || null) : null;
+            const audioTrack = ensureNativePipSilentAudioTrack();
+            if (audioTrack && nativePipStream.addTrack) {
+                try { nativePipStream.addTrack(audioTrack); } catch (_) {}
+            }
+            if (nativePipVideoTrack) {
+                nativePipVideoTrack.addEventListener('ended', () => {
+                    if (isNativePomodoroPipOpen()) recoverNativePipSource();
+                });
+                nativePipVideoTrack.addEventListener('mute', () => {
+                    setTimeout(() => {
+                        if (isNativePomodoroPipOpen()) recoverNativePipSource();
+                    }, 350);
+                });
+            }
             nativePipVideo.srcObject = nativePipStream;
             nativePipVideo.muted = true;
             nativePipVideo.playsInline = true;
@@ -2990,23 +2513,61 @@
         }
 
         function primeNativePipSource() {
+            nativePipAudioPrimed = true;
             if (!prepareNativePipSource()) return;
             renderNativePipFrame();
             playNativePipVideoSilently();
         }
 
         function startNativePipRenderLoop() {
-            if (nativePipRenderInterval) clearInterval(nativePipRenderInterval);
-            nativePipRenderInterval = setInterval(() => {
+            if (nativePipRenderInterval) clearTimeout(nativePipRenderInterval);
+            if (nativePipWatchdogInterval) clearInterval(nativePipWatchdogInterval);
+
+            const pump = () => {
+                if (!isNativePomodoroPipOpen()) {
+                    nativePipRenderInterval = null;
+                    return;
+                }
                 renderNativePipFrame();
-            }, 100);
+                if (isNativePomodoroPipOpen() && nativePipVideo?.paused) {
+                    playNativePipVideoSilently();
+                }
+                nativePipRenderInterval = setTimeout(pump, 250);
+            };
+            pump();
+
+            nativePipWatchdogInterval = setInterval(() => {
+                if (!isNativePomodoroPipOpen()) return;
+                renderNativePipFrame();
+                const staleFrame = nativePipLastFrameAt && Date.now() - nativePipLastFrameAt > 2600;
+                if (!nativePipTrackHealthy() || nativePipVideo?.paused || nativePipVideo?.readyState < 2 || staleFrame) {
+                    playNativePipVideoSilently();
+                    if (!nativePipTrackHealthy() || nativePipVideo?.readyState < 2 || staleFrame) {
+                        recoverNativePipSource();
+                    }
+                }
+            }, 1000);
         }
 
         function stopNativePipRenderLoop() {
             if (nativePipRenderInterval) {
-                clearInterval(nativePipRenderInterval);
+                clearTimeout(nativePipRenderInterval);
                 nativePipRenderInterval = null;
             }
+            if (nativePipWatchdogInterval) {
+                clearInterval(nativePipWatchdogInterval);
+                nativePipWatchdogInterval = null;
+            }
+            if (!isNativePomodoroPipOpen()) stopNativePipSilentAudio();
+        }
+
+        function refreshNativePipAfterResume() {
+            if (!isNativePomodoroPipOpen()) return;
+            renderNativePipFrame();
+            ensureNativePipSource().then(() => {
+                playNativePipVideoSilently();
+                if (!nativePipRenderInterval) startNativePipRenderLoop();
+            });
         }
 
         function setNativePipVideoPosition(visible) {
@@ -3039,6 +2600,7 @@
 
         async function openNativePomodoroPip() {
             if (nativePipOpening) return;
+            nativePipAudioPrimed = true;
             if (!supportsNativePomodoroPip()) {
                 notify('PiP nativo no disponible. Prueba en Chrome, Edge o Safari actualizado.', 'error');
                 return;
@@ -3205,7 +2767,7 @@
         }
 
         async function startOrPausePomodoro(options = {}) {
-            const { openFullscreen = false, manualTaskName = '' } = options;
+            const { openFullscreen = false } = options;
 
             if (pomodoroState.isRunning) {
                 if (openFullscreen) openPomodoroFullscreen();
@@ -3227,31 +2789,19 @@
                 const canStart = await ensurePomodoroCanStart();
                 if (!canStart) return;
                 const selectedTask = tdahSelectedTask || getStoredSelectedTask();
-                const freeTaskName = String(manualTaskName || oneThingInput?.value || '').trim();
-                if (!selectedTask && freeTaskName === '') {
+                if (!selectedTask) {
                     notify('Selecciona o escribe una tarea en La unica cosa que haras.', 'error');
                     return;
                 }
                 if (!pomodoroState.activeTaskId) {
-                    if (selectedTask) {
-                        pomodoroState.activeProjectId = String(selectedTask.projectId);
-                        pomodoroState.activeProjectTitle = String(selectedTask.projectTitle || '');
-                        pomodoroState.activeTaskId = String(selectedTask.taskId);
-                        pomodoroState.activeTaskName = String(selectedTask.taskName || '');
-                    } else {
-                        pomodoroState.activeProjectId = '';
-                        pomodoroState.activeProjectTitle = 'Pomodoro TDAH';
-                        pomodoroState.activeTaskId = 'manual-ai';
-                        pomodoroState.activeTaskName = freeTaskName;
-                    }
+                    pomodoroState.activeProjectId = String(selectedTask.projectId);
+                    pomodoroState.activeProjectTitle = String(selectedTask.projectTitle || '');
+                    pomodoroState.activeTaskId = String(selectedTask.taskId);
+                    pomodoroState.activeTaskName = String(selectedTask.taskName || '');
                 }
 
-                if (pomodoroState.activeProjectId && pomodoroState.activeTaskId !== 'manual-ai') {
-                    const synced = await syncPomodoroBackend('start', { projectId: pomodoroState.activeProjectId, taskId: pomodoroState.activeTaskId });
-                    if (!synced) return;
-                } else {
-                    pomodoroState.backendTimerActive = false;
-                }
+                const synced = await syncPomodoroBackend('start', { projectId: pomodoroState.activeProjectId, taskId: pomodoroState.activeTaskId });
+                if (!synced) return;
             }
 
             if (openFullscreen) openPomodoroFullscreen();
@@ -3291,29 +2841,6 @@
             pomodoroState.workMinutes = safeMinutes;
             pomodoroState.remainingSeconds = safeMinutes * 60;
             renderPomodoro();
-        }
-
-        window.startTdahPomodoroFromAi = async function(options = {}) {
-            if (pomodoroState.isRunning) {
-                if (options.openPip) await openPreferredPomodoroPip();
-                else openPomodoroFullscreen();
-                notify('El Pomodoro TDAH ya está en marcha.', 'info');
-                return { ok: true, alreadyRunning: true };
-            }
-
-            const safeMinutes = [25, 30, 60].includes(Number(options.minutes)) ? Number(options.minutes) : 25;
-            const taskName = String(options.task || oneThingInput?.value || 'Bloque de foco guiado por IA').trim();
-            await resetPomodoro(true);
-            pomodoroState.workMinutes = safeMinutes;
-            pomodoroState.remainingSeconds = safeMinutes * 60;
-            if (oneThingInput) {
-                oneThingInput.value = taskName;
-                localStorage.setItem('tdah_one_thing', taskName);
-            }
-            applySelectedTask(null, { syncInput: false, persist: true });
-            await startOrPausePomodoro({ openFullscreen: options.openPip !== true, manualTaskName: taskName });
-            if (options.openPip) await openPreferredPomodoroPip();
-            return { ok: !!pomodoroState.isRunning, minutes: safeMinutes, task: taskName };
         }
 
         if(oneThingInput) {
@@ -3416,12 +2943,21 @@
                     setNativePipVideoPosition(false);
                     nativePipLastPlaybackState = null;
                 } else {
+                    if (!nativePipRenderInterval) startNativePipRenderLoop();
                     syncNativePipPlaybackState();
                 }
                 renderNativePipFrame();
                 updateNativePipMediaSession();
+                refreshNativePipAfterResume();
             });
+            nativePipVideo.addEventListener('emptied', refreshNativePipAfterResume);
+            nativePipVideo.addEventListener('stalled', refreshNativePipAfterResume);
+            nativePipVideo.addEventListener('waiting', refreshNativePipAfterResume);
         }
+
+        document.addEventListener('visibilitychange', refreshNativePipAfterResume);
+        window.addEventListener('pageshow', refreshNativePipAfterResume);
+        window.addEventListener('focus', refreshNativePipAfterResume);
 
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && pomodoroState.fullscreenVisible) closePomodoroFullscreen();

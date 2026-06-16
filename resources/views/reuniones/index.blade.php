@@ -662,7 +662,7 @@
                           @endif
                         </div>
                       </div>
-                      @if(($meeting['source'] ?? 'meeting') !== 'lead')
+                      @if(!in_array(($meeting['source'] ?? 'meeting'), ['lead', 'google'], true))
                         <form action="{{ route('reuniones.destroy', $meeting['id']) }}" method="POST" onsubmit="return confirm('¿Eliminar esta reunion?')" class="meeting-delete-form" data-meeting-delete>
                           @csrf @method('DELETE')
                           <button class="meeting-delete-action h-8 w-8 rounded-full bg-white/95 border border-slate-200 inline-flex items-center justify-center hover:bg-white shadow-md" title="Eliminar">
@@ -1290,7 +1290,7 @@
       detailResponsibles.textContent = card.dataset.responsibles || 'Sin encargados';
       detailNotes.textContent = card.dataset.notes || 'Sin notas';
       if (detailEdit) {
-        detailEdit.classList.toggle('hidden', card.dataset.source === 'lead');
+        detailEdit.classList.toggle('hidden', ['lead', 'google'].includes(card.dataset.source || ''));
       }
       const meet = card.dataset.meet || '';
       if (meet) {

@@ -42,4 +42,11 @@ return [
         'admin_emails' => env('GOOGLE_ADMIN_EMAILS', ''),
     ],
 
+    'google_calendar' => [
+        'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID', env('GOOGLE_CLIENT_ID')),
+        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET', env('GOOGLE_CLIENT_SECRET')),
+        'redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI'),
+        'calendar_id' => env('GOOGLE_CALENDAR_ID', 'primary'),
+    ],
+
 ];

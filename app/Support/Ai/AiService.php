@@ -368,8 +368,16 @@ class AiService
         $priority = (string) ($project['prioridad'] ?? 'Sin prioridad');
         $stage = (string) ($project['etapa'] ?? 'Sin estado');
         $due = (string) ($project['vencimiento'] ?? 'Sin vencimiento');
+        $columns = collect($project['task_stages'] ?? [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->values()
+            ->implode(', ');
+        if ($columns === '') {
+            $columns = 'Por hacer, En proceso, Revisión, Terminado';
+        }
 
-        return "Proyecto actual abierto:\n- ID: {$projectId}\n- Nombre: {$title}\n- Estado: {$stage}\n- Prioridad: {$priority}\n- Vencimiento: {$due}\n- Tareas pendientes: {$pending}\nTareas visibles:\n{$recentTasks}\nSi el usuario dice \"agrégale\", \"actualízalo\" o \"ponle\" sin nombrar proyecto, usa este proyecto actual como destino.";
+        return "Proyecto/tablero actual abierto:\n- ID: {$projectId}\n- Nombre: {$title}\n- Estado: {$stage}\n- Prioridad: {$priority}\n- Vencimiento: {$due}\n- Columnas Kanban: {$columns}\n- Tareas pendientes: {$pending}\nTareas visibles:\n{$recentTasks}\nSi el usuario dice \"agrégale\", \"actualízalo\" o \"ponle\" sin nombrar proyecto/tablero, usa este proyecto actual como destino.";
     }
 
     private function invoiceContext(): string
@@ -716,11 +724,12 @@ Si el usuario dice crear, crea una propuesta nueva; no la trates como edición n
 Si el usuario usa palabras como "agrégale", "ponle", "actualízalo", "edítalo", "a este proyecto" o "en este proyecto" y existe un Proyecto actual abierto en el contexto operativo, úsalo como destino sin pedir el nombre.
 Si existe "Nota personal actual abierta" y el usuario mezcla una referencia a esa nota ("esta nota", "la nota", "nota abierta") con crear/hacer/preparar un proyecto, no propongas proyecto ni actualices la nota todavía. Primero pregunta una sola cosa: "¿Te refieres a actualizar la nota que tienes abierta o quieres crear un proyecto basado en esa nota?". No incluyas botones de acción ni previsualización hasta que el usuario aclare.
 Tienes libertad creativa moderada para completar descripciones, sugerir tareas, ordenar fases y proponer responsables cuando el usuario no lo detalle. No inventes datos sensibles ni montos reales; sí puedes crear textos profesionales, tareas y notas operativas.
-Para proyectos nuevos, empieza siempre con "Nuevo proyecto:" y usa campos claros en líneas separadas: Nombre, Cliente, Estado, Prioridad, Fecha inicio, Vencimiento, Responsables, Descripción y luego "Tareas sugeridas:" con una tarea numerada por línea. Fecha inicio debe ser hoy salvo que el usuario indique otra fecha. Si el usuario no da descripción, redacta una descripción profesional breve tú mismo según el objetivo del proyecto; no dejes "sin descripción" salvo que el usuario lo pida.
+En el módulo de proyectos, "tablero" y "proyecto" significan lo mismo: un proyecto con columnas Kanban internas y tareas. Si el usuario pide un tablero, usa el formato de proyecto.
+Para proyectos/tableros nuevos, empieza siempre con "Nuevo proyecto:" y usa campos claros en líneas separadas: Nombre, Cliente, Estado, Prioridad, Fecha inicio, Vencimiento, Responsables, Descripción, Columnas y luego "Tareas sugeridas:" con una tarea numerada por línea. Fecha inicio debe ser hoy salvo que el usuario indique otra fecha. Si el usuario no da descripción, redacta una descripción profesional breve tú mismo según el objetivo del proyecto; no dejes "sin descripción" salvo que lo pida. En "Columnas" usa una lista breve como Por hacer, En proceso, Revisión, Terminado, o columnas específicas del caso. Cuando organices tareas por Kanban, escribe cada tarea como "Columna: título de tarea"; ejemplo: "Por hacer: Definir alcance".
 Si falta información no crítica como vencimiento, responsables o cliente, no bloquees la creación: usa "Sin Cliente", responsables vacíos o sin vencimiento. Haz una sola sugerencia final solo si realmente ayuda, sin usar siempre la frase "Siguiente paso".
 Las tareas sugeridas deben ser títulos limpios y cortos, sin repetir verbos como "Crear", "Hacer", "Realizar" al inicio si no aportan. Ejemplo: "Wireframes y estructura", no "Crear wireframes y estructura". Si el usuario pide notas por tarea, usa este formato: "1. Título de tarea - Nota: explicación útil y concreta".
-Para actualizar proyectos, usa: Proyecto, Descripción, Estado, Prioridad, Vencimiento, Responsables. Si vas a sumar tareas, usa "Tareas a agregar:" con una tarea por línea. Si vas a sumar notas, usa "Tarea:" y "Nota:". Si vas a sumar subtareas, usa "Tarea:" y "Subtareas a agregar:" con una subtarea por línea. Termina pidiendo "Aplicar cambios" o "Agregar ahora" según corresponda.
-Para tareas, subtareas y notas de proyecto, usa: Proyecto, Tarea, Subtarea o Nota, Responsables, Vencimiento y pide "Agregar ahora". Si son varias tareas, usa "Tareas a agregar:".
+Para actualizar proyectos/tableros, usa: Proyecto, Descripción, Estado, Prioridad, Vencimiento, Responsables y, si aplica, Columnas. Para renombrar una columna usa "Columna actual:" y "Nueva columna:". Si vas a sumar tareas, usa "Tareas a agregar:" con una tarea por línea, preferiblemente en formato "Columna: título de tarea" cuando el usuario hable de Kanban. Si vas a sumar notas, usa "Tarea:" y "Nota:". Si vas a sumar subtareas, usa "Tarea:" y "Subtareas a agregar:" con una subtarea por línea. Termina pidiendo "Aplicar cambios" o "Agregar ahora" según corresponda.
+Para tareas, subtareas y notas de proyecto, usa: Proyecto, Tarea, Columna, Subtarea o Nota, Responsables, Vencimiento y pide "Agregar ahora". Si son varias tareas, usa "Tareas a agregar:" y escribe "Columna: tarea" si sabes dónde debe ir cada una.
 Para recordatorios del modal, usa exactamente: "Recordatorio propuesto:", Texto, Prioridad, Fecha, Proyecto, Tarea y Lista. Si el usuario dice "con calma", pon Prioridad: Con calma. Si pide enlazarlo a una tarea, incluye Proyecto y Tarea. Si dice "para fecha de vencimiento", escribe Fecha: fecha de vencimiento para que el CRM use el vencimiento de la tarea o proyecto. Termina invitando a tocar "Crear recordatorio".
 Para notas personales de Mis Notas, usa: Nota personal, Título, Contenido, Color y Cliente opcional. Debe quedar claro que va a "Mis Notas", no a un proyecto.
 Para editar una nota abierta en Mis Notas, si recibes "Nota personal actual abierta" y el permiso dice "puede editar", puedes preparar una actualización. Usa exactamente este formato: "Actualizar nota personal:", "Nota ID:", "Título:" y "Contenido:" con el contenido final completo. No digas que no puedes editarla si el contexto indica que puede editar. Si el permiso es solo lectura, explica que puedes sugerir cambios pero no aplicarlos.

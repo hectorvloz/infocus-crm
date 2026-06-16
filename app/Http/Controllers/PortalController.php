@@ -731,6 +731,18 @@ class PortalController extends Controller
         return $this->buildStripeSession($invoice, $client, $id, $token, $publicInvoiceId);
     }
 
+    protected function gatewayRedirect(string $gateway, string $url, array $invoice, ?string $cancelUrl = null)
+    {
+        return response()
+            ->view('portal.payment_redirect', [
+                'gateway' => $gateway,
+                'gatewayUrl' => $url,
+                'cancelUrl' => $cancelUrl,
+                'invoice' => $invoice,
+            ])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
     protected function paypalErrorMessage($response, string $fallback): string
     {
         $payload = $response->json();
@@ -997,7 +1009,7 @@ class PortalController extends Controller
             return back()->withErrors(['pago' => 'PayPal no devolvio URL de aprobacion.']);
         }
 
-        return redirect()->away($approveUrl);
+        return $this->gatewayRedirect('PayPal', $approveUrl, $invoice, $cancelUrl);
     }
 
     // ── Stripe Checkout ───────────────────────────────────────────
