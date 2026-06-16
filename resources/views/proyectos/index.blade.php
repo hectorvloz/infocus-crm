@@ -815,6 +815,32 @@
       min-height: calc(100vh - 128px);
     }
 
+    .project-board-anim {
+      transition: opacity .18s ease, transform .18s ease;
+      will-change: opacity, transform;
+    }
+
+    .project-board-anim.is-entering {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .project-board-anim.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .project-board-anim {
+        transition: none;
+      }
+
+      .project-board-anim.is-entering,
+      .project-board-anim.is-visible {
+        transform: none;
+      }
+    }
+
     .project-board-columns {
       display: flex;
       align-items: flex-start;
@@ -967,7 +993,7 @@
     }
   </style>
   <div id="stagesData" data-stages='{{ json_encode($stages) }}'></div>
-  <div id="projectBoardsHeader" class="mb-4 flex items-center justify-between flex-wrap gap-3">
+  <div id="projectBoardsHeader" class="project-board-anim is-visible mb-4 flex items-center justify-between flex-wrap gap-3">
     <div>
       <div id="projectsSectionTitle" data-build-marker="boards-v1" class="text-2xl font-extrabold">Tableros de proyectos</div>
       <div id="projectsSectionDescription" class="text-sm text-slate-500 mt-1">Abre un tablero para organizar sus tarjetas, tareas y entregables por columnas.</div>
@@ -1143,12 +1169,12 @@
   </div>
 
   <div id="proyectos-kanban" class="min-h-[calc(100vh-190px)]">
-    <div id="projectBoardsView">
+    <div id="projectBoardsView" class="project-board-anim is-visible">
       <div id="projectBoardsCount" class="hidden">0 tableros</div>
       <div id="projectBoardsGrid" class="project-board-grid"></div>
     </div>
 
-    <div id="projectBoardDetailView" class="project-board-detail hidden">
+    <div id="projectBoardDetailView" class="project-board-detail project-board-anim hidden">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
         <div class="min-w-0">
           <div id="projectBoardTitle" class="truncate text-xl font-black leading-tight text-slate-950 sm:text-2xl">Tablero</div>
@@ -3033,6 +3059,16 @@
     let boardTaskComposerFocusStage = '';
     let boardStageEditingName = '';
     const DEFAULT_PROJECT_TASK_STAGES = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
+    window.history.replaceState({
+      view: pendingBoardSlug || currentBoardProjectId ? 'project-board' : 'project-boards',
+      boardSlug: pendingBoardSlug || currentBoardProjectId || '',
+    }, '', window.location.href);
+    window.addEventListener('popstate', () => {
+      currentClienteId = new URLSearchParams(window.location.search || '').get('cliente_id') || '';
+      const clientSelector = document.getElementById('clientSelector');
+      if (clientSelector && clientSelector.value !== currentClienteId) clientSelector.value = currentClienteId;
+      syncProjectBoardFromLocation();
+    });
 
     // --- Dynamic Stages Logic ---
     function stageColumn(title, count) {
@@ -3369,6 +3405,14 @@
         || null;
     }
 
+    function getBoardSlugFromLocation() {
+      const path = decodeURIComponent(String(window.location.pathname || '')).replace(/\/+$/g, '');
+      const prefix = '/proyectos/';
+      if (path.startsWith(prefix)) return path.slice(prefix.length).trim();
+      const params = new URLSearchParams(window.location.search || '');
+      return String(params.get('board') || '').trim();
+    }
+
     function renderProjectBoards(list) {
       const grid = document.getElementById('projectBoardsGrid');
       const count = document.getElementById('projectBoardsCount');
@@ -3424,21 +3468,65 @@
       return clean.length ? clean : DEFAULT_PROJECT_TASK_STAGES.slice();
     }
 
-    function openProjectBoard(projectId) {
+    function setBoardRoute(slug = '', mode = 'push') {
+      const url = new URL(window.location.href);
+      const nextPath = slug ? `/proyectos/${encodeURIComponent(slug)}` : '/proyectos';
+      url.pathname = nextPath;
+      url.searchParams.delete('board');
+      url.searchParams.delete('open_project');
+      url.searchParams.delete('open_task');
+      url.searchParams.delete('new_project');
+      const state = { view: slug ? 'project-board' : 'project-boards', boardSlug: slug || '' };
+      if (mode === 'replace') window.history.replaceState(state, '', url);
+      else window.history.pushState(state, '', url);
+    }
+
+    function transitionBoardViews(showDetail = false) {
+      const header = document.getElementById('projectBoardsHeader');
+      const list = document.getElementById('projectBoardsView');
+      const detail = document.getElementById('projectBoardDetailView');
+      const show = (node) => {
+        if (!node) return;
+        node.classList.remove('hidden', 'is-visible');
+        node.classList.add('is-entering');
+        requestAnimationFrame(() => {
+          node.classList.remove('is-entering');
+          node.classList.add('is-visible');
+        });
+      };
+      const hide = (node) => {
+        if (!node) return;
+        node.classList.remove('is-entering', 'is-visible');
+        node.classList.add('hidden');
+      };
+
+      if (showDetail) {
+        hide(header);
+        hide(list);
+        show(detail);
+        return;
+      }
+
+      hide(detail);
+      show(header);
+      show(list);
+    }
+
+    function openProjectBoard(projectId, options = {}) {
       currentBoardProjectId = String(projectId || '');
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       const slug = projectBoardSlug(project || { id: currentBoardProjectId });
-      window.location.href = `/proyectos/${encodeURIComponent(slug)}`;
+      pendingBoardSlug = '';
+      if (!options.skipUrl) setBoardRoute(slug, options.replaceUrl ? 'replace' : 'push');
+      renderProjectBoard(currentBoardProjectId, { preserveScroll: false });
     }
 
     function closeProjectBoard(options = {}) {
       currentBoardProjectId = '';
       pendingBoardSlug = '';
-      document.getElementById('projectBoardsHeader')?.classList.remove('hidden');
-      document.getElementById('projectBoardsView')?.classList.remove('hidden');
-      document.getElementById('projectBoardDetailView')?.classList.add('hidden');
+      transitionBoardViews(false);
       if (!options.skipUrl) {
-        window.location.href = '/proyectos';
+        setBoardRoute('', options.replaceUrl ? 'replace' : 'push');
       }
     }
 
@@ -3446,9 +3534,28 @@
       if (!projectGlobalBackButton) return;
       projectGlobalBackButton.onclick = function (event) {
         event.preventDefault();
-        window.location.href = '/proyectos';
+        closeProjectBoard();
         return false;
       };
+    }
+
+    function syncProjectBoardFromLocation() {
+      const slug = getBoardSlugFromLocation();
+      if (!slug) {
+        closeProjectBoard({ skipUrl: true });
+        return;
+      }
+
+      const project = findProjectByBoardSlug(slug);
+      if (project?.id) {
+        currentBoardProjectId = String(project.id);
+        pendingBoardSlug = '';
+        renderProjectBoard(currentBoardProjectId, { preserveScroll: false });
+        return;
+      }
+
+      pendingBoardSlug = slug;
+      currentBoardProjectId = '';
     }
 
     function renderProjectBoard(projectId, options = {}) {
@@ -3458,9 +3565,7 @@
         return;
       }
 
-      document.getElementById('projectBoardsHeader')?.classList.add('hidden');
-      document.getElementById('projectBoardsView')?.classList.add('hidden');
-      document.getElementById('projectBoardDetailView')?.classList.remove('hidden');
+      transitionBoardViews(true);
       bindProjectBoardHeaderBack();
 
       const title = document.getElementById('projectBoardTitle');
