@@ -331,6 +331,71 @@
       outline: none;
     }
 
+    #taskSubtasksList {
+      position: relative;
+    }
+
+    #taskSubtasksList.is-ai-working {
+      border-radius: 1rem;
+    }
+
+    #taskSubtasksList.is-ai-working::before {
+      content: "";
+      position: absolute;
+      inset: -.45rem;
+      z-index: 3;
+      pointer-events: none;
+      border-radius: 1rem;
+      border: 2px solid rgba(217, 70, 239, .62);
+      background:
+        radial-gradient(circle at 16% 18%, rgba(232, 121, 249, .26), transparent 30%),
+        linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, .78) 45%, transparent 68%);
+      background-size: 100% 100%, 220% 100%;
+      box-shadow: 0 14px 34px rgba(217, 70, 239, .16);
+      animation: taskChecklistAiGlow .95s ease-in-out infinite;
+    }
+
+    #taskSubtasksList.is-ai-working::after {
+      content: "IA ajustando checklist";
+      position: absolute;
+      right: .45rem;
+      top: -.9rem;
+      z-index: 4;
+      pointer-events: none;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid rgba(217, 70, 239, .28);
+      color: #86198f;
+      font-size: .65rem;
+      font-weight: 900;
+      letter-spacing: .02em;
+      padding: .22rem .5rem;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .10);
+    }
+
+    .task-subtask-ai-enter {
+      animation: taskSubtaskAiEnter .48s cubic-bezier(.2, .9, .2, 1) both;
+    }
+
+    @keyframes taskChecklistAiGlow {
+      0% { background-position: 0 0, 180% 0; opacity: .72; }
+      50% { opacity: 1; }
+      100% { background-position: 0 0, -70% 0; opacity: .72; }
+    }
+
+    @keyframes taskSubtaskAiEnter {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(.985);
+        background: rgba(250, 232, 255, .75);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        background: transparent;
+      }
+    }
+
     .project-desc-shell.is-collapsed.has-overflow::after {
       content: "";
       pointer-events: none;
@@ -815,6 +880,25 @@
       min-height: calc(100vh - 128px);
     }
 
+    body.project-board-open {
+      overflow: hidden;
+    }
+
+    body.project-board-open #proyectos-kanban {
+      overflow: hidden;
+    }
+
+    body.project-board-open .project-board-detail {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    body.project-board-open .project-board-columns {
+      min-height: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
     .project-board-anim {
       transition: opacity .18s ease, transform .18s ease;
       will-change: opacity, transform;
@@ -900,6 +984,66 @@
       display: flex;
       flex-direction: column;
       gap: .55rem;
+    }
+
+    .project-board-ai-creating {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      border-radius: .85rem;
+      border: 1px solid rgba(217, 70, 239, .22);
+      background: linear-gradient(135deg, rgba(255, 255, 255, .96), rgba(250, 245, 255, .92));
+      padding: .72rem .78rem;
+      color: #334155;
+      box-shadow: 0 14px 32px rgba(168, 85, 247, .12);
+      overflow: hidden;
+    }
+
+    .project-board-ai-creating::before {
+      content: "";
+      position: absolute;
+      inset: -45%;
+      background: linear-gradient(90deg, transparent, rgba(217, 70, 239, .2), rgba(217, 255, 102, .24), transparent);
+      transform: translateX(-60%);
+      animation: projectBoardAiSweep 1.45s ease-in-out infinite;
+    }
+
+    .project-board-ai-creating-icon {
+      position: relative;
+      z-index: 1;
+      width: 1.85rem;
+      height: 1.85rem;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f172a;
+      color: #d9ff66;
+      box-shadow: 0 0 0 4px rgba(217, 255, 102, .18);
+    }
+
+    .project-board-ai-creating-text {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+      display: grid;
+      gap: .08rem;
+      font-size: .73rem;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .project-board-ai-creating-text span:last-child {
+      color: #64748b;
+      font-size: .66rem;
+      letter-spacing: .02em;
+    }
+
+    @keyframes projectBoardAiSweep {
+      0% { transform: translateX(-70%) rotate(8deg); opacity: .25; }
+      50% { opacity: .95; }
+      100% { transform: translateX(70%) rotate(8deg); opacity: .25; }
     }
 
     @media (max-width: 767px) {
@@ -1560,7 +1704,7 @@
 
                        <div>
                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Prioridad</div>
-                           <input type="hidden" id="modalPriority" value="Atención">
+                           <input type="hidden" id="modalPriority" value="Con calma">
                            <div class="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3" id="modalPrioritySelector">
                              <button type="button" data-priority="Con calma" class="priority-chip inline-flex h-10 items-center justify-center gap-1 px-2 rounded-xl text-[11px] font-bold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
                                <svg class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg>
@@ -2337,6 +2481,8 @@
     const pendingProjectDescriptions = {};
     let currentTaskId = null; // For task detail modal
     let taskAddInFlight = false;
+    let taskAiChecklistWorking = false;
+    let taskAiAnimatedSubtaskIds = new Set();
     let timerInterval = null; // For modal timer
     let taskTimerInterval = null;
     let headerTimerInterval = null;
@@ -2355,8 +2501,21 @@
       return /<\/?[a-z][\s\S]*>/i.test(String(value || ''));
     }
 
+    function normalizeDescriptionPlainText(value = '') {
+      return String(value || '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/\u00a0/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/([.!?])\s*(\d+[.)]\s+)/g, '$1\n\n$2')
+        .replace(/([^\n])\s+([–—]\s+)/g, (match, before, dash) => {
+          if (/[,:;]$/.test(before)) return match;
+          return `${before}\n${dash}`;
+        });
+    }
+
     function plainTextToDescriptionHtml(value = '') {
-      const text = String(value || '').replace(/\r\n/g, '\n');
+      const text = normalizeDescriptionPlainText(value);
       if (!text.trim()) return '';
       const lines = text.split('\n');
       const chunks = [];
@@ -2405,6 +2564,8 @@
     }
 
     function normalizeClipboardDescriptionHtml(html = '', plainText = '') {
+      const cleanPlainText = normalizeDescriptionPlainText(plainText).trim();
+      if (cleanPlainText) return plainTextToDescriptionHtml(cleanPlainText);
       if (!String(html || '').trim()) return plainTextToDescriptionHtml(plainText);
       const template = document.createElement('template');
       template.innerHTML = String(html || '');
@@ -3016,7 +3177,12 @@
       if (event.target?.closest?.('#taskAiSupportPanel, #taskAiSupportTrigger')) return;
       panel.classList.add('hidden');
     });
-    window.addEventListener('resize', positionTaskAiSupportPanel);
+    window.addEventListener('resize', () => {
+      positionTaskAiSupportPanel();
+      if (document.body.classList.contains('project-board-open')) {
+        fitProjectBoardViewport();
+      }
+    });
     window.addEventListener('scroll', positionTaskAiSupportPanel, true);
     const responsibleCatalogByName = {};
     const LIST_PRIORITY_OPTIONS = [
@@ -3058,6 +3224,7 @@
     let boardColumnPreviewOrder = null;
     let boardTaskComposerFocusStage = '';
     let boardStageEditingName = '';
+    let boardAiWorking = null;
     const DEFAULT_PROJECT_TASK_STAGES = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
     window.history.replaceState({
       view: pendingBoardSlug || currentBoardProjectId ? 'project-board' : 'project-boards',
@@ -3211,7 +3378,7 @@
       if (v === 'urgente' || v === 'alta') return 'Urgente';
       if (v === 'atención' || v === 'atencion' || v === 'media' || v === 'importante') return 'Atención';
       if (v === 'con calma' || v === 'baja') return 'Con calma';
-      return 'Atención';
+      return 'Con calma';
     }
 
     function getProjectTaskStats(project) {
@@ -3352,10 +3519,16 @@
         const projectFromSlug = findProjectByBoardSlug(pendingBoardSlug);
         if (projectFromSlug?.id) {
           currentBoardProjectId = String(projectFromSlug.id);
+        } else {
+          showProjectBoardLoading();
+          refreshProjectsSimpleModeUI();
+          return;
         }
       }
       if (currentBoardProjectId && list.some((project) => String(project.id) === String(currentBoardProjectId))) {
         renderProjectBoard(currentBoardProjectId);
+      } else if (pendingBoardSlug) {
+        showProjectBoardLoading();
       } else {
         closeProjectBoard({ skipUrl: true });
       }
@@ -3485,6 +3658,7 @@
       const header = document.getElementById('projectBoardsHeader');
       const list = document.getElementById('projectBoardsView');
       const detail = document.getElementById('projectBoardDetailView');
+      document.body.classList.toggle('project-board-open', !!showDetail);
       const show = (node) => {
         if (!node) return;
         node.classList.remove('hidden', 'is-visible');
@@ -3504,12 +3678,63 @@
         hide(header);
         hide(list);
         show(detail);
+        fitProjectBoardViewport();
         return;
       }
 
       hide(detail);
       show(header);
       show(list);
+      resetProjectBoardViewport();
+    }
+
+    function fitProjectBoardViewport() {
+      const shell = document.getElementById('proyectos-kanban');
+      const detail = document.getElementById('projectBoardDetailView');
+      const columns = document.getElementById('projectBoardColumns');
+      if (!shell || !detail || !columns) return;
+
+      requestAnimationFrame(() => {
+        const shellTop = shell.getBoundingClientRect().top;
+        const shellHeight = Math.max(280, window.innerHeight - shellTop - 14);
+        shell.style.height = `${shellHeight}px`;
+        detail.style.height = `${shellHeight}px`;
+        const detailHeader = detail.firstElementChild;
+        const headerHeight = detailHeader ? detailHeader.getBoundingClientRect().height : 0;
+        columns.style.height = `${Math.max(220, shellHeight - headerHeight - 16)}px`;
+      });
+    }
+
+    function resetProjectBoardViewport() {
+      const shell = document.getElementById('proyectos-kanban');
+      const detail = document.getElementById('projectBoardDetailView');
+      const columns = document.getElementById('projectBoardColumns');
+      if (shell) shell.style.height = '';
+      if (detail) detail.style.height = '';
+      if (columns) columns.style.height = '';
+    }
+
+    function showProjectBoardLoading(project = null) {
+      transitionBoardViews(true);
+      bindProjectBoardHeaderBack();
+      const title = document.getElementById('projectBoardTitle');
+      const meta = document.getElementById('projectBoardMeta');
+      const container = document.getElementById('projectBoardColumns');
+      if (title) title.textContent = project?.titulo || 'Cargando tablero';
+      if (meta) meta.textContent = 'Preparando columnas y tarjetas...';
+      updateBoardTaskTrashCount(project || {});
+      if (container) {
+        container.innerHTML = [1, 2, 3].map(() => `
+          <div class="project-board-column pointer-events-none">
+            <div class="border-b border-slate-200/80 px-3 py-3">
+              <div class="h-5 w-32 animate-pulse rounded-full bg-slate-200"></div>
+            </div>
+            <div class="project-board-column-body">
+              <div class="h-24 animate-pulse rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"></div>
+              <div class="h-20 animate-pulse rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"></div>
+            </div>
+          </div>`).join('');
+      }
     }
 
     function openProjectBoard(projectId, options = {}) {
@@ -3517,6 +3742,7 @@
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       const slug = projectBoardSlug(project || { id: currentBoardProjectId });
       pendingBoardSlug = '';
+      showProjectBoardLoading(project || null);
       if (!options.skipUrl) setBoardRoute(slug, options.replaceUrl ? 'replace' : 'push');
       renderProjectBoard(currentBoardProjectId, { preserveScroll: false });
     }
@@ -3550,12 +3776,14 @@
       if (project?.id) {
         currentBoardProjectId = String(project.id);
         pendingBoardSlug = '';
+        showProjectBoardLoading(project);
         renderProjectBoard(currentBoardProjectId, { preserveScroll: false });
         return;
       }
 
       pendingBoardSlug = slug;
       currentBoardProjectId = '';
+      showProjectBoardLoading();
     }
 
     function renderProjectBoard(projectId, options = {}) {
@@ -3565,6 +3793,10 @@
         return;
       }
 
+      window.__infocusAiCurrentProject = {
+        id: String(project.id || projectId || ''),
+        title: String(project.titulo || 'Tablero'),
+      };
       transitionBoardViews(true);
       bindProjectBoardHeaderBack();
 
@@ -3602,6 +3834,7 @@
             <span class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-500 shadow-sm">${stageTasks.length}</span>
           </div>
           <div class="project-board-column-body custom-scroll" data-board-drop-stage="${escapeHtml(stage)}">
+            ${projectBoardAiCreatingIndicator(project, stage)}
             ${stageTasks.map((task) => projectBoardTaskCard(project, task)).join('')}
             ${projectBoardAddTaskButton(stage)}
           </div>
@@ -3610,12 +3843,50 @@
 
       enableProjectBoardDnD();
       initProjectBoardDragScroll();
+      fitProjectBoardViewport();
       if (restoreScroll && previousScrollLeft > 0) {
         requestAnimationFrame(() => {
           container.scrollLeft = previousScrollLeft;
         });
       }
       focusProjectBoardInlineControls();
+    }
+
+    function normalizeBoardStageText(value = '') {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    }
+
+    function resolveBoardAiStage(project, preferredStage = '') {
+      const stages = getProjectBoardStages(project);
+      const preferred = normalizeBoardStageText(preferredStage);
+      if (!preferred) return stages[0] || 'Por hacer';
+      const exact = stages.find((stage) => normalizeBoardStageText(stage) === preferred);
+      if (exact) return exact;
+      return stages.find((stage) => {
+        const normalized = normalizeBoardStageText(stage);
+        return normalized && (normalized.includes(preferred) || preferred.includes(normalized));
+      }) || stages[0] || 'Por hacer';
+    }
+
+    function projectBoardAiCreatingIndicator(project, stage) {
+      if (!boardAiWorking?.working) return '';
+      const targetProjectMatches = !boardAiWorking.projectId || String(boardAiWorking.projectId) === String(project?.id || '');
+      const targetTitleMatches = !boardAiWorking.projectTitle || normalizeBoardStageText(boardAiWorking.projectTitle) === normalizeBoardStageText(project?.titulo || '');
+      if (!targetProjectMatches && !targetTitleMatches) return '';
+      const targetStage = resolveBoardAiStage(project, boardAiWorking.stage || '');
+      if (normalizeBoardStageText(targetStage) !== normalizeBoardStageText(stage)) return '';
+      return `<div class="project-board-ai-creating" aria-live="polite">
+        <span class="project-board-ai-creating-icon"><i class="fa-solid fa-robot" aria-hidden="true"></i></span>
+        <span class="project-board-ai-creating-text">
+          <span>IA creando tarjeta</span>
+          <span>${escapeHtml(stage)}</span>
+        </span>
+      </div>`;
     }
 
     function updateBoardTaskTrashCount(project) {
@@ -3704,11 +3975,40 @@
       if (idx >= 0) projects[idx] = project;
     }
 
+    window.addEventListener('infocus-ai-project-working', (event) => {
+      const detail = event.detail || {};
+      boardAiWorking = {
+        working: !!detail.working,
+        projectId: String(detail.projectId || ''),
+        projectTitle: String(detail.projectTitle || ''),
+        stage: String(detail.stage || ''),
+      };
+      if (currentBoardProjectId) {
+        const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+        renderProjectBoard(currentBoardProjectId, { scrollLeft });
+      }
+    });
+
+    window.addEventListener('infocus-ai-project-updated', (event) => {
+      const detail = event.detail || {};
+      if (detail.project?.id) {
+        patchBoardProject(detail.project);
+      }
+
+      const updatedProjectId = String(detail.project?.id || detail.action?.project_id || detail.fallback?.projectId || '');
+      if (updatedProjectId && String(currentBoardProjectId || '') === updatedProjectId) {
+        const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+        renderProjectBoard(currentBoardProjectId, { scrollLeft });
+      } else {
+        renderKanban(projects);
+      }
+    });
+
     function projectBoardTaskCard(project, task) {
       const safeProjectId = String(project.id || '').replace(/'/g, "\\'");
       const safeTaskId = String(task.id || '').replace(/'/g, "\\'");
       const done = !!task.done;
-      const priority = normalizePriority(task.priority || project.prioridad || 'Atención');
+      const priority = normalizePriority(task.priority || project.prioridad || 'Con calma');
       const due = task.due_date || task.end_date || '';
       const owners = getTaskOwnerSources(task, project);
       const files = Array.isArray(task.files) ? task.files : [];
@@ -3770,7 +4070,7 @@
         body: JSON.stringify({
           id: project.id,
           texto: clean,
-          priority: 'Atención',
+          priority: 'Con calma',
           board_stage: targetStage,
         }),
       });
@@ -5260,7 +5560,7 @@
         renderNewProjectCoverPicker();
         document.getElementById('newProjectTitle').value = '';
         document.getElementById('newProjectDescription').value = '';
-        document.getElementById('newProjectPriority').value = 'Atención';
+        document.getElementById('newProjectPriority').value = 'Con calma';
         document.getElementById('newProjectClient').value = currentClienteId || '';
       document.getElementById('newProjectPlannedDays').value = '0';
       document.getElementById('newProjectPlannedHours').value = '0';
@@ -5284,7 +5584,7 @@
         const titulo = document.getElementById('newProjectTitle').value.trim();
         const descripcion = document.getElementById('newProjectDescription').value.trim();
         const etapa = (stages && stages[0]) || 'Prospecto';
-        const prioridad = normalizePriority(document.getElementById('newProjectPriority').value || 'Atención');
+        const prioridad = normalizePriority(document.getElementById('newProjectPriority').value || 'Con calma');
         const cliente = document.getElementById('newProjectClient').value || (currentClienteId || 'general');
         const inicio = document.getElementById('newProjectStart').value || null;
         const vencimiento = document.getElementById('newProjectDue').value || null;
@@ -7485,7 +7785,7 @@
         if (diffDays < 0) return 'Vencido';
         if (diffDays <= 7) return 'Atención';
       }
-      return normalizeTaskPriority(task?.priority || project?.prioridad || 'Atención');
+      return normalizeTaskPriority(task?.priority || project?.prioridad || 'Con calma');
     }
 
     function getEffectiveProjectPriority(project) {
@@ -7498,7 +7798,7 @@
         if (diffDays < 0) return 'Vencido';
         if (diffDays <= 7) return 'Atención';
       }
-      return normalizePriority(project?.prioridad || 'Atención');
+      return normalizePriority(project?.prioridad || 'Con calma');
     }
 
     function getTaskPriorityStyles(value) {
@@ -7592,7 +7892,7 @@
     function refreshTaskModalPriorityUI() {
       const select = document.getElementById('taskModalPriority');
       const iconWrap = document.getElementById('taskModalPriorityIcon');
-      const level = normalizeTaskPriority(select?.value || 'Atención');
+      const level = normalizeTaskPriority(select?.value || 'Con calma');
       const styles = getTaskPriorityStyles(level);
       const textClass = (styles.chip.match(/text-\S+/) || ['text-amber-700'])[0];
       if (select) {
@@ -8856,12 +9156,24 @@
       box.scrollTop = box.scrollHeight;
     }
 
+    function getSubtaskAnimationId(subtask) {
+      return String(subtask?.id || subtask?.texto || '').trim();
+    }
+
+    function setTaskAiChecklistWorking(working = false) {
+      taskAiChecklistWorking = !!working;
+      const list = document.getElementById('taskSubtasksList');
+      list?.classList.toggle('is-ai-working', taskAiChecklistWorking);
+    }
+
     async function sendTaskAiSupport() {
       if (!currentProjectId || !currentTaskId) return;
       const input = document.getElementById('taskAiSupportInput');
       const button = document.getElementById('taskAiSupportSendBtn');
       const message = String(input?.value || '').trim();
       if (!message) return;
+      const previousTask = getCurrentTask();
+      const previousSubtaskIds = new Set((previousTask?.subtasks || []).map(getSubtaskAnimationId).filter(Boolean));
 
       appendTaskAiSupportMessage('user', message);
       if (input) input.value = '';
@@ -8870,6 +9182,7 @@
         button.textContent = 'Pensando...';
       }
       appendTaskAiSupportMessage('assistant', 'Estoy preparando cambios para el checklist...');
+      setTaskAiChecklistWorking(true);
 
       try {
         const response = await fetch('/api/proyectos/tareas/ia-apoyo', {
@@ -8880,22 +9193,34 @@
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) {
           appendTaskAiSupportMessage('assistant', data.message || 'No pude aplicar cambios con IA.');
+          setTaskAiChecklistWorking(false);
           return;
         }
 
+        const updatedTasks = data.item.tareas || [];
+        const updatedTask = updatedTasks.find((task) => String(task.id) === String(currentTaskId));
+        taskAiAnimatedSubtaskIds = new Set((updatedTask?.subtasks || [])
+          .map(getSubtaskAnimationId)
+          .filter((id) => id && !previousSubtaskIds.has(id)));
+
         const p = projects.find((item) => String(item.id) === String(currentProjectId));
         if (p) {
-          p.tareas = data.item.tareas || [];
+          p.tareas = updatedTasks;
           p.archived_tasks = data.item.archived_tasks || p.archived_tasks || [];
         }
-        syncCurrentProjectTasks(data.item.tareas || [], { rerenderTaskDetail: true });
+        syncCurrentProjectTasks(updatedTasks, { rerenderTaskDetail: true });
         if (String(currentBoardProjectId || '') === String(currentProjectId || '')) {
           renderProjectBoard(currentBoardProjectId);
         }
         appendTaskAiSupportMessage('assistant', data.message || 'Listo, apliqué los cambios.');
+        setTimeout(() => {
+          setTaskAiChecklistWorking(false);
+          taskAiAnimatedSubtaskIds.clear();
+        }, 950);
       } catch (error) {
         console.error(error);
         appendTaskAiSupportMessage('assistant', 'No pude conectar con el apoyo de IA.');
+        setTaskAiChecklistWorking(false);
       } finally {
         if (button) {
           button.disabled = false;
@@ -8991,6 +9316,7 @@
       const total = Array.isArray(subtasks) ? subtasks.length : 0;
       const done = (Array.isArray(subtasks) ? subtasks : []).filter((item) => !!item.done).length;
       const pct = total ? Math.round((done / total) * 100) : 0;
+      list.classList.toggle('is-ai-working', taskAiChecklistWorking);
       if (progress) progress.classList.toggle('progress-fill-live', animateProgressBarsOnce);
       if (progress) progress.style.width = `${pct}%`;
       if (progressLabel) progressLabel.textContent = `${pct}%`;
@@ -9004,17 +9330,19 @@
       }
       const project = projects.find(x => x.id === currentProjectId) || null;
       const task = getCurrentTask();
-      list.innerHTML = subtasks.map((s) => renderSubtaskRow(s, task, project)).join('');
+      list.innerHTML = subtasks.map((s, index) => renderSubtaskRow(s, task, project, index)).join('');
       if (currentEditingSubtaskId) {
         setTimeout(initSubtaskDuePicker, 0);
       }
     }
 
-    function renderSubtaskRow(subtask, task, project) {
+    function renderSubtaskRow(subtask, task, project, index = 0) {
       const subtaskId = String(subtask.id || '');
       const safeId = subtaskId.replace(/'/g, "\\'");
       const isEditing = String(currentEditingSubtaskId || '') === subtaskId;
       if (isEditing) return renderSubtaskEditor(subtask, task, project, safeId);
+      const shouldAnimate = taskAiAnimatedSubtaskIds.has(getSubtaskAnimationId(subtask));
+      const animationStyle = shouldAnimate ? `style="animation-delay:${Math.min(index, 8) * 55}ms"` : '';
 
       const ownerBadges = renderResponsibleBadges(subtask.owners || [], subtask.owner_ids || [], {
         limit: 3,
@@ -9027,7 +9355,7 @@
       const priority = getEffectiveSubtaskPriority(subtask, task, project);
 
       return `
-        <div onclick="openSubtaskEditor('${safeId}')" class="group cursor-pointer border-b border-slate-200 px-1 py-4 last:border-b-0 hover:bg-slate-50/60 transition-colors">
+        <div onclick="openSubtaskEditor('${safeId}')" ${animationStyle} class="group cursor-pointer border-b border-slate-200 px-1 py-4 last:border-b-0 hover:bg-slate-50/60 transition-colors ${shouldAnimate ? 'task-subtask-ai-enter' : ''}">
           <div class="flex items-start gap-4">
             <button type="button" onclick="event.stopPropagation(); toggleSubtask('${safeId}')" class="mt-1 w-6 h-6 rounded-md border ${subtask.done ? 'bg-lime-500 border-lime-500 text-white' : 'border-slate-300 bg-white text-transparent'} flex items-center justify-center shrink-0 transition-colors" title="Marcar / desmarcar elemento">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
@@ -9053,15 +9381,16 @@
     function renderSubtaskEditor(subtask, task, project, safeId) {
       const selectedOwners = renderSubtaskOwnerEditor(subtask);
       const priority = getEffectiveSubtaskPriority(subtask, task, project);
-      const rawPriority = normalizeTaskPriority(subtask.priority || task?.priority || 'Atención');
+      const rawPriority = normalizeTaskPriority(subtask.priority || task?.priority || 'Con calma');
       const parentIsOverdue = getEffectiveTaskPriority(task || {}, project) === 'Vencido';
       const priorityControl = parentIsOverdue
         ? getTaskPriorityBadge('Vencido', 'xs')
-        : `<label class="relative inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-2 text-xs font-extrabold text-slate-600 shadow-sm ring-1 ring-slate-200">
-            ${getTaskPriorityIcon(priority, 'w-3.5 h-3.5 shrink-0 self-center')}
-            <select id="editSubtaskPriority" class="h-7 max-w-[5.6rem] appearance-none border-0 bg-transparent p-0 pr-4 text-[11px] font-extrabold text-slate-600 focus:ring-0" onchange="setSubtaskAutosaveStatus('Guardando...'); saveSubtaskDetails({ closeAfter: false, rerender: false });">
+        : `<label class="relative inline-flex h-8 w-[9.25rem] shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600 shadow-sm transition-colors focus-within:border-lime-300 focus-within:ring-2 focus-within:ring-lime-100">
+            <span id="editSubtaskPriorityIcon" class="inline-flex shrink-0">${getTaskPriorityIcon(priority, 'w-3.5 h-3.5 shrink-0 self-center')}</span>
+            <select id="editSubtaskPriority" class="h-7 min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 pr-5 text-xs font-extrabold text-slate-700 focus:ring-0" onchange="updateSubtaskPriorityPill(this.value); setSubtaskAutosaveStatus('Guardando...'); saveSubtaskDetails({ closeAfter: false, rerender: false });">
               ${['Con calma', 'Atención', 'Urgente'].map((option) => `<option value="${option}" ${rawPriority === option ? 'selected' : ''}>${option}</option>`).join('')}
             </select>
+            <svg class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
           </label>`;
       const text = escapeHtml(String(subtask.texto || ''));
       const due = escapeHtml(String(subtask.due_date || ''));
@@ -9070,7 +9399,7 @@
           <input id="editSubtaskText" type="text" value="${text}" class="w-full rounded-xl border-slate-200 bg-white px-3 py-2 text-sm font-extrabold leading-6 text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500" placeholder="Nombre del elemento" oninput="setSubtaskAutosaveStatus('Pendiente')" onkeydown="if(event.key==='Enter'){ event.preventDefault(); saveSubtaskDetails({ closeAfter: true }); }">
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <div class="relative">
-              <button type="button" onclick="toggleSubtaskOwnerSearch()" class="inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-extrabold text-slate-600 hover:bg-white">
+              <button type="button" onclick="toggleSubtaskOwnerSearch()" class="inline-flex h-8 items-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs font-extrabold text-slate-600 transition-colors hover:border-slate-200 hover:bg-white">
                 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3M15 7a4 4 0 11-8 0 4 4 0 018 0zM3 21a6 6 0 0112 0"/></svg>
                 Asignar
               </button>
@@ -9079,12 +9408,12 @@
                 <div id="subtaskOwnerSearchResults" class="max-h-56 overflow-y-auto"></div>
               </div>
             </div>
-            <label class="relative inline-flex h-8 max-w-[6.3rem] items-center gap-1.5 rounded-lg bg-white px-2 text-xs font-extrabold text-slate-600 shadow-sm ring-1 ring-slate-200">
-              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              <input id="editSubtaskDueDate" type="text" value="${due}" class="h-7 w-[4.35rem] max-w-[4.35rem] border-0 bg-transparent p-0 text-[11px] font-extrabold text-slate-600 placeholder:text-slate-400 focus:ring-0" placeholder="Fecha">
-            </label>
             ${priorityControl}
-            <span id="subtaskAutosaveStatus" class="text-[11px] font-bold text-slate-400">Autoguardado</span>
+            <label class="relative inline-flex h-8 w-32 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600 shadow-sm transition-colors focus-within:border-lime-300 focus-within:ring-2 focus-within:ring-lime-100">
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <input id="editSubtaskDueDate" type="text" value="${due}" class="h-7 min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-extrabold text-slate-700 placeholder:text-slate-400 focus:ring-0" placeholder="Fecha">
+            </label>
+            <span id="subtaskAutosaveStatus" class="ml-auto text-[11px] font-bold text-slate-400">Autoguardado</span>
           </div>
           <div id="subtaskOwnerEditorList" class="mt-2 flex flex-wrap items-center gap-2">${selectedOwners}</div>
         </div>`;
@@ -9093,7 +9422,13 @@
     function getEffectiveSubtaskPriority(subtask, task, project) {
       const parentPriority = getEffectiveTaskPriority(task || {}, project);
       if (parentPriority === 'Vencido') return 'Vencido';
-      return normalizeTaskPriority(subtask?.priority || task?.priority || parentPriority || 'Atención');
+      return normalizeTaskPriority(subtask?.priority || task?.priority || parentPriority || 'Con calma');
+    }
+
+    function updateSubtaskPriorityPill(value) {
+      const icon = document.getElementById('editSubtaskPriorityIcon');
+      if (!icon) return;
+      icon.innerHTML = getTaskPriorityIcon(normalizeTaskPriority(value), 'w-3.5 h-3.5 shrink-0 self-center');
     }
 
     function renderSubtaskOwnerEditor(subtask) {
@@ -9488,9 +9823,9 @@
       const end_date = document.getElementById('taskModalEnd')?.value || null;
       const due_date = end_date || null;
       const task = getCurrentTask();
-      const selectedPriority = document.getElementById('taskModalPriority')?.value || 'Atención';
+      const selectedPriority = document.getElementById('taskModalPriority')?.value || 'Con calma';
       const priority = selectedPriority === 'Vencido'
-        ? normalizeTaskPriority(task?.priority || 'Atención')
+        ? normalizeTaskPriority(task?.priority || 'Con calma')
         : selectedPriority;
       const owners = Array.isArray(task?.owners) ? task.owners : [];
       const owner_ids = parseTaskOwnerIds();
@@ -9578,7 +9913,7 @@
             start_date: task.start_date || null,
             end_date: task.end_date || task.due_date || null,
             due_date: task.due_date || task.end_date || null,
-            priority: normalizeTaskPriority(task.priority || 'Atención'),
+            priority: normalizeTaskPriority(task.priority || 'Con calma'),
             owners: Array.isArray(task.owners) ? task.owners : [],
             owner_ids: Array.isArray(task.owner_ids) ? task.owner_ids : [],
             board_stage: task.board_stage || 'Por hacer',
@@ -9721,7 +10056,7 @@
       if (!subtask) return;
       subtask.texto = String(document.getElementById('editSubtaskText')?.value || subtask.texto || '');
       subtask.due_date = String(document.getElementById('editSubtaskDueDate')?.value || subtask.due_date || '');
-      subtask.priority = String(document.getElementById('editSubtaskPriority')?.value || subtask.priority || 'Atención');
+      subtask.priority = String(document.getElementById('editSubtaskPriority')?.value || subtask.priority || 'Con calma');
       const names = Array.isArray(subtask.owners) ? [...subtask.owners] : [];
       const ids = Array.isArray(subtask.owner_ids) ? [...subtask.owner_ids] : [];
       if (!ids.includes(userId) && !names.includes(userName)) {
@@ -9739,7 +10074,7 @@
       if (!subtask) return;
       subtask.texto = String(document.getElementById('editSubtaskText')?.value || subtask.texto || '');
       subtask.due_date = String(document.getElementById('editSubtaskDueDate')?.value || subtask.due_date || '');
-      subtask.priority = String(document.getElementById('editSubtaskPriority')?.value || subtask.priority || 'Atención');
+      subtask.priority = String(document.getElementById('editSubtaskPriority')?.value || subtask.priority || 'Con calma');
       const names = Array.isArray(subtask.owners) ? [...subtask.owners] : [];
       const ids = Array.isArray(subtask.owner_ids) ? [...subtask.owner_ids] : [];
       names.splice(index, 1);
@@ -9763,7 +10098,7 @@
         return;
       }
       const dueDate = String(document.getElementById('editSubtaskDueDate')?.value || '').trim();
-      const priority = String(document.getElementById('editSubtaskPriority')?.value || subtask.priority || 'Atención').trim();
+      const priority = String(document.getElementById('editSubtaskPriority')?.value || subtask.priority || 'Con calma').trim();
       const owners = Array.isArray(subtask.owners) ? subtask.owners.filter(Boolean) : [];
       const ownerIds = Array.isArray(subtask.owner_ids) ? subtask.owner_ids.filter(Boolean) : [];
 

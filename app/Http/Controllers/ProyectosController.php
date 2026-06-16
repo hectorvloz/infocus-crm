@@ -713,7 +713,7 @@ class ProyectosController extends Controller
             'cliente_id'=>$data['cliente_id'],
             'titulo'=>$data['titulo'],
             'etapa'=>$data['etapa'] ?? 'Prospecto',
-            'prioridad'=>$data['prioridad'] ?? 'Atención',
+            'prioridad'=>$data['prioridad'] ?? 'Con calma',
             'valor'=>$data['valor'] ?? 0,
             'progreso'=>$data['progreso'] ?? 0,
             'planned_seconds'=>$data['planned_seconds'] ?? 0,
@@ -910,7 +910,7 @@ class ProyectosController extends Controller
             'start_date' => $data['start_date'] ?? null,
             'end_date' => $data['end_date'] ?? ($data['due_date'] ?? null),
             'due_date' => $data['due_date'] ?? ($data['end_date'] ?? null),
-            'priority' => $data['priority'] ?? 'Atención',
+            'priority' => $data['priority'] ?? 'Con calma',
             'owners' => array_values(array_filter($data['owners'] ?? [])),
             'owner_ids' => array_values(array_filter($data['owner_ids'] ?? [])),
             'board_stage' => trim((string) ($data['board_stage'] ?? '')) ?: 'Por hacer',
@@ -975,7 +975,7 @@ class ProyectosController extends Controller
             $t['start_date'] = $data['start_date'] ?? ($t['start_date'] ?? null);
             $t['end_date'] = $data['end_date'] ?? ($data['due_date'] ?? ($t['end_date'] ?? null));
             $t['due_date'] = $data['due_date'] ?? ($data['end_date'] ?? ($t['due_date'] ?? null));
-            $t['priority'] = $data['priority'] ?? ($t['priority'] ?? 'Atención');
+            $t['priority'] = $data['priority'] ?? ($t['priority'] ?? 'Con calma');
             $t['owners'] = array_values(array_filter($data['owners'] ?? ($t['owners'] ?? [])));
             $t['owner_ids'] = array_values(array_filter($data['owner_ids'] ?? ($t['owner_ids'] ?? [])));
             $t['board_stage'] = trim((string) ($data['board_stage'] ?? ($t['board_stage'] ?? 'Por hacer'))) ?: 'Por hacer';
@@ -1065,7 +1065,7 @@ class ProyectosController extends Controller
                     'start_date' => null,
                     'end_date' => null,
                     'due_date' => null,
-                    'priority' => 'Atención',
+                    'priority' => 'Con calma',
                     'owners' => [],
                     'owner_ids' => [],
                     'board_stage' => $task['board_stage'] ?? 'Por hacer',
@@ -1352,7 +1352,7 @@ class ProyectosController extends Controller
                 'owners' => [],
                 'owner_ids' => [],
                 'due_date' => '',
-                'priority' => 'Atención',
+                'priority' => 'Con calma',
             ];
             $t['subtasks'] = $subtasks;
             break;
@@ -1405,7 +1405,7 @@ class ProyectosController extends Controller
                     $s['due_date'] = trim((string) ($data['due_date'] ?? ''));
                 }
                 if (array_key_exists('priority', $data)) {
-                    $s['priority'] = trim((string) ($data['priority'] ?? '')) ?: 'Atención';
+                    $s['priority'] = trim((string) ($data['priority'] ?? '')) ?: 'Con calma';
                 }
                 break;
             }
@@ -1487,8 +1487,8 @@ class ProyectosController extends Controller
         return "Actúa como asistente de gestión de proyectos. Responde solo con JSON válido, sin markdown.\n"
             . "Puedes agregar subtareas, reemplazar subtareas existentes o agregar tareas nuevas al mismo tablero.\n"
             . "Formato exacto:\n"
-            . "{\"summary\":\"texto breve\",\"replace_subtasks\":[{\"texto\":\"...\",\"priority\":\"Atención\"}],\"add_subtasks\":[{\"texto\":\"...\",\"priority\":\"Atención\"}],\"add_tasks\":[{\"texto\":\"...\"}]}\n"
-            . "Usa solo estas prioridades: Con calma, Atención, Urgente. Si no aplica, usa Atención.\n"
+            . "{\"summary\":\"texto breve\",\"replace_subtasks\":[{\"texto\":\"...\",\"priority\":\"Con calma\"}],\"add_subtasks\":[{\"texto\":\"...\",\"priority\":\"Con calma\"}],\"add_tasks\":[{\"texto\":\"...\"}]}\n"
+            . "Usa solo estas prioridades: Con calma, Atención, Urgente. Si no aplica, usa Con calma.\n"
             . "Si el usuario pide reescribir, ordenar o mejorar el checklist actual, usa replace_subtasks. Si pide añadir, usa add_subtasks o add_tasks.\n\n"
             . "Proyecto: " . (string) ($project['titulo'] ?? 'Proyecto') . "\n"
             . "Tarea actual: " . (string) ($task['texto'] ?? 'Tarea') . "\n"
@@ -1523,7 +1523,7 @@ class ProyectosController extends Controller
             }
             $priority = trim(is_array($item) ? (string) ($item['priority'] ?? '') : '');
             if (!in_array($priority, ['Con calma', 'Atención', 'Urgente'], true)) {
-                $priority = 'Atención';
+                $priority = 'Con calma';
             }
             $out[] = [
                 'id' => (string) Str::ulid(),

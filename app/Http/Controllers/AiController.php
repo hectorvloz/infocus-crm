@@ -195,6 +195,8 @@ class AiController extends Controller
             'message' => $assistantMessage,
             'url' => $result['url'] ?? null,
             'project_id' => $result['project_id'] ?? null,
+            'project_item' => $result['project_item'] ?? null,
+            'project_action' => $result['project_action'] ?? null,
             'note_update' => $result['note_update'] ?? null,
             'reminder_action' => $result['reminder_action'] ?? null,
             'undo_action' => $result['undo_action'] ?? null,

@@ -6258,7 +6258,7 @@
           rows = [
             ['Cliente', aiExtractField(text, ['Cliente', 'Empresa']) || 'Sin Cliente'],
             ['Estado', aiExtractField(text, ['Estado', 'Etapa']) || 'INICIO'],
-            ['Prioridad', aiExtractField(text, ['Prioridad']) || 'Atención'],
+            ['Prioridad', aiExtractField(text, ['Prioridad']) || 'Con calma'],
             ['Inicio', aiExtractField(text, ['Fecha inicio', 'Inicio']) || 'Hoy'],
             ['Vence', aiExtractField(text, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']) || 'Sin vencimiento'],
           ];
@@ -6659,6 +6659,29 @@
         return ok ? 'Acción aplicada en el CRM' : 'No pude ejecutar eso en el CRM. Intenta de nuevo o revisa tus permisos.';
       }
 
+      function parseProjectAiWorkingTarget(proposal = '', context = {}) {
+        const currentProject = context.current_project || window.__infocusAiCurrentProject || null;
+        const text = String(proposal || '');
+        const normalized = normalizeAiText(text);
+        const isProjectAction = /proyecto|tablero|kanban|columna|tarea|subtarea/.test(normalized);
+        if (!isProjectAction) return null;
+
+        const lineValue = (labels) => {
+          for (const label of labels) {
+            const pattern = new RegExp(`(?:^|\\n)\\s*(?:[-*•]\\s*)?\\**${label}\\**\\s*:\\s*([^\\n]+)`, 'i');
+            const match = text.match(pattern);
+            if (match?.[1]) return match[1].replace(/\*\*/g, '').trim();
+          }
+          return '';
+        };
+
+        return {
+          projectId: currentProject?.id || '',
+          projectTitle: lineValue(['Proyecto', 'Tablero']) || currentProject?.title || '',
+          stage: lineValue(['Columna', 'Lista', 'Estado de tarea']) || '',
+        };
+      }
+
       function appendUndoAction(node, undoAction) {
         if (!node || !undoAction) return;
         const actions = document.createElement('div');
@@ -6919,12 +6942,18 @@
         const actionContext = pageContext(proposal);
         const confirmLabels = aiConfirmLabels(proposal);
         const isNoteAction = !!actionContext.current_note?.id && /nota personal|mis notas|actualizar nota|editar nota|reescribir nota/i.test(proposal);
+        const projectWorkingTarget = parseProjectAiWorkingTarget(proposal, actionContext);
         if (actionContext.current_note?.id && confirmLabels.accept === 'Actualizar nota') {
           actionContext.forced_intent = 'note_update';
         }
         if (isNoteAction) {
           window.dispatchEvent(new CustomEvent('infocus-ai-note-working', {
             detail: { id: actionContext.current_note.id, working: true },
+          }));
+        }
+        if (projectWorkingTarget) {
+          window.dispatchEvent(new CustomEvent('infocus-ai-project-working', {
+            detail: { ...projectWorkingTarget, working: true },
           }));
         }
         try {
@@ -6955,6 +6984,15 @@
           } else if (json.ok && actionContext.forced_intent === 'note_update') {
             throw new Error('La acción no devolvió la actualización de la nota abierta.');
           }
+          if (json.ok && (json.project_item || json.project_action)) {
+            window.dispatchEvent(new CustomEvent('infocus-ai-project-updated', {
+              detail: {
+                project: json.project_item || null,
+                action: json.project_action || null,
+                fallback: projectWorkingTarget,
+              },
+            }));
+          }
           if (json.ok && undoAction) {
             appendUndoAction(thinking, undoAction);
           }
@@ -6973,6 +7011,11 @@
           if (isNoteAction) {
             window.dispatchEvent(new CustomEvent('infocus-ai-note-working', {
               detail: { id: actionContext.current_note.id, working: false },
+            }));
+          }
+          if (projectWorkingTarget) {
+            window.dispatchEvent(new CustomEvent('infocus-ai-project-working', {
+              detail: { ...projectWorkingTarget, working: false },
             }));
           }
           sending = false;
