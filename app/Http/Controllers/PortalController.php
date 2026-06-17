@@ -301,6 +301,73 @@ class PortalController extends Controller
         ));
     }
 
+    public function storeProjectTaskNoteAuth(Request $request)
+    {
+        $client = $this->getClientFromAuth();
+        return $this->storeProjectTaskNoteForClient($request, $client);
+    }
+
+    public function storeProjectTaskNoteToken(Request $request, $id, $token)
+    {
+        $client = $this->getClient($id, $token);
+        return $this->storeProjectTaskNoteForClient($request, $client);
+    }
+
+    protected function storeProjectTaskNoteForClient(Request $request, array $client)
+    {
+        $data = $request->validate([
+            'project_id' => 'required|string',
+            'task_id' => 'required|string',
+            'texto' => 'required|string|max:1500',
+        ]);
+
+        $project = $this->proyectos->find($data['project_id']);
+        abort_if(!$project, 404);
+        abort_if((string) ($project['cliente_id'] ?? '') !== (string) ($client['id'] ?? ''), 403);
+
+        $noteText = trim((string) $data['texto']);
+        abort_if($noteText === '', 422, 'La nota no puede estar vacía.');
+
+        $tasks = array_values($project['tareas'] ?? []);
+        $found = false;
+        $clientName = trim((string) ($client['empresa'] ?? $client['contacto_nombre'] ?? 'Cliente'));
+        if ($clientName === '') {
+            $clientName = 'Cliente';
+        }
+
+        foreach ($tasks as &$task) {
+            if ((string) ($task['id'] ?? '') !== (string) $data['task_id']) {
+                continue;
+            }
+
+            $notes = array_values($task['notes'] ?? []);
+            $notes[] = [
+                'id' => (string) Str::ulid(),
+                'texto' => $noteText,
+                'created_at' => now()->toIso8601String(),
+                'updated_at' => null,
+                'author_name' => $clientName,
+                'author_id' => null,
+                'source' => 'portal_cliente',
+            ];
+            $task['notes'] = $notes;
+            $found = true;
+            break;
+        }
+        unset($task);
+
+        abort_if(!$found, 404);
+
+        $updated = $this->proyectos->update((string) $project['id'], ['tareas' => $tasks]);
+        $updatedTask = collect($updated['tareas'] ?? [])
+            ->first(fn($task) => (string) ($task['id'] ?? '') === (string) $data['task_id']);
+
+        return response()->json([
+            'ok' => true,
+            'task' => $updatedTask,
+        ]);
+    }
+
     private function registerPortalAccess(array $client, Request $request): void
     {
         try {

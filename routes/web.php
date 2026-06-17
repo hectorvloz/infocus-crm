@@ -278,6 +278,7 @@ Route::middleware(['auth', 'portal.client'])->prefix('portal')->name('portal.aut
     Route::get('/factura/{invoiceId}/pdf', [PortalController::class, 'invoicePdfAuth'])->name('invoice.pdf');
     Route::get('/documento/{docId}/download', [PortalController::class, 'downloadDocumentAuth'])->name('document.download');
     Route::post('/mensajes', [PortalController::class, 'storeMessageAuth'])->name('mensajes.store');
+    Route::post('/proyectos/tareas/notas', [PortalController::class, 'storeProjectTaskNoteAuth'])->name('proyectos.tareas.notas.store');
     Route::get('/cambiar-clave', [PortalController::class, 'showChangePassword'])->name('change-password');
     Route::post('/cambiar-clave', [PortalController::class, 'storeChangePassword'])->name('change-password.store');
     Route::get('/facturas/zip', [PortalController::class, 'zipFacturasAuth'])->name('zip-facturas');
@@ -295,6 +296,7 @@ Route::prefix('portal/{id}/{token}')->name('portal.')->group(function() {
     Route::get('/factura/{invoiceId}', [PortalController::class, 'invoice'])->name('invoice');
     Route::get('/documento/{docId}/download', [PortalController::class, 'downloadDocument'])->name('document.download');
     Route::post('/mensajes', [PortalController::class, 'storeMessageToken'])->name('mensajes.store');
+    Route::post('/proyectos/tareas/notas', [PortalController::class, 'storeProjectTaskNoteToken'])->name('proyectos.tareas.notas.store');
     Route::get('/facturas/zip', [PortalController::class, 'zipFacturasToken'])->name('zip-facturas');
     Route::get('/pay/{invoiceId}', [PortalController::class, 'payCheckout'])->name('pay.checkout');
     Route::get('/stripe/{invoiceId}', [PortalController::class, 'stripeCheckout'])->name('stripe.checkout');

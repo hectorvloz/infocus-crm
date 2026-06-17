@@ -224,11 +224,38 @@
     padding: 0.75rem;
   }
   .portal-kanban-task {
+    width: 100%;
+    text-align: left;
     border-radius: 0.9rem;
     border: 1px solid #dbe4f0;
     background: #fff;
     padding: 0.85rem;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .portal-kanban-task:hover {
+    border-color: #cbe7ff;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+  .portal-task-detail-dialog {
+    width: min(36rem, 100%);
+    max-height: calc(100vh - 3rem);
+    overflow: hidden;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 26px 70px rgba(15, 23, 42, 0.28);
+  }
+  .portal-task-detail-body {
+    max-height: calc(100vh - 12rem);
+    overflow: auto;
+  }
+  .portal-task-note-input {
+    min-height: 7rem;
+    resize: vertical;
+  }
+  .portal-task-note-status {
+    min-height: 1.25rem;
   }
   @media (max-width: 640px) {
     .portal-whatsapp-fab {
@@ -246,6 +273,10 @@
       align-items: flex-end;
     }
     .portal-project-dialog {
+      max-height: calc(100vh - 1.5rem);
+      border-radius: 1rem 1rem 0.75rem 0.75rem;
+    }
+    .portal-task-detail-dialog {
       max-height: calc(100vh - 1.5rem);
       border-radius: 1rem 1rem 0.75rem 0.75rem;
     }
@@ -566,7 +597,6 @@
             if (!$due) return ['label' => 'Sin fecha', 'class' => 'bg-slate-400 text-white border border-slate-400'];
             return ['label' => (string) ($priority ?: 'En curso'), 'class' => 'bg-emerald-50 text-emerald-700 border border-emerald-200'];
           };
-          $portalKanbanStages = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
           $portalProjectsPayload = [];
         @endphp
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -588,18 +618,30 @@
                 $due = $task['due_date'] ?? $task['end_date'] ?? $task['fecha'] ?? null;
                 $status = $portalStatus($due, $task['priority'] ?? $task['prioridad'] ?? null, $taskDone);
                 return [
+                  'id' => (string) ($task['id'] ?? ''),
                   'title' => (string) ($task['texto'] ?? $task['titulo'] ?? $task['nombre'] ?? 'Tarea'),
-                  'stage' => (string) ($task['board_stage'] ?? 'Por hacer'),
+                  'description' => (string) ($task['descripcion'] ?? $task['description'] ?? ''),
+                  'stage' => trim((string) ($task['board_stage'] ?? '')),
                   'due' => $portalDate($due, 'd M, Y'),
                   'status' => $status['label'],
                   'statusClass' => $status['class'],
                   'done' => $taskDone,
+                  'notesCount' => collect($task['notes'] ?? [])->count(),
                 ];
               })->values()->all();
-              $projectStagesPayload = collect($portalKanbanStages)
-                ->merge($tasks->pluck('board_stage')->filter())
+              $configuredStages = collect($p['task_stages'] ?? [])
+                ->map(fn($stage) => trim((string) $stage))
+                ->filter()
                 ->unique()
-                ->values()
+                ->values();
+              $projectStages = $configuredStages->isNotEmpty()
+                ? $configuredStages
+                : $tasks->pluck('board_stage')
+                    ->map(fn($stage) => trim((string) $stage))
+                    ->filter()
+                    ->unique()
+                    ->values();
+              $projectStagesPayload = $projectStages
                 ->map(function ($stage) use ($projectTasksPayload) {
                   return [
                     'title' => (string) $stage,
@@ -695,6 +737,47 @@
               </div>
               <div id="portal-project-tasks" class="portal-project-kanban" aria-label="Vista previa Kanban del proyecto"></div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="portal-task-modal" class="portal-project-modal" aria-hidden="true">
+        <div class="portal-task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="portal-task-title">
+          <div class="border-b border-slate-100 p-5">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <p id="portal-task-project" class="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400"></p>
+                <h3 id="portal-task-title" class="text-2xl font-black leading-tight text-slate-950"></h3>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <span id="portal-task-status" class="portal-status-pill"></span>
+                  <span id="portal-task-due" class="portal-status-pill bg-slate-100 text-slate-600 border border-slate-200"></span>
+                </div>
+              </div>
+              <button type="button" class="rounded-full border border-slate-200 p-2.5 text-slate-400 hover:bg-slate-50 hover:text-slate-700" data-close-portal-task aria-label="Cerrar tarea">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.4" d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="portal-task-detail-body space-y-5 p-5">
+            <section>
+              <p class="mb-2 text-xs font-black uppercase tracking-[0.22em] text-slate-400">Descripción</p>
+              <div id="portal-task-description" class="min-h-[6rem] rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700 whitespace-pre-wrap"></div>
+            </section>
+            <section class="rounded-2xl border border-slate-200 bg-white p-4">
+              <div class="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Nota para el equipo</p>
+                  <p id="portal-task-notes-count" class="mt-1 text-xs font-semibold text-slate-400"></p>
+                </div>
+              </div>
+              <textarea id="portal-task-note-input" class="portal-task-note-input w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:border-lime-300 focus:outline-none focus:ring-4 focus:ring-lime-100" maxlength="1500" placeholder="Escribe una nota sobre esta tarea..."></textarea>
+              <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p id="portal-task-note-status" class="portal-task-note-status text-xs font-bold text-slate-400"></p>
+                <button type="button" id="portal-task-note-submit" class="rounded-xl bg-lime-300 px-5 py-2.5 text-sm font-black text-slate-950 transition hover:bg-lime-400 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">
+                  Enviar nota
+                </button>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -991,8 +1074,13 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
   const raw = document.getElementById('portal-projects-json');
   const modal = document.getElementById('portal-project-modal');
   if (!raw || !modal) return;
+  const taskModal = document.getElementById('portal-task-modal');
+  const taskNoteUrl = @json(!empty($useTokenLinks) ? route('portal.proyectos.tareas.notas.store', ['id' => $client['id'], 'token' => $token]) : route('portal.auth.proyectos.tareas.notas.store'));
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
   let projects = {};
+  let activeProject = null;
+  let activeTask = null;
   try {
     projects = JSON.parse(raw.textContent || '{}');
   } catch (error) {
@@ -1006,8 +1094,30 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
   const taskTotal = document.getElementById('portal-project-task-total');
   const status = document.getElementById('portal-project-status');
   const tasks = document.getElementById('portal-project-tasks');
+  const taskProject = document.getElementById('portal-task-project');
+  const taskTitle = document.getElementById('portal-task-title');
+  const taskStatus = document.getElementById('portal-task-status');
+  const taskDue = document.getElementById('portal-task-due');
+  const taskDescription = document.getElementById('portal-task-description');
+  const taskNotesCount = document.getElementById('portal-task-notes-count');
+  const taskNoteInput = document.getElementById('portal-task-note-input');
+  const taskNoteSubmit = document.getElementById('portal-task-note-submit');
+  const taskNoteStatus = document.getElementById('portal-task-note-status');
+
+  const closeTask = () => {
+    if (!taskModal) return;
+    taskModal.classList.remove('is-open');
+    taskModal.setAttribute('aria-hidden', 'true');
+    activeTask = null;
+    if (taskNoteInput) taskNoteInput.value = '';
+    if (taskNoteStatus) taskNoteStatus.textContent = '';
+    if (!modal.classList.contains('is-open')) {
+      document.body.classList.remove('overflow-hidden');
+    }
+  };
 
   const close = () => {
+    closeTask();
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('overflow-hidden');
@@ -1015,6 +1125,7 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
 
   const open = (project) => {
     if (!project) return;
+    activeProject = project;
     title.textContent = project.title || 'Proyecto';
     dates.textContent = project.dateRange || '— — —';
     meta.textContent = `${project.client || 'Cliente'} · ${project.stage || 'INICIO'}`;
@@ -1035,7 +1146,7 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
               </div>
               <div class="portal-kanban-column-body">
                 ${columnTasks.length ? columnTasks.map((task) => `
-                  <article class="portal-kanban-task">
+                  <button type="button" class="portal-kanban-task" data-portal-task-id="${escapeAttribute(task.id || '')}">
                     <div class="flex items-start gap-2">
                       <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${task.done ? 'border-emerald-300 bg-emerald-100 text-emerald-700' : 'border-slate-300 text-transparent'}">
                         <svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
@@ -1043,10 +1154,13 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
                       <div class="min-w-0 flex-1">
                         <p class="line-clamp-3 text-sm font-black leading-snug text-slate-950">${escapeHtml(task.title || 'Tarea')}</p>
                         <p class="mt-1 text-xs font-semibold text-slate-400">${task.due ? `Vence: ${escapeHtml(task.due)}` : 'Sin fecha'}</p>
-                        <span class="portal-status-pill mt-2 ${escapeAttribute(task.statusClass || 'bg-slate-100 text-slate-700 border border-slate-200')}">${escapeHtml(task.status || 'Sin fecha')}</span>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                          <span class="portal-status-pill ${escapeAttribute(task.statusClass || 'bg-slate-100 text-slate-700 border border-slate-200')}">${escapeHtml(task.status || 'Sin fecha')}</span>
+                          ${(task.notesCount || 0) > 0 ? `<span class="portal-status-pill bg-lime-50 text-lime-700 border border-lime-200">${Number(task.notesCount) || 0} notas</span>` : ''}
+                        </div>
                       </div>
                     </div>
-                  </article>
+                  </button>
                 `).join('') : '<div class="rounded-xl border border-dashed border-slate-200 bg-white/70 p-4 text-center text-xs font-bold text-slate-400">Sin tareas</div>'}
               </div>
             </section>
@@ -1058,6 +1172,95 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
+  };
+
+  const openTask = (taskId) => {
+    if (!taskModal || !activeProject) return;
+    const task = (activeProject.tasks || []).find((entry) => String(entry.id || '') === String(taskId || ''));
+    if (!task) return;
+    activeTask = task;
+    if (taskProject) taskProject.textContent = activeProject.title || 'Proyecto';
+    if (taskTitle) taskTitle.textContent = task.title || 'Tarea';
+    if (taskStatus) {
+      taskStatus.textContent = task.status || 'Sin fecha';
+      taskStatus.className = `portal-status-pill ${task.statusClass || 'bg-slate-100 text-slate-700 border border-slate-200'}`;
+    }
+    if (taskDue) taskDue.textContent = task.due ? `Vence: ${task.due}` : 'Sin fecha';
+    if (taskDescription) {
+      const description = String(task.description || '').trim();
+      taskDescription.textContent = description || 'Esta tarea no tiene descripción todavía.';
+      taskDescription.classList.toggle('text-slate-400', !description);
+    }
+    if (taskNotesCount) {
+      const count = Number(task.notesCount || 0);
+      taskNotesCount.textContent = count === 1 ? '1 nota enviada' : `${count} notas enviadas`;
+    }
+    if (taskNoteInput) taskNoteInput.value = '';
+    if (taskNoteStatus) taskNoteStatus.textContent = '';
+    if (taskNoteSubmit) taskNoteSubmit.disabled = false;
+    taskModal.classList.add('is-open');
+    taskModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+    setTimeout(() => taskNoteInput?.focus(), 80);
+  };
+
+  const updateActiveTaskNotesCount = (taskId, count) => {
+    if (!activeProject) return;
+    (activeProject.tasks || []).forEach((task) => {
+      if (String(task.id || '') === String(taskId || '')) {
+        task.notesCount = count;
+      }
+    });
+    (activeProject.columns || []).forEach((column) => {
+      (column.tasks || []).forEach((task) => {
+        if (String(task.id || '') === String(taskId || '')) {
+          task.notesCount = count;
+        }
+      });
+    });
+  };
+
+  const submitTaskNote = async () => {
+    if (!activeProject || !activeTask || !taskNoteInput || !taskNoteSubmit) return;
+    const text = taskNoteInput.value.trim();
+    if (!text) {
+      if (taskNoteStatus) taskNoteStatus.textContent = 'Escribe una nota antes de enviarla.';
+      return;
+    }
+
+    taskNoteSubmit.disabled = true;
+    if (taskNoteStatus) taskNoteStatus.textContent = 'Enviando...';
+
+    try {
+      const response = await fetch(taskNoteUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({
+          project_id: activeProject.id,
+          task_id: activeTask.id,
+          texto: text,
+        }),
+      });
+      if (!response.ok) throw new Error('No se pudo enviar la nota.');
+      const payload = await response.json();
+      const notesCount = Array.isArray(payload?.task?.notes) ? payload.task.notes.length : Number(activeTask.notesCount || 0) + 1;
+      activeTask.notesCount = notesCount;
+      updateActiveTaskNotesCount(activeTask.id, notesCount);
+      if (taskNotesCount) taskNotesCount.textContent = notesCount === 1 ? '1 nota enviada' : `${notesCount} notas enviadas`;
+      taskNoteInput.value = '';
+      if (taskNoteStatus) taskNoteStatus.textContent = 'Nota enviada al equipo.';
+      open(activeProject);
+      openTask(activeTask.id);
+      if (taskNoteStatus) taskNoteStatus.textContent = 'Nota enviada al equipo.';
+    } catch (error) {
+      if (taskNoteStatus) taskNoteStatus.textContent = 'No se pudo enviar. Inténtalo de nuevo.';
+    } finally {
+      taskNoteSubmit.disabled = false;
+    }
   };
 
   const escapeHtml = (value) => String(value)
@@ -1107,12 +1310,35 @@ function scrollToId(id) { const el = document.getElementById(id); if(el) el.scro
     button.addEventListener('click', () => open(projects[button.dataset.portalProjectId]));
   });
 
+  tasks?.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-portal-task-id]');
+    if (!card) return;
+    openTask(card.getAttribute('data-portal-task-id'));
+  });
+
   modal.addEventListener('click', (event) => {
     if (event.target === modal || event.target.closest('[data-close-portal-project]')) close();
   });
 
+  taskModal?.addEventListener('click', (event) => {
+    if (event.target === taskModal || event.target.closest('[data-close-portal-task]')) closeTask();
+  });
+
+  taskNoteSubmit?.addEventListener('click', submitTaskNote);
+  taskNoteInput?.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      submitTaskNote();
+    }
+  });
+
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && modal.classList.contains('is-open')) close();
+    if (event.key !== 'Escape') return;
+    if (taskModal?.classList.contains('is-open')) {
+      closeTask();
+      return;
+    }
+    if (modal.classList.contains('is-open')) close();
   });
 })();
 // Close avatar dropdown on outside click

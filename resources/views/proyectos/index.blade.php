@@ -1390,10 +1390,29 @@
       flex: 0 0 auto;
       padding: .8rem;
       background: #fff;
+      gap: 0 !important;
     }
 
     .project-task-toggle {
       margin-top: .15rem;
+      margin-right: 0;
+      width: 0 !important;
+      min-width: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(.82);
+      transition: width .16s ease, opacity .16s ease, transform .16s ease;
+    }
+
+    .project-task-card:hover .project-task-toggle,
+    .project-task-card:focus-within .project-task-toggle,
+    .project-task-card.is-done .project-task-toggle {
+      width: 1.25rem !important;
+      min-width: 1.25rem;
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+      margin-right: .625rem;
     }
 
     .project-task-title {
