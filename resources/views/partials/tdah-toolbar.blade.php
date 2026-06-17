@@ -524,17 +524,29 @@
     #quick-note-editor h3 {
         margin: 0 0 0.4rem;
         line-height: 1.2;
-        font-size: 1.24em;
         font-weight: 800;
         text-align: left;
+        overflow-wrap: anywhere;
+    }
+    #quick-note-editor h1 {
+        font-size: 1.42em;
+    }
+    #quick-note-editor h2 {
+        font-size: 1.24em;
+        font-weight: 750;
+        color: #31415f;
+    }
+    #quick-note-editor h3 {
+        font-size: 1.1em;
     }
     #quick-note-editor div,
     #quick-note-editor p,
     #quick-note-editor li {
         margin: 0 0 0.3rem;
-        font-size: 0.86em;
-        font-weight: 600;
-        line-height: 1.45;
+        font-size: 0.92em;
+        font-weight: 400;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
     }
     #quick-note-editor {
         caret-color: #101729;
@@ -895,8 +907,46 @@
         function normalizeQuickNoteHtml(html) {
             const holder = document.createElement('div');
             holder.innerHTML = String(html || '').replace(/<div><br><\/div>/g, '<div></div>');
+            promoteQuickHeadingBlocks(holder);
             scrubQuickNoteHtml(holder);
             return holder.innerHTML.trim();
+        }
+
+        function isQuickHeadingText(text) {
+            const value = String(text || '').replace(/\s+/g, ' ').trim();
+            if (!value || value.length > 120 || /[.!?;:]$/.test(value)) return false;
+            return /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(value);
+        }
+
+        function isQuickAllCapsHeading(text) {
+            const value = String(text || '').replace(/\s+/g, ' ').trim();
+            if (!isQuickHeadingText(value)) return false;
+            const letters = value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '');
+            return letters.length >= 3 && letters === letters.toUpperCase();
+        }
+
+        function hasSingleQuickBoldChild(el) {
+            const meaningful = Array.from(el.childNodes || []).filter((node) => {
+                return !(node.nodeType === Node.TEXT_NODE && !(node.textContent || '').trim());
+            });
+            return meaningful.length === 1
+                && meaningful[0].nodeType === Node.ELEMENT_NODE
+                && ['strong', 'b'].includes(meaningful[0].tagName.toLowerCase());
+        }
+
+        function promoteQuickHeadingBlocks(root) {
+            if (!root) return;
+            root.querySelectorAll('p,div').forEach((block) => {
+                if (!block.isConnected) return;
+                if (block.closest('li,.qn-checkline,.qn-numberline')) return;
+                const text = (block.textContent || '').replace(/\u00a0/g, ' ').trim();
+                if (!isQuickHeadingText(text)) return;
+                const shouldPromote = hasSingleQuickBoldChild(block) || isQuickAllCapsHeading(text);
+                if (!shouldPromote) return;
+                const heading = document.createElement(isQuickAllCapsHeading(text) ? 'h2' : 'h3');
+                heading.innerHTML = block.innerHTML;
+                block.replaceWith(heading);
+            });
         }
 
         function isSafeQuickNoteHref(href) {
@@ -1063,6 +1113,7 @@
             source.innerHTML = String(html || '');
             const holder = document.createElement('div');
             Array.from(source.childNodes).forEach((node) => holder.appendChild(cleanQuickPastedNode(node)));
+            promoteQuickHeadingBlocks(holder);
             scrubQuickNoteHtml(holder);
             return holder.innerHTML;
         }
