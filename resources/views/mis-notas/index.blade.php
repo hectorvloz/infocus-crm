@@ -154,12 +154,12 @@
   </div>
 </div>
 
-<div id="note-share-modal" class="fixed inset-0 z-[110] hidden">
-  <div class="fixed inset-0 bg-slate-900/45"></div>
+<div id="note-share-modal" class="fixed inset-0 z-[10000] hidden" role="dialog" aria-modal="true" aria-labelledby="note-share-title">
+  <div class="fixed inset-0 bg-slate-900/55"></div>
   <div class="fixed inset-0 flex items-center justify-center p-4">
     <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
       <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-        <div class="text-lg font-extrabold text-slate-900">Compartir nota</div>
+        <div id="note-share-title" class="text-lg font-extrabold text-slate-900">Compartir nota</div>
         <button id="note-share-close" type="button" class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500">✕</button>
       </div>
       <div class="p-5 space-y-4">
