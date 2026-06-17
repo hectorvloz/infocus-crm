@@ -17,7 +17,10 @@
   ];
   $today = \Carbon\Carbon::now($timezone)->toDateString();
   $now = \Carbon\Carbon::now($timezone);
-  $nowMinutes = max(0, min((22 - 8 + 1) * 60, ($now->hour * 60 + $now->minute) - (8 * 60)));
+  $calendarStartHour = 1;
+  $calendarEndHour = 24;
+  $calendarVisibleMinutes = ($calendarEndHour - $calendarStartHour) * 60;
+  $nowMinutes = max(0, min($calendarVisibleMinutes, ($now->hour * 60 + $now->minute) - ($calendarStartHour * 60)));
   $daysCount = count($days);
   $calendarMinWidth = $daysCount === 1 ? '360px' : '100%';
   $dayMinTrack = $daysCount === 1 ? '18rem' : '0';
@@ -68,12 +71,13 @@
   .meeting-card {
     top: calc(var(--start-min) / 60 * var(--slot-height));
     height: calc(var(--duration-min) / 60 * var(--slot-height) - 6px);
-    overflow: visible;
+    overflow: hidden;
+    min-height: 1.9rem;
   }
   .meeting-card-content {
     height: 100%;
     overflow: hidden;
-    border-radius: 0;
+    border-radius: 0.85rem;
   }
   .meeting-card {
     font-size: var(--calendar-event-font);
@@ -99,6 +103,11 @@
     white-space: nowrap;
     box-shadow: 0 6px 16px rgba(255, 255, 255, 0.42);
   }
+  .meeting-overflow-card {
+    box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+  }
+  .meeting-day-column {
+    overflow: hidden;
   }
   .meetings-calendar {
     cursor: grab;
@@ -525,18 +534,23 @@
                 @foreach($hours as $hour)
                   <button type="button" data-open-meeting-modal data-date="{{ $day->toDateString() }}" data-time="{{ str_pad((string) $hour, 2, '0', STR_PAD_LEFT) }}:00" class="block w-full h-[var(--slot-height)] border-b border-slate-100 hover:bg-slate-50 transition"></button>
                 @endforeach
-	                @if($isTodayColumn && $now->hour >= 8 && $now->hour <= 22)
+	                @if($isTodayColumn && $now->hour >= $calendarStartHour && $now->hour < $calendarEndHour)
 	                  <div class="meeting-past-overlay" style="height: calc({{ $nowMinutes }} / 60 * var(--slot-height));"></div>
 	                  <div class="meeting-now-line" style="top: calc({{ $nowMinutes }} / 60 * var(--slot-height));"></div>
 	                @endif
 	                <div class="absolute inset-x-1 top-0 bottom-0 pointer-events-none sm:inset-x-1.5 lg:inset-x-2">
 	                  @php
 	                    $dayMeetings = collect($weekMeetings[$day->toDateString()] ?? [])
-	                      ->map(function ($meeting, $meetingIndex) use ($timezone) {
+	                      ->map(function ($meeting, $meetingIndex) use ($timezone, $calendarStartHour, $calendarVisibleMinutes) {
 	                        $start = \Carbon\Carbon::parse($meeting['inicio_at'])->setTimezone($timezone);
 	                        $end = \Carbon\Carbon::parse($meeting['fin_at'] ?? $meeting['inicio_at'])->setTimezone($timezone);
-	                        $startMin = max(0, $start->hour * 60 + $start->minute - 8 * 60);
-	                        $durationMin = max(30, $start->diffInMinutes($end));
+	                        $rawStartMin = $start->hour * 60 + $start->minute - ($calendarStartHour * 60);
+                          $durationMin = max(30, $start->diffInMinutes($end));
+	                        $startMin = max(0, $rawStartMin);
+                          $endMin = min($calendarVisibleMinutes, max($startMin + 30, $rawStartMin + $durationMin));
+                          if ($endMin <= 0 || $startMin >= $calendarVisibleMinutes) {
+                            return null;
+                          }
 
 	                        return [
 	                          'meeting' => $meeting,
@@ -544,10 +558,11 @@
 	                          'start' => $start,
 	                          'end' => $end,
 	                          'start_min' => $startMin,
-	                          'end_min' => $startMin + $durationMin,
-	                          'duration_min' => $durationMin,
+	                          'end_min' => $endMin,
+	                          'duration_min' => max(30, $endMin - $startMin),
 	                        ];
 	                      })
+                        ->filter()
 	                      ->sortBy([
 	                        ['start_min', 'asc'],
 	                        ['end_min', 'asc'],
@@ -608,17 +623,16 @@
 	                      $meetingLanes = max(1, (int) ($layoutItem['lanes'] ?? 1));
 	                      $meetingLane = max(0, (int) ($layoutItem['lane'] ?? 0));
 	                      $laneWidth = 100 / $meetingLanes;
-	                      $laneGap = $meetingLanes > 1 ? 1.2 : 0;
 	                      $leftPct = $meetingLane * $laneWidth;
-	                      $widthPct = max(12, $laneWidth - $laneGap);
+	                      $laneGapPx = $meetingLanes > 1 ? 4 : 0;
 	                      $colorKey = $meeting['color'] ?? 'emerald';
 	                      $accent = $meetingColors[$colorKey]['class'] ?? $meetingColors['emerald']['class'];
 	                      $fullDate = $fullDayNames[$start->dayOfWeekIso - 1] . ' ' . $start->format('j') . ' ' . $monthNames[$start->month - 1] . ' ' . $start->year;
                       $isPastMeeting = $end->lt($now);
                     @endphp
                     <div
-	                      class="meeting-card absolute rounded-xl border px-[var(--calendar-event-pad)] py-[var(--calendar-event-pad)] shadow-sm pointer-events-auto cursor-pointer hover:shadow-md transition {{ $accent }} {{ $isPastMeeting ? 'is-past' : '' }}"
-	                      style="--start-min: {{ $startMin }}; --duration-min: {{ $durationMin }}; left: {{ $leftPct }}%; width: calc({{ $widthPct }}%); z-index: {{ 10 + $meetingLane }};"
+	                      class="meeting-card meeting-overflow-card absolute rounded-xl border px-[var(--calendar-event-pad)] py-[var(--calendar-event-pad)] shadow-sm pointer-events-auto cursor-pointer hover:shadow-md transition {{ $accent }} {{ $isPastMeeting ? 'is-past' : '' }}"
+	                      style="--start-min: {{ $startMin }}; --duration-min: {{ $durationMin }}; left: calc({{ $leftPct }}% + {{ $meetingLane > 0 ? $laneGapPx : 0 }}px); width: calc({{ $laneWidth }}% - {{ $meetingLanes > 1 ? ($meetingLane > 0 ? $laneGapPx + 2 : $laneGapPx) : 0 }}px); z-index: {{ 10 + $meetingLane }};"
                       data-meeting-card
                       data-title="{{ e($meeting['titulo'] ?? 'Reunion') }}"
                       data-client="{{ e($meeting['cliente'] ?? 'Sin cliente') }}"

@@ -3,6 +3,15 @@
 
 @section('content')
 <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
+<style>
+  .notes-search-shell{display:flex;align-items:center;gap:.75rem;max-width:42rem}
+  .notes-search-box{position:relative;flex:1 1 auto;min-width:0}
+  .notes-search-icon{position:absolute;left:1rem;top:50%;width:1.15rem;height:1.15rem;transform:translateY(-50%);color:#94a3b8;pointer-events:none}
+  .notes-search-input{width:100%;height:3.1rem;border-radius:1.15rem;border:1px solid #dbe5f1;background:#fff;padding:0 3rem 0 2.95rem;color:#1e293b;font-size:.98rem;font-weight:700;outline:none}
+  .notes-search-clear{position:absolute;right:.65rem;top:50%;width:2rem;height:2rem;transform:translateY(-50%);border-radius:999px;border:1px solid #dbe5f1;color:#64748b;background:#f8fafc;display:inline-grid;place-content:center}
+  .notes-search-clear.hidden{display:none}
+  .notes-search-count{flex:0 0 auto;border-radius:999px;border:1px solid #dbe5f1;background:#f8fafc;padding:.55rem .8rem;color:#64748b;font-size:.78rem;font-weight:900}
+</style>
 <div id="notes-list-view">
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
     <div>
@@ -13,6 +22,17 @@
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14M5 12h14"/></svg>
       <span>Añadir nota</span>
     </button>
+  </div>
+
+  <div class="notes-search-shell mb-5">
+    <div class="notes-search-box">
+      <svg class="notes-search-icon" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" style="position:absolute;left:1rem;top:50%;width:1.15rem;height:1.15rem;transform:translateY(-50%);color:#94a3b8;pointer-events:none"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="m21 21-4.35-4.35M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z"/></svg>
+      <input id="notes-search-input" type="text" class="notes-search-input" placeholder="Buscar por titulo, contenido o cliente..." autocomplete="off" aria-label="Buscar notas por titulo, contenido o cliente">
+      <button id="notes-search-clear" type="button" class="notes-search-clear hidden" aria-label="Limpiar busqueda">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18 18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="notes-search-count" class="notes-search-count">0 resultados</div>
   </div>
 
   <div class="client-tabs-shell mb-8">
@@ -169,6 +189,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const clientTabsScroll = document.getElementById('client-tabs-scroll');
   const clientTabsPrev = document.getElementById('client-tabs-prev');
   const clientTabsNext = document.getElementById('client-tabs-next');
+  const notesSearchInput = document.getElementById('notes-search-input');
+  const notesSearchClear = document.getElementById('notes-search-clear');
+  const notesSearchCount = document.getElementById('notes-search-count');
   const noteEditor = document.getElementById('note-editor');
   const noteCanvas = document.getElementById('note-canvas');
   const noteEmojiToggle = document.getElementById('note-emoji-toggle');
@@ -208,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let allNotes = [];
   let clients = [];
   let currentFilter = 'todos';
+  let currentSearchQuery = '';
   let editingNoteIndex = -1;
   let activeNoteColor = 'yellow';
   let autosaveTimer = null;
@@ -320,6 +344,78 @@ document.addEventListener('DOMContentLoaded', function () {
       el.after(document.createTextNode('\n'));
     });
     return (temp.textContent || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function resolveNoteClientName(note) {
+    const raw = String(note?.linkedClient || '').trim();
+    if (!raw) return '';
+    const match = clients.find((client) => {
+      const id = String(client.id ?? client.uuid ?? '').trim();
+      const name = String(client.empresa || client.nombre || client.name || '').trim();
+      return raw === id || normalizeSearchText(raw) === normalizeSearchText(name);
+    });
+    return String(match?.empresa || match?.nombre || match?.name || raw).trim();
+  }
+
+  function noteMatchesSearch(note, query) {
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedQuery) return true;
+    const htmlHolder = document.createElement('div');
+    htmlHolder.innerHTML = String(note.html || '');
+    const heading = htmlHolder.querySelector('h1,h2,h3')?.textContent || note.title || '';
+    const body = htmlToPlainText(note.html || note.plainText || '');
+    const client = resolveNoteClientName(note);
+    return normalizeSearchText(heading + ' ' + body + ' ' + client).includes(normalizedQuery);
+  }
+
+  function highlightSearchInElement(root, query) {
+    const needle = normalizeSearchText(query);
+    if (!root || !needle) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const text = node.nodeValue || '';
+        if (!text.trim()) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (parent?.closest?.('script,style,mark,.note-search-match')) return NodeFilter.FILTER_REJECT;
+        return normalizeSearchText(text).includes(needle) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const text = node.nodeValue || '';
+      const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const fragment = document.createDocumentFragment();
+      let start = 0;
+      let index = normalized.indexOf(needle);
+      while (index !== -1) {
+        if (index > start) fragment.appendChild(document.createTextNode(text.slice(start, index)));
+        const mark = document.createElement('mark');
+        mark.className = 'note-search-match';
+        mark.textContent = text.slice(index, index + needle.length);
+        fragment.appendChild(mark);
+        start = index + needle.length;
+        index = normalized.indexOf(needle, start);
+      }
+      if (start < text.length) fragment.appendChild(document.createTextNode(text.slice(start)));
+      node.parentNode?.replaceChild(fragment, node);
+    });
+  }
+
+  function highlightSearchHtml(html, query) {
+    if (!String(query || '').trim()) return html;
+    const holder = document.createElement('span');
+    holder.innerHTML = String(html || '');
+    highlightSearchInElement(holder, query);
+    return holder.innerHTML;
   }
 
   function updateInfocusAiCurrentNoteContext() {
@@ -1181,7 +1277,7 @@ document.addEventListener('DOMContentLoaded', function () {
     renderNotes();
   }
 
-  function buildNotePreviewHtml(noteHtml) {
+  function buildNotePreviewHtml(noteHtml, query = '') {
     const holder = document.createElement('div');
     holder.innerHTML = String(noteHtml || '');
     holder.querySelector('h1,h2,h3')?.remove();
@@ -1208,20 +1304,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const preview = document.createElement('div');
     meaningful.forEach((node) => preview.appendChild(node.cloneNode(true)));
+    highlightSearchInElement(preview, query);
     return preview.innerHTML;
   }
 
   function renderNotes() {
     notesContainer.innerHTML = '';
-    const filtered = (currentFilter === 'todos'
+    const query = String(currentSearchQuery || '').trim();
+    const clientFiltered = (currentFilter === 'todos'
       ? allNotes
       : currentFilter === null
-        ? allNotes.filter((note) => !note.linkedClient)
-        : allNotes.filter((note) => note.linkedClient === currentFilter)
-    ).slice().sort((a, b) => Number(b.createdAt || b.updatedAt || 0) - Number(a.createdAt || a.updatedAt || 0));
+        ? allNotes.filter((note) => !resolveNoteClientName(note))
+        : allNotes.filter((note) => normalizeSearchText(resolveNoteClientName(note)) === normalizeSearchText(currentFilter))
+    );
+    const filtered = clientFiltered
+      .filter((note) => noteMatchesSearch(note, query))
+      .slice()
+      .sort((a, b) => Number(b.createdAt || b.updatedAt || 0) - Number(a.createdAt || a.updatedAt || 0));
+
+    if (notesSearchClear) notesSearchClear.classList.toggle('hidden', !query);
+    if (notesSearchCount) {
+      const resultCount = query ? filtered.length : 0;
+      notesSearchCount.textContent = `${resultCount} ${resultCount === 1 ? 'resultado' : 'resultados'}`;
+    }
 
     if (!filtered.length) {
-      notesContainer.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400 text-lg">No hay notas para esta seccion</div>';
+      notesContainer.innerHTML = '<div class="col-span-full text-center py-16 text-slate-400 text-lg">' + (query ? 'No hay notas que coincidan con la busqueda' : 'No hay notas para esta seccion') + '</div>';
       return;
     }
 
@@ -1233,10 +1341,16 @@ document.addEventListener('DOMContentLoaded', function () {
       htmlHolder.innerHTML = String(note.html || '');
       const titleEl = htmlHolder.querySelector('h1,h2,h3');
       const title = titleEl?.textContent?.replace(/\u00a0/g, ' ').trim() || String(note.title || 'Nota sin titulo');
-      const previewHtml = buildNotePreviewHtml(note.html || '');
+      const previewHtml = buildNotePreviewHtml(note.html || '', query);
+      const titleHtml = highlightSearchHtml(escapeNoteHtml(title), query);
+      const linkedClientName = resolveNoteClientName(note);
+      const linkedClientPillHtml = currentFilter === 'todos'
+        ? '<button type="button" class="note-client-pill" data-note-client-pill="' + escapeNoteHtml(linkedClientName || '') + '">' + highlightSearchHtml(escapeNoteHtml(linkedClientName || 'Sin cliente'), query) + '</button>'
+        : '';
 
-      const card = document.createElement('button');
-      card.type = 'button';
+      const card = document.createElement('div');
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
       card.className = 'rounded-xl p-5 border text-left transition-all hover:shadow-lg flex flex-col';
       card.style.backgroundColor = tone.cardBg;
       card.style.borderColor = tone.cardBorder;
@@ -1253,13 +1367,33 @@ document.addEventListener('DOMContentLoaded', function () {
         ? ('<div class="mt-3 text-[11px] text-slate-600">Propietario: <span class="font-semibold">' + escapeNoteHtml(ownerName) + '</span></div>'
           + '<div class="mt-2 flex items-center">' + avatars + extra + '</div>')
         : '';
-      card.innerHTML = '<div class="font-extrabold text-lg text-slate-900 mb-2 line-clamp-2">' + escapeNoteHtml(title) + '</div>'
+      card.innerHTML = '<div class="font-extrabold text-lg text-slate-900 mb-2 line-clamp-2">' + titleHtml + '</div>'
         + '<div class="note-card-preview text-sm text-slate-700 flex-1">' + previewHtml + '</div>'
         + sharedMetaHtml
-        + '<div class="mt-4 pt-3 border-t text-xs text-slate-500" style="border-color:' + tone.cardBorder + '40">'
-        + new Date(note.updatedAt || Date.now()).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' })
+        + '<div class="note-card-footer" style="border-color:' + tone.cardBorder + '40">'
+        + '<span>' + new Date(note.updatedAt || Date.now()).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }) + '</span>'
+        + linkedClientPillHtml
         + '</div>';
       card.addEventListener('click', () => openNoteEditor(actualIndex));
+      card.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        openNoteEditor(actualIndex);
+      });
+      card.querySelector('[data-note-client-pill]')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const clientName = String(event.currentTarget?.getAttribute('data-note-client-pill') || '').trim();
+        if (clientName) {
+          const client = clients.find((item) => {
+            const name = String(item.empresa || item.nombre || item.name || '').trim();
+            return normalizeSearchText(name) === normalizeSearchText(clientName);
+          });
+          selectClient(client?.id || clientName, clientName);
+        } else {
+          selectClient(null, 'Sin cliente');
+        }
+      });
       notesContainer.appendChild(card);
     });
   }
@@ -1358,6 +1492,18 @@ document.addEventListener('DOMContentLoaded', function () {
   clientTabsNext?.addEventListener('click', () => scrollClientTabs(1));
   clientTabsScroll?.addEventListener('scroll', updateClientTabsNav, { passive: true });
   window.addEventListener('resize', updateClientTabsNav);
+  notesSearchInput?.addEventListener('input', (event) => {
+    currentSearchQuery = String(event.target.value || '');
+    renderNotes();
+  });
+  notesSearchClear?.addEventListener('click', () => {
+    currentSearchQuery = '';
+    if (notesSearchInput) {
+      notesSearchInput.value = '';
+      notesSearchInput.focus();
+    }
+    renderNotes();
+  });
 
   noteFormatTrigger?.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -1581,6 +1727,130 @@ document.addEventListener('DOMContentLoaded', function () {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+.notes-search-shell {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  max-width: 42rem;
+}
+.notes-search-box {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.notes-search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  width: 1.15rem;
+  height: 1.15rem;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.notes-search-input {
+  width: 100%;
+  height: 3.1rem;
+  border-radius: 1.15rem;
+  border: 1px solid #dbe5f1;
+  background: #fff;
+  padding: 0 3rem 0 2.95rem;
+  color: #1e293b;
+  font-size: .98rem;
+  font-weight: 700;
+  outline: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .04);
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.notes-search-input::placeholder {
+  color: #94a3b8;
+  font-weight: 700;
+}
+.notes-search-input:focus {
+  border-color: #d9ff66;
+  box-shadow: 0 0 0 4px rgba(236, 254, 136, .48), 0 12px 26px rgba(15, 23, 42, .06);
+}
+.notes-search-clear {
+  position: absolute;
+  right: .65rem;
+  top: 50%;
+  width: 2rem;
+  height: 2rem;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  border: 1px solid #dbe5f1;
+  color: #64748b;
+  background: #f8fafc;
+  display: inline-grid;
+  place-content: center;
+}
+.notes-search-clear:hover {
+  color: #0f172a;
+  background: #eef2f7;
+}
+.notes-search-clear.hidden,
+.notes-search-count.hidden {
+  display: none;
+}
+.notes-search-count {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid #dbe5f1;
+  background: #f8fafc;
+  padding: .55rem .8rem;
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 900;
+}
+.note-search-match {
+  background: linear-gradient(180deg, transparent 58%, rgba(217, 255, 102, .85) 58%);
+  color: inherit;
+  padding: 0 .04em;
+  text-decoration: underline;
+  text-decoration-color: #84cc16;
+  text-decoration-thickness: 2px;
+  text-underline-offset: .16em;
+}
+.note-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  margin-top: 1rem;
+  padding-top: .75rem;
+  border-top: 1px solid;
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 700;
+}
+.note-client-pill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 10rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(71, 85, 105, .18);
+  background: rgba(255, 255, 255, .68);
+  padding: 0 .6rem;
+  color: #334155;
+  font-size: .68rem;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.note-client-pill:hover,
+.note-client-pill:focus-visible {
+  border-color: rgba(132, 204, 22, .5);
+  background: rgba(236, 254, 136, .82);
+  color: #0f172a;
+  outline: none;
+}
 
 .client-tabs-shell {
   position: relative;

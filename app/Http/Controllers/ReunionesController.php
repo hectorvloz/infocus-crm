@@ -92,7 +92,7 @@ class ReunionesController extends Controller
             'monthDays' => $monthDays,
             'settings' => $settings,
             'teamUsers' => $this->teamUsers(),
-            'hours' => range(8, 22),
+            'hours' => range(1, 23),
             'timezone' => $timezone,
         ]);
     }
@@ -369,6 +369,7 @@ class ReunionesController extends Controller
 
         return collect($response->json('items') ?? [])
             ->map(function (array $event) use ($timezone) {
+                $isAllDay = !empty($event['start']['date']) && empty($event['start']['dateTime']);
                 $startRaw = $event['start']['dateTime'] ?? $event['start']['date'] ?? null;
                 $endRaw = $event['end']['dateTime'] ?? $event['end']['date'] ?? null;
                 if (!$startRaw) {
@@ -403,6 +404,7 @@ class ReunionesController extends Controller
                     'hora_fin' => $end->format('H:i'),
                     'ubicacion' => (string) ($event['location'] ?? ($meetLink ? 'Google Meet' : '')),
                     'color' => 'sky',
+                    'all_day' => $isAllDay,
                     'inicio_at' => $start->toISOString(),
                     'fin_at' => $end->toISOString(),
                     'notas' => trim(strip_tags((string) ($event['description'] ?? ''))),

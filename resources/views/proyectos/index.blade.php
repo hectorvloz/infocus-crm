@@ -1334,7 +1334,7 @@
     }
 
     .project-task-card.is-entering {
-      animation: projectTaskCardEnter .24s cubic-bezier(.2, .8, .2, 1);
+      animation: projectTaskCardEnter .46s cubic-bezier(.16, .84, .28, 1);
     }
 
     .project-task-card.is-pending {
@@ -1356,11 +1356,11 @@
     @keyframes projectTaskCardEnter {
       0% {
         opacity: 0;
-        transform: translateY(8px) scale(.98);
+        transform: translateY(8px) scale(.99);
       }
-      70% {
+      72% {
         opacity: 1;
-        transform: translateY(-1px) scale(1.005);
+        transform: translateY(0) scale(1);
       }
       100% {
         opacity: 1;
@@ -1400,8 +1400,13 @@
       min-width: 0;
       opacity: 0;
       pointer-events: none;
-      transform: scale(.82);
-      transition: width .16s ease, opacity .16s ease, transform .16s ease;
+      transform: translateX(-.18rem) scale(.86);
+      transition:
+        width .34s cubic-bezier(.16, .84, .28, 1),
+        min-width .34s cubic-bezier(.16, .84, .28, 1),
+        margin-right .34s cubic-bezier(.16, .84, .28, 1),
+        opacity .32s ease,
+        transform .36s cubic-bezier(.16, .84, .28, 1);
     }
 
     .project-task-card:hover .project-task-toggle,
