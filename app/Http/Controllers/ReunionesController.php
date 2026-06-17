@@ -123,8 +123,7 @@ class ReunionesController extends Controller
         $manualMeetUrl = trim((string) ($data['meet_url'] ?? ''));
         $invitedEmails = $this->parseEmailList((string) ($data['invitados'] ?? ''));
         $assignees = $this->resolveAssignees((array) ($data['responsable_ids'] ?? []));
-        $allowedColors = ['emerald', 'sky', 'violet', 'rose', 'amber', 'cyan', 'slate'];
-        $color = in_array(($data['color'] ?? ''), $allowedColors, true) ? $data['color'] : 'emerald';
+        $color = $this->normalizeCrmCalendarColor($data['color'] ?? 'emerald');
 
         $meeting = [
             'titulo' => trim((string) $data['titulo']),
@@ -140,6 +139,7 @@ class ReunionesController extends Controller
             'hora_fin' => $end->format('H:i'),
             'ubicacion' => trim((string) ($data['ubicacion'] ?? '')),
             'color' => $color,
+            'google_color_id' => $this->crmColorToGoogleColorId($color),
             'inicio_at' => $start->toISOString(),
             'fin_at' => $end->toISOString(),
             'notas' => trim((string) ($data['notas'] ?? '')),
@@ -194,6 +194,10 @@ class ReunionesController extends Controller
 
     public function update(Request $request, string $id)
     {
+        if (str_starts_with($id, 'google:')) {
+            return $this->updateGoogleCalendarMeeting($request, $id);
+        }
+
         $meeting = $this->store->find($id);
         abort_if(!$meeting, 404);
 
@@ -217,8 +221,7 @@ class ReunionesController extends Controller
         $cliente = !empty($data['cliente_id']) ? $this->clientes->find($data['cliente_id']) : null;
         $start = Carbon::parse($data['fecha'] . ' ' . $data['hora_inicio'], $timezone);
         $end = Carbon::parse($data['fecha'] . ' ' . $data['hora_fin'], $timezone);
-        $allowedColors = ['emerald', 'sky', 'violet', 'rose', 'amber', 'cyan', 'slate'];
-        $color = in_array(($data['color'] ?? ''), $allowedColors, true) ? $data['color'] : ($meeting['color'] ?? 'emerald');
+        $color = $this->normalizeCrmCalendarColor($data['color'] ?? ($meeting['color'] ?? 'emerald'));
         $manualMeetUrl = trim((string) ($data['meet_url'] ?? ''));
         $assignees = $this->resolveAssignees((array) ($data['responsable_ids'] ?? []));
 
@@ -236,21 +239,59 @@ class ReunionesController extends Controller
             'hora_fin' => $end->format('H:i'),
             'ubicacion' => trim((string) ($data['ubicacion'] ?? '')),
             'color' => $color,
+            'google_color_id' => $this->crmColorToGoogleColorId($color),
             'inicio_at' => $start->toISOString(),
             'fin_at' => $end->toISOString(),
             'notas' => trim((string) ($data['notas'] ?? '')),
             'meet_link' => $manualMeetUrl !== '' ? $manualMeetUrl : ($meeting['meet_link'] ?? null),
         ]);
+        $googleSyncWarning = $this->syncStoredMeetingToGoogleCalendar($updated ?? []);
 
         return redirect()
             ->route('reuniones.index', ['week' => $start->toDateString()])
-            ->with('success', 'Reunion actualizada.');
+            ->with($googleSyncWarning ? 'warning' : 'success', $googleSyncWarning ?: 'Reunion actualizada.');
     }
 
     protected function timezone(): string
     {
         $settings = $this->settings->find('settings') ?: [];
         return $settings['google_meet_timezone'] ?? config('app.timezone', 'America/Bogota');
+    }
+
+    protected function normalizeCrmCalendarColor(?string $color): string
+    {
+        $allowedColors = ['emerald', 'sky', 'violet', 'rose', 'amber', 'cyan', 'slate'];
+        return in_array($color, $allowedColors, true) ? $color : 'emerald';
+    }
+
+    protected function crmColorToGoogleColorId(?string $color): string
+    {
+        return [
+            'violet' => '3',
+            'rose' => '4',
+            'amber' => '5',
+            'sky' => '7',
+            'slate' => '8',
+            'cyan' => '9',
+            'emerald' => '10',
+        ][$this->normalizeCrmCalendarColor($color)] ?? '10';
+    }
+
+    protected function googleColorIdToCrmColor(?string $colorId): string
+    {
+        return [
+            '1' => 'violet',
+            '2' => 'emerald',
+            '3' => 'violet',
+            '4' => 'rose',
+            '5' => 'amber',
+            '6' => 'amber',
+            '7' => 'sky',
+            '8' => 'slate',
+            '9' => 'cyan',
+            '10' => 'emerald',
+            '11' => 'rose',
+        ][(string) $colorId] ?? 'sky';
     }
 
     protected function normalizeMeeting(array $meeting, string $timezone): array
@@ -403,7 +444,8 @@ class ReunionesController extends Controller
                     'hora_inicio' => $start->format('H:i'),
                     'hora_fin' => $end->format('H:i'),
                     'ubicacion' => (string) ($event['location'] ?? ($meetLink ? 'Google Meet' : '')),
-                    'color' => 'sky',
+                    'color' => $this->googleColorIdToCrmColor($event['colorId'] ?? null),
+                    'google_color_id' => isset($event['colorId']) ? (string) $event['colorId'] : null,
                     'all_day' => $isAllDay,
                     'inicio_at' => $start->toISOString(),
                     'fin_at' => $end->toISOString(),
@@ -558,6 +600,96 @@ class ReunionesController extends Controller
         ];
     }
 
+    protected function updateGoogleCalendarMeeting(Request $request, string $id)
+    {
+        $settings = $this->settings->find('settings') ?: [];
+        $token = $this->getGoogleCalendarAccessToken($settings);
+        if (!$token) {
+            return back()->with('warning', 'No hay token valido de Google Calendar. Vuelve a conectar OAuth.');
+        }
+
+        $data = $request->validate([
+            'titulo' => 'required|string|max:160',
+            'cliente_id' => 'nullable|string',
+            'fecha' => 'required|date',
+            'hora_inicio' => 'required|date_format:H:i',
+            'hora_fin' => 'required|date_format:H:i',
+            'ubicacion' => 'nullable|string|max:255',
+            'color' => 'nullable|string|max:20',
+            'notas' => 'nullable|string|max:1500',
+            'invitados' => 'nullable|string|max:2000',
+            'all_day' => 'nullable|boolean',
+        ]);
+
+        $timezone = $this->timezone();
+        $isAllDay = $request->boolean('all_day') || ($data['hora_inicio'] === '00:00' && $data['hora_fin'] === '00:00');
+        $start = Carbon::parse($data['fecha'] . ' ' . $data['hora_inicio'], $timezone);
+        $end = $isAllDay
+            ? Carbon::parse($data['fecha'], $timezone)->addDay()->startOfDay()
+            : Carbon::parse($data['fecha'] . ' ' . $data['hora_fin'], $timezone);
+
+        if (!$isAllDay && $end->lessThanOrEqualTo($start)) {
+            return back()->withErrors(['hora_fin' => 'La hora final debe ser mayor a la hora inicial.'])->withInput();
+        }
+
+        $cliente = !empty($data['cliente_id']) ? $this->clientes->find($data['cliente_id']) : null;
+        $color = $this->normalizeCrmCalendarColor($data['color'] ?? 'sky');
+        $meeting = [
+            'titulo' => trim((string) $data['titulo']),
+            'cliente' => $cliente['empresa'] ?? 'Google Calendar',
+            'invitados' => $this->parseEmailList((string) ($data['invitados'] ?? '')),
+            'ubicacion' => trim((string) ($data['ubicacion'] ?? '')),
+            'color' => $color,
+            'google_color_id' => $this->crmColorToGoogleColorId($color),
+            'inicio_at' => $start->toISOString(),
+            'fin_at' => $end->toISOString(),
+            'notas' => trim((string) ($data['notas'] ?? '')),
+            'all_day' => $isAllDay,
+        ];
+
+        $calendarId = $settings['google_calendar_id'] ?? config('services.google_calendar.calendar_id', 'primary');
+        $calendarPath = rawurlencode($calendarId);
+        $eventPath = rawurlencode(Str::after($id, 'google:'));
+        $response = Http::withToken($token)
+            ->patch("https://www.googleapis.com/calendar/v3/calendars/{$calendarPath}/events/{$eventPath}?sendUpdates=all", $this->buildCalendarPayload($meeting, $settings, false));
+
+        if (!$response->ok()) {
+            $message = (string) ($response->json('error.message') ?? '');
+            return back()->with('warning', 'Google Calendar no pudo actualizar el evento' . ($message ? ': ' . $message : '.'));
+        }
+
+        return redirect()
+            ->route('reuniones.index', ['week' => $start->toDateString()])
+            ->with('success', 'Reunion actualizada en Google Calendar.');
+    }
+
+    protected function syncStoredMeetingToGoogleCalendar(array $meeting): ?string
+    {
+        $eventId = trim((string) ($meeting['google_event_id'] ?? ''));
+        if ($eventId === '') {
+            return null;
+        }
+
+        $settings = $this->settings->find('settings') ?: [];
+        $token = $this->getGoogleCalendarAccessToken($settings);
+        if (!$token) {
+            return 'Reunion actualizada en CRM, pero Google Calendar no se pudo sincronizar por token invalido.';
+        }
+
+        $calendarId = $settings['google_calendar_id'] ?? config('services.google_calendar.calendar_id', 'primary');
+        $calendarPath = rawurlencode($calendarId);
+        $eventPath = rawurlencode($eventId);
+        $response = Http::withToken($token)
+            ->patch("https://www.googleapis.com/calendar/v3/calendars/{$calendarPath}/events/{$eventPath}?sendUpdates=all", $this->buildCalendarPayload($meeting, $settings, false));
+
+        if ($response->ok()) {
+            return null;
+        }
+
+        $message = (string) ($response->json('error.message') ?? '');
+        return 'Reunion actualizada en CRM, pero Google Calendar no se pudo sincronizar' . ($message ? ': ' . $message : '.');
+    }
+
     protected function getGoogleCalendarAccessToken(array $settings): ?string
     {
         $token = $settings['google_calendar_access_token'] ?? null;
@@ -698,32 +830,44 @@ class ReunionesController extends Controller
         ]);
     }
 
-    protected function buildCalendarPayload(array $meeting, array $settings): array
+    protected function buildCalendarPayload(array $meeting, array $settings, bool $includeConference = true): array
     {
         $timezone = $settings['google_meet_timezone'] ?? $this->timezone();
         $description = trim((string) ($meeting['notas'] ?? ''));
         $clientLine = 'Cliente: ' . ($meeting['cliente'] ?? 'Sin cliente');
         $description = trim($description . "\n\n" . $clientLine);
+        $isAllDay = !empty($meeting['all_day']);
 
         $payload = [
             'summary' => $meeting['titulo'] ?? 'Reunion',
             'description' => $description,
-            'start' => [
-                'dateTime' => Carbon::parse($meeting['inicio_at'])->setTimezone($timezone)->format(DATE_ATOM),
-                'timeZone' => $timezone,
-            ],
-            'end' => [
-                'dateTime' => Carbon::parse($meeting['fin_at'])->setTimezone($timezone)->format(DATE_ATOM),
-                'timeZone' => $timezone,
-            ],
+            'start' => $isAllDay
+                ? ['date' => Carbon::parse($meeting['inicio_at'])->setTimezone($timezone)->toDateString()]
+                : [
+                    'dateTime' => Carbon::parse($meeting['inicio_at'])->setTimezone($timezone)->format(DATE_ATOM),
+                    'timeZone' => $timezone,
+                ],
+            'end' => $isAllDay
+                ? ['date' => Carbon::parse($meeting['fin_at'])->setTimezone($timezone)->toDateString()]
+                : [
+                    'dateTime' => Carbon::parse($meeting['fin_at'])->setTimezone($timezone)->format(DATE_ATOM),
+                    'timeZone' => $timezone,
+                ],
             'location' => (string) (($meeting['ubicacion'] ?? '') !== '' ? $meeting['ubicacion'] : (!empty($meeting['meet_link']) ? 'Google Meet' : '')),
-            'conferenceData' => [
+        ];
+        $googleColorId = (string) ($meeting['google_color_id'] ?? $this->crmColorToGoogleColorId($meeting['color'] ?? null));
+        if ($googleColorId !== '') {
+            $payload['colorId'] = $googleColorId;
+        }
+
+        if ($includeConference) {
+            $payload['conferenceData'] = [
                 'createRequest' => [
                     'requestId' => (string) Str::uuid(),
                     'conferenceSolutionKey' => ['type' => 'hangoutsMeet'],
                 ],
-            ],
-        ];
+            ];
+        }
 
         $attendees = collect($meeting['invitados'] ?? [])
             ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))

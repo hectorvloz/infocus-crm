@@ -622,23 +622,22 @@
 	                      $durationMin = $layoutItem['duration_min'];
 	                      $meetingLanes = max(1, (int) ($layoutItem['lanes'] ?? 1));
 	                      $meetingLane = max(0, (int) ($layoutItem['lane'] ?? 0));
-	                      $laneWidth = 100 / $meetingLanes;
-	                      $leftPct = $meetingLane * $laneWidth;
-	                      $laneGapPx = $meetingLanes > 1 ? 4 : 0;
+	                      $stackOffsetPx = $meetingLanes > 1 ? min($meetingLane * 12, 36) : 0;
 	                      $colorKey = $meeting['color'] ?? 'emerald';
 	                      $accent = $meetingColors[$colorKey]['class'] ?? $meetingColors['emerald']['class'];
 	                      $fullDate = $fullDayNames[$start->dayOfWeekIso - 1] . ' ' . $start->format('j') . ' ' . $monthNames[$start->month - 1] . ' ' . $start->year;
+                      $isAllDayMeeting = !empty($meeting['all_day']);
                       $isPastMeeting = $end->lt($now);
                     @endphp
                     <div
 	                      class="meeting-card meeting-overflow-card absolute rounded-xl border px-[var(--calendar-event-pad)] py-[var(--calendar-event-pad)] shadow-sm pointer-events-auto cursor-pointer hover:shadow-md transition {{ $accent }} {{ $isPastMeeting ? 'is-past' : '' }}"
-	                      style="--start-min: {{ $startMin }}; --duration-min: {{ $durationMin }}; left: calc({{ $leftPct }}% + {{ $meetingLane > 0 ? $laneGapPx : 0 }}px); width: calc({{ $laneWidth }}% - {{ $meetingLanes > 1 ? ($meetingLane > 0 ? $laneGapPx + 2 : $laneGapPx) : 0 }}px); z-index: {{ 10 + $meetingLane }};"
+	                      style="--start-min: {{ $startMin }}; --duration-min: {{ $durationMin }}; left: {{ $stackOffsetPx }}px; width: calc(100% - {{ $stackOffsetPx }}px); z-index: {{ 10 + $meetingLane }};"
                       data-meeting-card
                       data-title="{{ e($meeting['titulo'] ?? 'Reunion') }}"
                       data-client="{{ e($meeting['cliente'] ?? 'Sin cliente') }}"
                       data-date="{{ $start->format('d/m/Y') }}"
                       data-full-date="{{ e($fullDate) }}"
-                      data-time="{{ $start->format('H:i') }} - {{ $end->format('H:i') }}"
+                      data-time="{{ $isAllDayMeeting ? 'Todo el dia' : $start->format('H:i') . ' - ' . $end->format('H:i') }}"
                       data-location="{{ e($meeting['ubicacion'] ?? '') }}"
                       data-notes="{{ e($meeting['notas'] ?? '') }}"
                       data-meet="{{ e($meeting['meet_link'] ?? '') }}"
@@ -652,6 +651,7 @@
                       data-start="{{ $start->format('H:i') }}"
                       data-end="{{ $end->format('H:i') }}"
                       data-color="{{ e($meeting['color'] ?? 'emerald') }}"
+                      data-all-day="{{ $isAllDayMeeting ? '1' : '0' }}"
                     >
                       <div class="meeting-card-content">
                         <div class="min-w-0">
@@ -785,6 +785,7 @@
     </div>
     <form id="meetingForm" method="POST" action="{{ route('reuniones.store') }}" class="p-6 space-y-5 overflow-y-auto">
       @csrf
+      <input id="meetingAllDayInput" type="hidden" name="all_day" value="0">
       <div>
         <label class="text-sm font-medium">Titulo</label>
         <input id="meetingTitleInput" name="titulo" value="{{ old('titulo') }}" required class="form-input" placeholder="Reunion de seguimiento">
@@ -962,6 +963,7 @@
     const meetingLocationInput = document.getElementById('meetingLocationInput');
     const meetingNotesInput = document.getElementById('meetingNotesInput');
     const meetingManualMeetInput = document.getElementById('meetingManualMeetInput');
+    const meetingAllDayInput = document.getElementById('meetingAllDayInput');
     const meetingSubmitBtn = document.getElementById('meetingSubmitBtn');
     const dateInput = document.getElementById('meetingDateInput');
     const startInput = document.getElementById('meetingStartInput');
@@ -1193,6 +1195,7 @@
       if (meetingLocationInput) meetingLocationInput.value = '';
       if (meetingNotesInput) meetingNotesInput.value = '';
       if (meetingManualMeetInput) meetingManualMeetInput.value = '';
+      if (meetingAllDayInput) meetingAllDayInput.value = '0';
       if (createMeetCheckbox) createMeetCheckbox.checked = false;
       setColor('emerald');
       setResponsibleSelection([]);
@@ -1201,7 +1204,7 @@
     };
     const setEditMode = (card) => {
       if (!card || !card.dataset.id) return;
-      if (meetingForm) meetingForm.action = `/reuniones/${card.dataset.id}`;
+      if (meetingForm) meetingForm.action = `/reuniones/${encodeURIComponent(card.dataset.id)}`;
       if (meetingFormTitle) meetingFormTitle.textContent = 'Editar reunion';
       if (meetingSubmitBtn) meetingSubmitBtn.textContent = 'Guardar cambios';
       if (meetingTitleInput) meetingTitleInput.value = card.dataset.title || '';
@@ -1212,6 +1215,7 @@
       if (meetingLocationInput) meetingLocationInput.value = card.dataset.location || '';
       if (meetingNotesInput) meetingNotesInput.value = card.dataset.notes || '';
       if (meetingManualMeetInput) meetingManualMeetInput.value = card.dataset.meet || '';
+      if (meetingAllDayInput) meetingAllDayInput.value = card.dataset.allDay === '1' ? '1' : '0';
       if (createMeetCheckbox) createMeetCheckbox.checked = false;
       setColor(card.dataset.color || 'emerald');
       setResponsibleSelection(selectedResponsibleIdsFromCard(card));
@@ -1304,7 +1308,7 @@
       detailResponsibles.textContent = card.dataset.responsibles || 'Sin encargados';
       detailNotes.textContent = card.dataset.notes || 'Sin notas';
       if (detailEdit) {
-        detailEdit.classList.toggle('hidden', ['lead', 'google'].includes(card.dataset.source || ''));
+        detailEdit.classList.toggle('hidden', (card.dataset.source || '') === 'lead');
       }
       const meet = card.dataset.meet || '';
       if (meet) {
