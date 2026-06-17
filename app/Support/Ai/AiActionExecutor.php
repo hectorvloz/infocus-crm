@@ -833,7 +833,7 @@ class AiActionExecutor
 
         return [
             'ok' => true,
-            'content' => "✅ **Cambios aplicados al proyecto**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n- **Cambios:** " . implode(', ', $changes) . "\n\n[Abrir proyecto]({$url})",
+            'content' => "✅ **Cambios aplicados al proyecto**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n- **Cambios:** " . implode(', ', $changes) . "\n\n[Abrir tablero]({$url})",
             'url' => $url,
             'project_id' => $updated['id'] ?? null,
             'project_item' => $updated,
@@ -915,7 +915,7 @@ class AiActionExecutor
         }
 
         $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
-        $url = '/proyectos?open_project=' . rawurlencode((string) $project['id']) . '&view=tareas';
+        $url = '/proyectos?open_project=' . rawurlencode((string) $project['id']);
         $taskLine = count($taskItems) === 1 ? $taskItems[0] : count($taskItems) . ' tareas';
         $extra = [];
         if ($description !== '' && count($taskItems) === 1) $extra[] = 'descripción agregada';
@@ -924,7 +924,7 @@ class AiActionExecutor
 
         return [
             'ok' => true,
-            'content' => "✅ **Tareas agregadas**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n- **Tareas:** {$taskLine}{$extraLine}\n\n[Abrir proyecto]({$url})",
+            'content' => "✅ **Tareas agregadas**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n- **Tareas:** {$taskLine}{$extraLine}\n\n[Abrir tablero]({$url})",
             'url' => $url,
             'project_id' => $project['id'] ?? null,
             'project_item' => $updated,
@@ -988,7 +988,7 @@ class AiActionExecutor
 
         return [
             'ok' => true,
-            'content' => "✅ **Nota agregada**\n\n- **Proyecto:** " . ($project['titulo'] ?? 'Proyecto') . "\n- **Nota:** {$noteText}\n\n[Abrir proyecto]({$url})",
+            'content' => "✅ **Nota agregada**\n\n- **Proyecto:** " . ($project['titulo'] ?? 'Proyecto') . "\n- **Nota:** {$noteText}\n\n[Abrir tablero]({$url})",
             'url' => $url,
             'project_id' => $project['id'] ?? null,
             'undo_action' => $this->restoreUndo('proyectos', (string) ($project['id'] ?? ''), $projectBefore, 'Deshacer nota agregada'),
@@ -1032,7 +1032,7 @@ class AiActionExecutor
 
         return [
             'ok' => true,
-            'content' => "✅ **Subtarea agregada**\n\n- **Proyecto:** " . ($project['titulo'] ?? 'Proyecto') . "\n- **Subtarea:** {$subtaskText}\n\n[Abrir proyecto]({$url})",
+            'content' => "✅ **Subtarea agregada**\n\n- **Proyecto:** " . ($project['titulo'] ?? 'Proyecto') . "\n- **Subtarea:** {$subtaskText}\n\n[Abrir tablero]({$url})",
             'url' => $url,
             'project_id' => $project['id'] ?? null,
             'undo_action' => $this->restoreUndo('proyectos', (string) ($project['id'] ?? ''), $projectBefore, 'Deshacer subtarea agregada'),

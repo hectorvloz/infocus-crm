@@ -3,6 +3,10 @@
 @section('content')
   <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
   <style>
+    #global-header-back-btn {
+      display: none !important;
+    }
+
     #newProjectModal .ts-dropdown,
     #projectModal .ts-dropdown,
     #taskDetailModal .ts-dropdown,
@@ -19,7 +23,6 @@
       z-index: 2147483000 !important;
     }
 
-    #projectBoardColumns,
     #kanbanScroll,
     #kanban,
     #kanban .stage-column,
@@ -27,12 +30,10 @@
       cursor: grab;
     }
 
-    #projectBoardColumns.is-grabbing,
     #kanbanScroll.is-grabbing {
       cursor: grabbing;
     }
 
-    #projectBoardColumns.is-grabbing *,
     #kanbanScroll.is-grabbing * {
       cursor: grabbing !important;
       user-select: none;
@@ -857,6 +858,203 @@
       box-shadow: 0 0 0 3px #ecfe88, 0 12px 24px rgba(15, 23, 42, .14);
     }
 
+    .project-cover-trigger-wrap {
+      position: relative;
+      display: inline-flex;
+      justify-content: flex-end;
+    }
+
+    .project-cover-popover {
+      position: fixed;
+      z-index: 2147482200;
+      width: min(19.5rem, calc(100vw - 1.5rem));
+      max-height: min(28rem, calc(100vh - 1.5rem));
+      overflow-y: auto;
+      border-radius: .95rem;
+      border: 1px solid #dbe5f2;
+      background: #fff;
+      padding: .75rem;
+      color: #0f172a;
+      box-shadow: 0 18px 42px rgba(15, 23, 42, .16);
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+
+    .project-cover-popover.hidden {
+      display: none !important;
+    }
+
+    .project-cover-section {
+      display: grid;
+      gap: .55rem;
+    }
+
+    .project-cover-section + .project-cover-section {
+      margin-top: .8rem;
+      padding-top: .75rem;
+      border-top: 1px solid #eef2f7;
+    }
+
+    .project-cover-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .project-cover-section-title {
+      color: #334155;
+      font-size: .66rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .project-cover-more-btn {
+      height: 1.65rem;
+      border-radius: .58rem;
+      border: 1px solid #dbe5f2;
+      background: #f8fafc;
+      padding: 0 .55rem;
+      color: #475569;
+      font-size: .66rem;
+      font-weight: 900;
+      transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+    }
+
+    .project-cover-more-btn:hover {
+      background: #ecfe88;
+      border-color: #c8f24a;
+      color: #0f172a;
+    }
+
+    .project-cover-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .45rem;
+    }
+
+    .project-cover-grid.is-colors {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .project-cover-option {
+      position: relative;
+      min-height: 3.75rem;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: .58rem;
+      border: 2px solid transparent;
+      background: #e2e8f0;
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 -42px 70px rgba(15, 23, 42, .14);
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+
+    .project-cover-option:hover {
+      transform: translateY(-1px);
+      border-color: rgba(217, 255, 102, .78);
+      box-shadow: inset 0 -42px 70px rgba(15, 23, 42, .24), 0 14px 28px rgba(15, 23, 42, .12);
+    }
+
+    .project-cover-option.is-active {
+      border-color: #a3e635;
+      box-shadow: inset 0 -42px 70px rgba(15, 23, 42, .18), 0 0 0 3px rgba(236, 254, 136, .75);
+    }
+
+    .project-cover-option span {
+      position: absolute;
+      left: .55rem;
+      right: .55rem;
+      bottom: .45rem;
+      display: block;
+      color: #fff;
+      font-size: .56rem;
+      font-weight: 900;
+      line-height: 1.1;
+      text-align: left;
+      text-shadow: 0 1px 6px rgba(15, 23, 42, .75);
+    }
+
+    .project-cover-option.is-active::after {
+      content: "✓";
+      position: absolute;
+      right: .45rem;
+      top: .45rem;
+      width: 1.15rem;
+      height: 1.15rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #0f172a;
+      color: #ecfe88;
+      font-size: .68rem;
+      font-weight: 900;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, .28);
+    }
+
+    .project-cover-color-option {
+      min-height: 3.1rem;
+      border-radius: .58rem;
+      border: 2px solid transparent;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+
+    .project-cover-color-option:hover {
+      transform: translateY(-1px);
+      border-color: rgba(217, 255, 102, .78);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, .22);
+    }
+
+    .project-cover-color-option.is-active {
+      border-color: #a3e635;
+      box-shadow: 0 0 0 3px rgba(236, 254, 136, .38);
+    }
+
+    .project-cover-upload-btn {
+      width: 100%;
+      min-height: 3rem;
+      border-radius: .7rem;
+      border: 1.5px dashed #cbd5e1;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      padding: .65rem .7rem;
+      color: #334155;
+      text-align: left;
+      transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+    }
+
+    .project-cover-upload-btn:hover {
+      border-color: #b8f52f;
+      background: #fbffea;
+      box-shadow: 0 0 0 3px rgba(236, 254, 136, .28);
+    }
+
+    .project-cover-upload-icon {
+      width: 2rem;
+      height: 2rem;
+      border-radius: .55rem;
+      display: grid;
+      place-items: center;
+      background: #ecfe88;
+      color: #0f172a;
+      flex: 0 0 auto;
+    }
+
+    @media (max-width: 640px) {
+      .project-cover-popover {
+        width: calc(100vw - 1rem);
+      }
+
+      .project-cover-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     .project-board-footer {
       background: #fff;
       border-top: 1px solid #e2e8f0;
@@ -926,6 +1124,8 @@
     }
 
     .project-board-columns {
+      position: relative;
+      isolation: isolate;
       display: flex;
       align-items: flex-start;
       gap: .8rem;
@@ -936,7 +1136,42 @@
       user-select: none;
     }
 
+    .project-board-columns.is-ai-working::before {
+      content: "";
+      position: absolute;
+      inset: .2rem;
+      z-index: 0;
+      pointer-events: none;
+      border-radius: 1.15rem;
+      background: linear-gradient(120deg, rgba(129, 140, 248, .42), rgba(217, 70, 239, .38), rgba(240, 254, 151, .55), rgba(56, 189, 248, .32), rgba(129, 140, 248, .42));
+      background-size: 260% 260%;
+      filter: blur(18px);
+      opacity: .62;
+      animation: projectBoardAiGlow 2.25s ease-in-out infinite;
+    }
+
+    .project-board-columns.is-ai-working::after {
+      content: attr(data-ai-label);
+      position: absolute;
+      left: .75rem;
+      top: .45rem;
+      z-index: 4;
+      pointer-events: none;
+      border-radius: 999px;
+      border: 1px solid rgba(217, 70, 239, .22);
+      background: rgba(255, 255, 255, .9);
+      color: #86198f;
+      padding: .34rem .64rem;
+      font-size: .68rem;
+      font-weight: 900;
+      line-height: 1;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, .12);
+      backdrop-filter: blur(10px);
+    }
+
     .project-board-column {
+      position: relative;
+      z-index: 1;
       width: min(292px, calc(100vw - 2rem));
       min-width: 276px;
       max-height: min(980px, calc(100vh - 205px));
@@ -947,6 +1182,30 @@
       border: 1px solid #dbe5f2;
       background: linear-gradient(180deg, #f8fafc, #eef3f9);
       overflow: hidden;
+    }
+
+    .project-board-column.is-ai-working {
+      isolation: isolate;
+      border-color: rgba(217, 70, 239, .25);
+      box-shadow: 0 0 0 3px rgba(236, 254, 151, .55), 0 18px 44px rgba(168, 85, 247, .16);
+    }
+
+    .project-board-column.is-ai-working::before {
+      content: "";
+      position: absolute;
+      inset: -12px;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, rgba(129, 140, 248, .42), rgba(217, 70, 239, .38), rgba(240, 254, 151, .62), rgba(56, 189, 248, .32), rgba(129, 140, 248, .42));
+      background-size: 260% 260%;
+      filter: blur(16px);
+      opacity: .7;
+      animation: projectBoardAiGlow 2.25s ease-in-out infinite;
+    }
+
+    .project-board-column.is-ai-working > * {
+      position: relative;
+      z-index: 1;
     }
 
     .project-board-column.is-column-dragging {
@@ -968,12 +1227,12 @@
     }
 
     .project-board-column-header {
-      cursor: grab;
+      cursor: default;
       user-select: none;
     }
 
     .project-board-column-header:active {
-      cursor: grabbing;
+      cursor: default;
     }
 
     .project-board-column-body {
@@ -1046,6 +1305,11 @@
       100% { transform: translateX(70%) rotate(8deg); opacity: .25; }
     }
 
+    @keyframes projectBoardAiGlow {
+      0%, 100% { background-position: 0% 50%; opacity: .58; }
+      50% { background-position: 100% 50%; opacity: .92; }
+    }
+
     @media (max-width: 767px) {
       .project-board-columns {
         min-height: calc(100vh - 175px);
@@ -1065,8 +1329,49 @@
       background: #fff;
       padding: 0;
       box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
-      cursor: grab;
+      cursor: default;
       overflow: hidden;
+    }
+
+    .project-task-card.is-entering {
+      animation: projectTaskCardEnter .24s cubic-bezier(.2, .8, .2, 1);
+    }
+
+    .project-task-card.is-pending {
+      border-color: #d9ff66;
+      box-shadow: 0 0 0 3px rgba(236, 254, 136, .38), 0 10px 22px rgba(15, 23, 42, .08);
+    }
+
+    .project-task-card.is-pending .project-task-card-body::after {
+      content: "Creando...";
+      position: absolute;
+      right: .7rem;
+      bottom: .55rem;
+      color: #65a30d;
+      font-size: .62rem;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+
+    @keyframes projectTaskCardEnter {
+      0% {
+        opacity: 0;
+        transform: translateY(8px) scale(.98);
+      }
+      70% {
+        opacity: 1;
+        transform: translateY(-1px) scale(1.005);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .project-task-card.is-entering {
+        animation: none;
+      }
     }
 
     .project-task-cover {
@@ -1105,7 +1410,7 @@
     }
 
     .project-task-card:active {
-      cursor: grabbing;
+      cursor: default;
     }
 
     .project-task-card.is-done {
@@ -1135,9 +1440,111 @@
     .progress-fill-live {
       transition: width .5s ease, background-color .2s ease;
     }
+
+    .project-client-filter {
+      position: relative;
+      width: 100%;
+      z-index: 2147482100;
+    }
+
+    .project-client-filter #clientSelector {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      clip: rect(0 0 0 0) !important;
+      clip-path: inset(50%) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    .project-client-filter-button {
+      width: 100%;
+      height: 2.65rem;
+      border-radius: .82rem;
+      border: 1px solid #dbe5f2;
+      background: #fff;
+      color: #334155;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, .04);
+      padding: 0 .82rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .55rem;
+      font-size: .86rem;
+      font-weight: 800;
+      line-height: 1;
+      transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+    }
+
+    .project-client-filter-button:hover,
+    .project-client-filter-button[aria-expanded="true"] {
+      border-color: #d9f99d;
+      box-shadow: 0 0 0 3px rgba(236, 254, 136, .35), 0 10px 24px rgba(15, 23, 42, .07);
+    }
+
+    .project-client-filter-button svg {
+      flex: 0 0 auto;
+      color: #94a3b8;
+      transition: transform .16s ease;
+    }
+
+    .project-client-filter-button[aria-expanded="true"] svg {
+      transform: rotate(180deg);
+    }
+
+    .project-client-filter-menu {
+      position: absolute;
+      left: 0;
+      top: calc(100% + .35rem);
+      z-index: 2147482000;
+      width: min(20rem, calc(100vw - 2rem));
+      max-height: 15rem;
+      overflow-y: auto;
+      border-radius: .9rem;
+      border: 1px solid #dbe5f2;
+      background: #fff;
+      padding: .35rem;
+      box-shadow: 0 18px 44px rgba(15, 23, 42, .16);
+    }
+
+    .project-client-filter-menu.hidden {
+      display: none !important;
+    }
+
+    .project-client-filter-option {
+      width: 100%;
+      border-radius: .72rem;
+      padding: .58rem .7rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      color: #334155;
+      font-size: .82rem;
+      font-weight: 800;
+      text-align: left;
+      transition: background-color .14s ease, color .14s ease;
+    }
+
+    .project-client-filter-option:hover,
+    .project-client-filter-option.is-active {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .project-client-filter-option.is-active {
+      background: #ecfe88;
+    }
   </style>
   <div id="stagesData" data-stages='{{ json_encode($stages) }}'></div>
-  <div id="projectBoardsHeader" class="project-board-anim is-visible mb-4 flex items-center justify-between flex-wrap gap-3">
+  <div id="projectBoardsHeader" class="project-board-anim is-visible relative z-[2147482050] mb-4 flex items-center justify-between flex-wrap gap-3 overflow-visible">
     <div>
       <div id="projectsSectionTitle" data-build-marker="boards-v1" class="text-2xl font-extrabold">Tableros de proyectos</div>
       <div id="projectsSectionDescription" class="text-sm text-slate-500 mt-1">Abre un tablero para organizar sus tarjetas, tareas y entregables por columnas.</div>
@@ -1145,12 +1552,30 @@
 
     <div class="flex w-full items-center gap-3 flex-wrap">
       <div class="min-w-[240px] flex-1 lg:flex-none">
-        <select id="clientSelector" class="w-full" aria-label="Filtrar por cliente">
+        <div class="project-client-filter" id="projectClientFilter">
+          <select id="clientSelector" class="sr-only" data-native-select="1" aria-label="Filtrar por cliente" tabindex="-1">
           <option value="">Todos los Clientes</option>
           @foreach($clientes as $c)
             <option value="{{ $c['id'] }}">{{ $c['empresa'] }}</option>
           @endforeach
         </select>
+          <button id="projectClientFilterButton" type="button" class="project-client-filter-button" aria-haspopup="listbox" aria-expanded="false" onclick="toggleProjectClientFilter(event)">
+            <span id="projectClientFilterLabel" class="min-w-0 truncate">Todos los Clientes</span>
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div id="projectClientFilterMenu" class="project-client-filter-menu hidden" role="listbox" aria-label="Filtrar proyectos por cliente">
+            <button type="button" class="project-client-filter-option" data-project-client-option="" role="option" onclick="selectProjectClientFilter('')">
+              <span class="truncate">Todos los Clientes</span>
+              <span class="hidden text-slate-900" data-project-client-check="">✓</span>
+            </button>
+            @foreach($clientes as $c)
+              <button type="button" class="project-client-filter-option" data-project-client-option="{{ $c['id'] }}" role="option" onclick="selectProjectClientFilter(@js($c['id']))">
+                <span class="truncate">{{ $c['empresa'] }}</span>
+                <span class="hidden text-slate-900" data-project-client-check="{{ $c['id'] }}">✓</span>
+              </button>
+            @endforeach
+          </div>
+        </div>
       </div>
 
       <div class="ml-auto flex items-center gap-3">
@@ -1184,14 +1609,15 @@
             <div>
               <div class="mb-2 flex items-center justify-between gap-3">
                 <label class="block text-sm font-semibold text-slate-700">Portada</label>
-                <button type="button" onclick="document.getElementById('newProjectCoverImage')?.click()" class="inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 shadow-sm hover:bg-slate-50">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2 1.6-1.6a2 2 0 012.8 0L20 14m-9-6h.01M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
-                  Subir imagen
-                </button>
-                <input id="newProjectCoverImage" type="file" accept="image/*" class="hidden" onchange="handleNewProjectCoverImage(event)">
+                <div class="project-cover-trigger-wrap">
+                  <button type="button" onclick="toggleNewProjectCoverGallery()" class="inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 shadow-sm hover:bg-slate-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2 1.6-1.6a2 2 0 012.8 0L20 14m-9-6h.01M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+                    Cambiar
+                  </button>
+                  <div id="newProjectCoverGallery" class="project-cover-popover hidden"></div>
+                </div>
               </div>
               <div id="newProjectCoverPreview" class="project-cover-preview mb-3"></div>
-              <div id="newProjectCoverSwatches" class="flex flex-wrap items-center gap-2"></div>
             </div>
             <div>
               <label class="block text-xl font-extrabold text-slate-900 mb-2 leading-none">Título</label>
@@ -1320,9 +1746,14 @@
 
     <div id="projectBoardDetailView" class="project-board-detail project-board-anim hidden">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
-        <div class="min-w-0">
-          <div id="projectBoardTitle" class="truncate text-xl font-black leading-tight text-slate-950 sm:text-2xl">Tablero</div>
-          <div id="projectBoardMeta" class="mt-0.5 truncate text-xs font-bold text-slate-700 sm:text-sm">Proyecto</div>
+        <div class="flex min-w-0 items-center gap-3">
+          <button type="button" onclick="closeProjectBoard()" class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-lime-200 bg-lime-100 text-slate-950 shadow-sm hover:bg-lime-200" aria-label="Volver a tableros">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="min-w-0">
+            <div id="projectBoardTitle" class="truncate text-xl font-black leading-tight text-slate-950 sm:text-2xl">Tablero</div>
+            <div id="projectBoardMeta" class="mt-0.5 truncate text-xs font-bold text-slate-700 sm:text-sm">Proyecto</div>
+          </div>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" onclick="openProject(currentBoardProjectId)" class="inline-flex h-9 items-center gap-2 rounded-full border border-slate-900/10 bg-white/80 px-3 text-xs font-extrabold text-slate-800 shadow-sm hover:bg-white sm:px-4 sm:text-sm">
@@ -1402,12 +1833,7 @@
                 <div class="flex-1 min-w-0">
                     <input id="modalTitle" class="block w-full bg-transparent border-0 p-0 text-xl font-extrabold text-slate-900 focus:ring-0 placeholder-slate-400" placeholder="Título del Proyecto">
                     <div class="mt-2 flex items-center gap-2 flex-wrap">
-                      <select id="modalClientSelect" class="w-44"></select>
-                      <div class="relative w-36">
-                        <select id="modalStage" class="w-full">
-                          <!-- Populated via JS -->
-                        </select>
-                      </div>
+                      <select id="modalClientSelect" class="w-72 max-w-full"></select>
                     </div>
                 </div>
              </div>
@@ -1664,17 +2090,15 @@
                          <div>
                            <div class="mb-2 flex items-center justify-between gap-3">
                              <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Portada</div>
-                             <button type="button" onclick="document.getElementById('modalCoverImageInput')?.click()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50">
-                               <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2 1.6-1.6a2 2 0 012.8 0L20 14m-9-6h.01M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
-                               Cambiar
-                             </button>
-                             <input id="modalCoverImageInput" type="file" accept="image/*" class="hidden" onchange="handleModalCoverImage(event)">
+                             <div class="project-cover-trigger-wrap">
+                               <button type="button" onclick="toggleModalCoverGallery()" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-slate-700 hover:bg-slate-50">
+                                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2 1.6-1.6a2 2 0 012.8 0L20 14m-9-6h.01M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+                                 Cambiar
+                               </button>
+                               <div id="modalCoverGallery" class="project-cover-popover hidden"></div>
+                             </div>
                            </div>
                            <div id="modalCoverPreview" class="project-cover-preview min-h-[92px]"></div>
-                           <div class="mt-2 flex items-center justify-between gap-2">
-                             <input id="modalCoverUrlInput" type="url" class="h-9 min-w-0 flex-1 rounded-lg border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm focus:border-lime-500 focus:ring-lime-500" placeholder="Pegar URL de imagen..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); updateModalCoverFromUrl(); }">
-                             <button type="button" onclick="updateModalCoverFromUrl()" class="h-9 rounded-lg border border-lime-200 bg-lime-100 px-3 text-[10px] font-bold text-slate-900 hover:bg-lime-200">Aplicar</button>
-                           </div>
                            <button id="modalCoverClearBtn" type="button" onclick="clearModalCoverImage()" class="mt-2 hidden text-[11px] font-bold text-slate-500 hover:text-rose-600">Quitar imagen de portada</button>
                          </div>
 
@@ -2439,14 +2863,84 @@
       nextUrl.searchParams.delete('new_project');
       window.history.replaceState({}, '', nextUrl);
     }
+
+    function syncProjectClientFilterUI() {
+      const select = document.getElementById('clientSelector');
+      const label = document.getElementById('projectClientFilterLabel');
+      const button = document.getElementById('projectClientFilterButton');
+      cleanupProjectClientNativeSelectEnhancement();
+      const currentValue = String(select?.value || '');
+      const selectedText = select?.selectedOptions?.[0]?.textContent?.trim() || 'Todos los Clientes';
+      if (label) label.textContent = selectedText;
+      document.querySelectorAll('[data-project-client-option]').forEach((option) => {
+        const isActive = String(option.getAttribute('data-project-client-option') || '') === currentValue;
+        option.classList.toggle('is-active', isActive);
+        option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      document.querySelectorAll('[data-project-client-check]').forEach((check) => {
+        check.classList.toggle('hidden', String(check.getAttribute('data-project-client-check') || '') !== currentValue);
+      });
+      button?.setAttribute('aria-label', `Filtrar por cliente: ${selectedText}`);
+    }
+
+    function cleanupProjectClientNativeSelectEnhancement() {
+      const filter = document.getElementById('projectClientFilter');
+      const select = document.getElementById('clientSelector');
+      if (!filter || !select) return;
+
+      const wrapper = select.closest('.app-select-wrap');
+      if (wrapper && wrapper.parentElement === filter) {
+        filter.insertBefore(select, wrapper);
+        wrapper.remove();
+      }
+
+      delete select.dataset.appSelectEnhanced;
+      select.classList.remove('app-native-select');
+      select._appSelectWrapper = null;
+      select._appSelectTrigger = null;
+      select._appSelectLabel = null;
+      select._appSelectMenu = null;
+      select._appSelectSearch = null;
+      select._appSelectOptions = null;
+    }
+
+    function closeProjectClientFilter() {
+      const menu = document.getElementById('projectClientFilterMenu');
+      const button = document.getElementById('projectClientFilterButton');
+      menu?.classList.add('hidden');
+      button?.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleProjectClientFilter(event = null) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      const menu = document.getElementById('projectClientFilterMenu');
+      const button = document.getElementById('projectClientFilterButton');
+      if (!menu || !button) return;
+      const willOpen = menu.classList.contains('hidden');
+      menu.classList.toggle('hidden', !willOpen);
+      button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      if (willOpen) syncProjectClientFilterUI();
+    }
+
+    function selectProjectClientFilter(value = '') {
+      const select = document.getElementById('clientSelector');
+      if (!select) return;
+      select.value = String(value || '');
+      syncProjectClientFilterUI();
+      closeProjectClientFilter();
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     
     // Set initial selector value
     if (currentClienteId) {
         document.getElementById('clientSelector').value = currentClienteId;
     }
+    syncProjectClientFilterUI();
     
     document.getElementById('clientSelector').addEventListener('change', (e) => {
         currentClienteId = e.target.value;
+        syncProjectClientFilterUI();
         const url = new URL(window.location);
         if (currentClienteId) {
             url.searchParams.set('cliente_id', currentClienteId);
@@ -2466,6 +2960,14 @@
     let currentProjectId = null; // For modal
     let newProjectCoverColor = '#0f766e|#bef264';
     let newProjectCoverImage = '';
+    let newProjectCoverFile = null;
+    let newProjectCoverObjectUrl = '';
+    const projectCoverPickerExpanded = {
+      newPhotos: false,
+      newColors: false,
+      modalPhotos: false,
+      modalColors: false,
+    };
     const PROJECT_COVER_PALETTES = [
       ['#0f766e', '#bef264'],
       ['#0f4c81', '#ec4899'],
@@ -2473,6 +2975,26 @@
       ['#f97316', '#ef4444'],
       ['#2563eb', '#22d3ee'],
       ['#111827', '#64748b'],
+      ['#12355b', '#1d4ed8'],
+      ['#0891b2', '#22d3ee'],
+      ['#0f172a', '#334155'],
+      ['#14532d', '#84cc16'],
+      ['#be123c', '#fb7185'],
+      ['#581c87', '#c084fc'],
+    ];
+    const PROJECT_COVER_PRESETS = [
+      { name: 'Neon suave', url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Prisma', url: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Vidrio azul', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Luz líquida', url: 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Aurora digital', url: 'https://images.unsplash.com/photo-1635776062360-af423602aff3?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Cromo', url: 'https://images.unsplash.com/photo-1604076913837-52ab5629fba9?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Bruma violeta', url: 'https://images.unsplash.com/photo-1579547621706-1a9c79d5c9f1?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Ondas', url: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Malla azul', url: 'https://images.unsplash.com/photo-1614851099362-9adf73ccebe9?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Tinta', url: 'https://images.unsplash.com/photo-1574169208507-84376144848b?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Pulso', url: 'https://images.unsplash.com/photo-1620121684840-edffcfc4b878?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Líneas', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80' },
     ];
     let modalDescAutosaveTimer = null;
     let taskDescAutosaveTimer = null;
@@ -3223,6 +3745,9 @@
     let boardColumnPreviewEl = null;
     let boardColumnPreviewOrder = null;
     let boardTaskComposerFocusStage = '';
+    let boardPendingTaskSeq = 0;
+    const boardPendingTasks = new Map();
+    const boardRecentTaskIds = new Set();
     let boardStageEditingName = '';
     let boardAiWorking = null;
     const DEFAULT_PROJECT_TASK_STAGES = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
@@ -3234,6 +3759,8 @@
       currentClienteId = new URLSearchParams(window.location.search || '').get('cliente_id') || '';
       const clientSelector = document.getElementById('clientSelector');
       if (clientSelector && clientSelector.value !== currentClienteId) clientSelector.value = currentClienteId;
+      syncProjectClientFilterUI();
+      closeProjectClientFilter();
       syncProjectBoardFromLocation();
     });
 
@@ -3758,11 +4285,8 @@
 
     function bindProjectBoardHeaderBack() {
       if (!projectGlobalBackButton) return;
-      projectGlobalBackButton.onclick = function (event) {
-        event.preventDefault();
-        closeProjectBoard();
-        return false;
-      };
+      projectGlobalBackButton.classList.add('hidden');
+      projectGlobalBackButton.onclick = null;
     }
 
     function syncProjectBoardFromLocation() {
@@ -3815,12 +4339,20 @@
       const previousScrollLeft = restoreScroll ? Number(options.scrollLeft ?? container.scrollLeft ?? 0) : 0;
       const boardStages = getProjectBoardStages(project);
       const tasks = (Array.isArray(project.tareas) ? project.tareas : []).slice().sort((a, b) => Number(a.board_order || 0) - Number(b.board_order || 0));
+      const aiState = getProjectBoardAiState(project);
+      container.classList.toggle('is-ai-working', aiState.isBoardWide);
+      if (aiState.isBoardWide) {
+        container.setAttribute('data-ai-label', 'IA ajustando tablero');
+      } else {
+        container.removeAttribute('data-ai-label');
+      }
 
       container.innerHTML = boardStages.map((stage) => {
         const stageTasks = tasks.filter((task) => (String(task.board_stage || 'Por hacer').trim() || 'Por hacer') === stage);
         const safeStageArg = escapeHtml(JSON.stringify(stage));
         const isEditingStage = boardStageEditingName === stage;
-        return `<div class="project-board-column" draggable="true" data-board-stage="${escapeHtml(stage)}" data-board-column-stage="${escapeHtml(stage)}">
+        const isAiTargetStage = aiState.isColumn && normalizeBoardStageText(aiState.stage) === normalizeBoardStageText(stage);
+        return `<div class="project-board-column ${isAiTargetStage ? 'is-ai-working' : ''}" draggable="true" data-board-stage="${escapeHtml(stage)}" data-board-column-stage="${escapeHtml(stage)}">
           <div class="project-board-column-header flex items-center justify-between gap-2 border-b border-slate-200/80 px-3 py-2.5" title="Arrastra para reorganizar columnas">
             <span class="shrink-0 text-slate-300" data-board-column-handle aria-hidden="true">
               <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.2" d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01"/></svg>
@@ -3873,13 +4405,27 @@
       }) || stages[0] || 'Por hacer';
     }
 
-    function projectBoardAiCreatingIndicator(project, stage) {
-      if (!boardAiWorking?.working) return '';
+    function getProjectBoardAiState(project) {
+      if (!boardAiWorking?.working) return { working: false, isBoardWide: false, isColumn: false, stage: '' };
       const targetProjectMatches = !boardAiWorking.projectId || String(boardAiWorking.projectId) === String(project?.id || '');
       const targetTitleMatches = !boardAiWorking.projectTitle || normalizeBoardStageText(boardAiWorking.projectTitle) === normalizeBoardStageText(project?.titulo || '');
-      if (!targetProjectMatches && !targetTitleMatches) return '';
-      const targetStage = resolveBoardAiStage(project, boardAiWorking.stage || '');
-      if (normalizeBoardStageText(targetStage) !== normalizeBoardStageText(stage)) return '';
+      if (!targetProjectMatches && !targetTitleMatches) return { working: false, isBoardWide: false, isColumn: false, stage: '' };
+
+      const explicitStage = String(boardAiWorking.stage || '').trim();
+      if (!explicitStage) return { working: true, isBoardWide: true, isColumn: false, stage: '' };
+
+      return {
+        working: true,
+        isBoardWide: false,
+        isColumn: true,
+        stage: resolveBoardAiStage(project, explicitStage),
+      };
+    }
+
+    function projectBoardAiCreatingIndicator(project, stage) {
+      const aiState = getProjectBoardAiState(project);
+      if (!aiState.isColumn) return '';
+      if (normalizeBoardStageText(aiState.stage) !== normalizeBoardStageText(stage)) return '';
       return `<div class="project-board-ai-creating" aria-live="polite">
         <span class="project-board-ai-creating-icon"><i class="fa-solid fa-robot" aria-hidden="true"></i></span>
         <span class="project-board-ai-creating-text">
@@ -4008,6 +4554,8 @@
       const safeProjectId = String(project.id || '').replace(/'/g, "\\'");
       const safeTaskId = String(task.id || '').replace(/'/g, "\\'");
       const done = !!task.done;
+      const isPending = !!task._pending;
+      const isEntering = isPending || boardRecentTaskIds.has(String(task.id || ''));
       const priority = normalizePriority(task.priority || project.prioridad || 'Con calma');
       const due = task.due_date || task.end_date || '';
       const owners = getTaskOwnerSources(task, project);
@@ -4020,7 +4568,7 @@
         bubbleClass: 'w-6 h-6 rounded-full border-2 border-white bg-slate-200 text-slate-600 text-[8px] font-bold flex items-center justify-center overflow-hidden',
         emptyHtml: '<span class="text-[11px] font-semibold text-slate-400">Sin responsable</span>',
       });
-      return `<div class="project-task-card ${done ? 'is-done' : ''} ${coverUrl ? 'has-cover' : ''}" draggable="true" data-board-task-id="${escapeHtml(task.id || '')}" onclick="openProjectTask('${safeProjectId}', '${safeTaskId}')">
+      return `<div class="project-task-card ${done ? 'is-done' : ''} ${coverUrl ? 'has-cover' : ''} ${isPending ? 'is-pending' : ''} ${isEntering ? 'is-entering' : ''}" draggable="${isPending ? 'false' : 'true'}" data-board-task-id="${escapeHtml(task.id || '')}" onclick="${isPending ? '' : `openProjectTask('${safeProjectId}', '${safeTaskId}')`}">
         ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="project-task-cover" alt="">` : ''}
         <div class="project-task-card-body flex items-start gap-2.5">
           <button type="button" onclick="event.stopPropagation(); toggleTask('${safeTaskId}', '${safeProjectId}')" class="project-task-toggle h-5 w-5 shrink-0 rounded-full border-2 ${done ? 'border-lime-300 bg-lime-200 text-slate-950' : 'border-slate-300 bg-white'} flex items-center justify-center">
@@ -4044,6 +4592,41 @@
       </div>`;
     }
 
+    function getNextBoardTaskOrder(project, stage) {
+      const normalizedStage = String(stage || 'Por hacer').trim() || 'Por hacer';
+      return (Array.isArray(project?.tareas) ? project.tareas : [])
+        .filter((task) => (String(task.board_stage || 'Por hacer').trim() || 'Por hacer') === normalizedStage)
+        .reduce((max, task) => Math.max(max, Number(task.board_order || 0)), -1) + 1;
+    }
+
+    function findCreatedBoardTaskId(project, text, stage, knownIds = new Set()) {
+      const normalizedStage = String(stage || 'Por hacer').trim() || 'Por hacer';
+      const matches = (Array.isArray(project?.tareas) ? project.tareas : [])
+        .filter((task) => {
+          if (knownIds.has(String(task.id || ''))) return false;
+          const taskStage = String(task.board_stage || 'Por hacer').trim() || 'Por hacer';
+          return taskStage === normalizedStage && String(task.texto || '').trim() === String(text || '').trim();
+        });
+      if (!matches.length) return '';
+      matches.sort((a, b) => Number(b.board_order || 0) - Number(a.board_order || 0));
+      return String(matches[0].id || '');
+    }
+
+    function mergePendingBoardTasks(project) {
+      if (!project?.id) return project;
+      const pending = Array.from(boardPendingTasks.values())
+        .filter((item) => String(item.projectId || '') === String(project.id || ''))
+        .map((item) => item.task);
+      if (!pending.length) return project;
+      const existingIds = new Set((Array.isArray(project.tareas) ? project.tareas : []).map((task) => String(task.id || '')));
+      const missingPending = pending.filter((task) => !existingIds.has(String(task.id || '')));
+      if (!missingPending.length) return project;
+      return {
+        ...project,
+        tareas: (Array.isArray(project.tareas) ? project.tareas : []).concat(missingPending),
+      };
+    }
+
     function projectBoardAddTaskButton(stage) {
       const safeStageArg = escapeHtml(JSON.stringify(stage || 'Por hacer'));
       return `<div class="project-board-card-composer" data-no-pan>
@@ -4063,6 +4646,22 @@
       if (!clean) return;
       const targetStage = stage || 'Por hacer';
       boardTaskComposerFocusStage = targetStage;
+      const knownIds = new Set((Array.isArray(project.tareas) ? project.tareas : []).map((task) => String(task.id || '')));
+      const tempId = `pending-${Date.now()}-${++boardPendingTaskSeq}`;
+      const pendingTask = {
+        id: tempId,
+        texto: clean,
+        priority: 'Con calma',
+        board_stage: targetStage,
+        board_order: getNextBoardTaskOrder(project, targetStage),
+        done: false,
+        subtasks: [],
+        files: [],
+        _pending: true,
+      };
+      boardPendingTasks.set(tempId, { projectId: project.id, task: pendingTask });
+      project.tareas = Array.isArray(project.tareas) ? project.tareas.concat(pendingTask) : [pendingTask];
+      renderProjectBoard(project.id);
 
       const response = await fetch('/api/proyectos/tareas/agregar', {
         method: 'POST',
@@ -4076,10 +4675,23 @@
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok && data.item) {
+        boardPendingTasks.delete(tempId);
+        const createdId = findCreatedBoardTaskId(data.item, clean, targetStage, knownIds);
+        if (createdId) {
+          boardRecentTaskIds.add(createdId);
+          window.setTimeout(() => boardRecentTaskIds.delete(createdId), 700);
+        }
+        const mergedProject = mergePendingBoardTasks(data.item);
         const idx = projects.findIndex((item) => String(item.id) === String(project.id));
-        if (idx >= 0) projects[idx] = data.item;
+        if (idx >= 0) projects[idx] = mergedProject;
         renderProjectBoard(project.id);
+        return true;
       }
+      boardPendingTasks.delete(tempId);
+      project.tareas = (Array.isArray(project.tareas) ? project.tareas : []).filter((task) => String(task.id || '') !== tempId);
+      renderProjectBoard(project.id);
+      if (window.showNotification) window.showNotification('No se pudo crear la tarjeta', 'error');
+      return false;
     }
 
     function handleBoardTaskComposerKey(event, stage) {
@@ -4089,7 +4701,12 @@
       const clean = String(input?.value || '').trim();
       if (!clean) return;
       input.value = '';
-      addBoardTask(stage, clean);
+      addBoardTask(stage, clean).then((created) => {
+        if (created === false && input && document.body.contains(input)) {
+          input.value = clean;
+          input.focus();
+        }
+      });
     }
 
     async function addBoardStage() {
@@ -5441,8 +6058,8 @@
     window.addProjectTo = addProjectTo;
 
     function renderNewProjectCoverPicker() {
-      const swatches = document.getElementById('newProjectCoverSwatches');
       const preview = document.getElementById('newProjectCoverPreview');
+      const gallery = document.getElementById('newProjectCoverGallery');
       const [from, to] = parseProjectCoverColor(newProjectCoverColor) || PROJECT_COVER_PALETTES[0];
 
       if (preview) {
@@ -5453,48 +6070,190 @@
           : '';
       }
 
-      if (swatches) {
-        swatches.innerHTML = PROJECT_COVER_PALETTES.map(([start, end]) => {
-          const value = `${start}|${end}`;
-          const active = value === newProjectCoverColor && !newProjectCoverImage;
-          return `<button type="button" class="project-cover-swatch ${active ? 'is-active' : ''}" style="background:linear-gradient(135deg, ${start}, ${end});" onclick="selectNewProjectCoverColor('${value}')" title="Color de portada"></button>`;
-        }).join('') + (newProjectCoverImage ? `<button type="button" onclick="clearNewProjectCoverImage()" class="ml-1 inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600 hover:bg-slate-50">Quitar imagen</button>` : '');
+      if (gallery) {
+        gallery.innerHTML = renderProjectCoverPopover({
+          activeImage: newProjectCoverImage,
+          activeColor: newProjectCoverColor,
+          target: 'new',
+        });
       }
     }
 
+    function renderProjectCoverPopover({ activeImage = '', activeColor = '', target = 'new' } = {}) {
+      const active = String(activeImage || '').trim();
+      const photosKey = `${target}Photos`;
+      const colorsKey = `${target}Colors`;
+      const photosExpanded = !!projectCoverPickerExpanded[photosKey];
+      const colorsExpanded = !!projectCoverPickerExpanded[colorsKey];
+      const photos = photosExpanded ? PROJECT_COVER_PRESETS : PROJECT_COVER_PRESETS.slice(0, 4);
+      const colors = colorsExpanded ? PROJECT_COVER_PALETTES : PROJECT_COVER_PALETTES.slice(0, 4);
+      const inputId = `${target}ProjectCoverUploadInput`;
+      const photoOptions = photos.map((preset, index) => {
+        const isActive = active === preset.url;
+        const originalIndex = PROJECT_COVER_PRESETS.indexOf(preset);
+        const action = target === 'modal'
+          ? `selectModalCoverPreset(${originalIndex})`
+          : `selectNewProjectCoverPreset(${originalIndex})`;
+        return `<button type="button" class="project-cover-option ${isActive ? 'is-active' : ''}" style="background-image:url('${escapeHtml(preset.url)}')" onclick="${action}" aria-label="Usar portada ${escapeHtml(preset.name)}">
+          <span>${escapeHtml(preset.name)}</span>
+        </button>`;
+      }).join('');
+      const colorOptions = colors.map(([start, end]) => {
+        const value = `${start}|${end}`;
+        const isActive = !active && value === activeColor;
+        const action = target === 'modal'
+          ? `selectModalCoverColor('${value}')`
+          : `selectNewProjectCoverColor('${value}')`;
+        return `<button type="button" class="project-cover-color-option ${isActive ? 'is-active' : ''}" style="background:linear-gradient(135deg, ${start}, ${end});" onclick="${action}" aria-label="Usar color de portada"></button>`;
+      }).join('');
+
+      return `<div class="project-cover-section">
+        <div class="project-cover-section-header">
+          <div class="project-cover-section-title">Fondos de imagen</div>
+          <button type="button" class="project-cover-more-btn" onclick="toggleProjectCoverMore('${target}', 'photos', event)">${photosExpanded ? 'Ver menos' : 'Ver más'}</button>
+        </div>
+        <div class="project-cover-grid">${photoOptions}</div>
+      </div>
+      <div class="project-cover-section">
+        <div class="project-cover-section-header">
+          <div class="project-cover-section-title">Colores</div>
+          <button type="button" class="project-cover-more-btn" onclick="toggleProjectCoverMore('${target}', 'colors', event)">${colorsExpanded ? 'Ver menos' : 'Ver más'}</button>
+        </div>
+        <div class="project-cover-grid is-colors">${colorOptions}</div>
+      </div>
+      <div class="project-cover-section">
+        <div class="project-cover-section-header">
+          <div class="project-cover-section-title">Subir personalizada</div>
+        </div>
+        <input id="${inputId}" type="file" accept="image/*" class="hidden" onchange="handleProjectCoverCustomUpload(this.files, '${target}'); this.value='';">
+        <button type="button" class="project-cover-upload-btn" onclick="document.getElementById('${inputId}')?.click()">
+          <span class="project-cover-upload-icon">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2 1.6-1.6a2 2 0 012.8 0L20 14m-9-6h.01M5 20h14a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+          </span>
+          <span>
+            <span class="block text-xs font-black text-slate-800">Elegir imagen</span>
+            <span class="block text-[10px] font-bold text-slate-500">JPG, PNG o WebP</span>
+          </span>
+        </button>
+      </div>`;
+    }
+
+    function toggleProjectCoverMore(target = 'new', type = 'photos', event = null) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      const key = `${target}${type === 'colors' ? 'Colors' : 'Photos'}`;
+      projectCoverPickerExpanded[key] = !projectCoverPickerExpanded[key];
+      if (target === 'modal') renderModalCoverPicker();
+      else renderNewProjectCoverPicker();
+      positionOpenProjectCoverPicker(target);
+    }
+    window.toggleProjectCoverMore = toggleProjectCoverMore;
+
+    function positionProjectCoverPopover(gallery, trigger) {
+      if (!gallery || !trigger) return;
+      const gap = 10;
+      const margin = 12;
+      gallery.style.visibility = 'hidden';
+      gallery.classList.remove('hidden');
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const popoverRect = gallery.getBoundingClientRect();
+      const maxLeft = window.innerWidth - popoverRect.width - margin;
+      let left = Math.min(Math.max(margin, triggerRect.right - popoverRect.width), maxLeft);
+      let top = triggerRect.bottom + gap;
+
+      if (top + popoverRect.height > window.innerHeight - margin) {
+        top = Math.max(margin, triggerRect.top - popoverRect.height - gap);
+      }
+
+      gallery.style.left = `${left}px`;
+      gallery.style.top = `${top}px`;
+      gallery.style.right = 'auto';
+      gallery.style.visibility = '';
+    }
+
+    function positionOpenProjectCoverPicker(target = 'new') {
+      const galleryId = target === 'modal' ? 'modalCoverGallery' : 'newProjectCoverGallery';
+      const gallery = document.getElementById(galleryId);
+      if (!gallery || gallery.classList.contains('hidden')) return;
+      const trigger = gallery.closest('.project-cover-trigger-wrap')?.querySelector('button');
+      positionProjectCoverPopover(gallery, trigger);
+    }
+
+    function toggleNewProjectCoverGallery(forceState = null) {
+      const gallery = document.getElementById('newProjectCoverGallery');
+      if (!gallery) return;
+      const shouldShow = forceState === null ? gallery.classList.contains('hidden') : !!forceState;
+      if (shouldShow) document.getElementById('modalCoverGallery')?.classList.add('hidden');
+      gallery.classList.toggle('hidden', !shouldShow);
+      if (shouldShow) {
+        renderNewProjectCoverPicker();
+        positionOpenProjectCoverPicker('new');
+      }
+    }
+    window.toggleNewProjectCoverGallery = toggleNewProjectCoverGallery;
+
+    function selectNewProjectCoverPreset(index) {
+      const preset = PROJECT_COVER_PRESETS[Number(index)];
+      if (!preset) return;
+      clearNewProjectCoverFile();
+      newProjectCoverImage = preset.url;
+      renderNewProjectCoverPicker();
+      toggleNewProjectCoverGallery(false);
+    }
+    window.selectNewProjectCoverPreset = selectNewProjectCoverPreset;
+
     function selectNewProjectCoverColor(value) {
       newProjectCoverColor = value || `${PROJECT_COVER_PALETTES[0][0]}|${PROJECT_COVER_PALETTES[0][1]}`;
+      clearNewProjectCoverFile();
       newProjectCoverImage = '';
-      const input = document.getElementById('newProjectCoverImage');
-      if (input) input.value = '';
       renderNewProjectCoverPicker();
+      toggleNewProjectCoverGallery(false);
     }
     window.selectNewProjectCoverColor = selectNewProjectCoverColor;
 
     function clearNewProjectCoverImage() {
       newProjectCoverImage = '';
-      const input = document.getElementById('newProjectCoverImage');
-      if (input) input.value = '';
+      clearNewProjectCoverFile();
       renderNewProjectCoverPicker();
     }
     window.clearNewProjectCoverImage = clearNewProjectCoverImage;
 
-    function handleNewProjectCoverImage(event) {
-      const file = event?.target?.files?.[0];
-      if (!file || !file.type?.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        newProjectCoverImage = String(reader.result || '');
-        renderNewProjectCoverPicker();
-      };
-      reader.readAsDataURL(file);
+    function clearNewProjectCoverFile() {
+      newProjectCoverFile = null;
+      if (newProjectCoverObjectUrl) {
+        URL.revokeObjectURL(newProjectCoverObjectUrl);
+        newProjectCoverObjectUrl = '';
+      }
     }
-    window.handleNewProjectCoverImage = handleNewProjectCoverImage;
+
+    async function handleProjectCoverCustomUpload(files, target = 'new') {
+      const file = Array.from(files || [])[0];
+      if (!file) return;
+      if (!String(file.type || '').startsWith('image/')) {
+        if (window.showNotification) window.showNotification('Elige una imagen para la portada', 'error');
+        return;
+      }
+
+      if (target === 'modal') {
+        toggleModalCoverGallery(false);
+        await uploadAndApplyProjectCover(file, currentProjectId).catch(() => {});
+        return;
+      }
+
+      clearNewProjectCoverFile();
+      newProjectCoverFile = file;
+      newProjectCoverObjectUrl = URL.createObjectURL(file);
+      newProjectCoverImage = newProjectCoverObjectUrl;
+      renderNewProjectCoverPicker();
+      toggleNewProjectCoverGallery(false);
+    }
+    window.handleProjectCoverCustomUpload = handleProjectCoverCustomUpload;
 
     function renderModalCoverPicker(project = null) {
       const p = project || projects.find(x => String(x.id) === String(currentProjectId)) || {};
       const preview = document.getElementById('modalCoverPreview');
-      const input = document.getElementById('modalCoverUrlInput');
+      const gallery = document.getElementById('modalCoverGallery');
       const clearBtn = document.getElementById('modalCoverClearBtn');
       const coverImage = String(p.cover_image || '').trim();
       const [from, to] = parseProjectCoverColor(p.cover_color) || boardCoverTone(p, 0);
@@ -5504,7 +6263,13 @@
         preview.style.setProperty('--cover-to', to);
         preview.style.backgroundImage = coverImage ? `url("${coverImage}")` : '';
       }
-      if (input && document.activeElement !== input) input.value = coverImage;
+      if (gallery) {
+        gallery.innerHTML = renderProjectCoverPopover({
+          activeImage: coverImage,
+          activeColor: p.cover_color || '',
+          target: 'modal',
+        });
+      }
       clearBtn?.classList.toggle('hidden', !coverImage);
     }
 
@@ -5522,42 +6287,75 @@
       }
     }
 
-    function updateModalCoverFromUrl() {
-      const input = document.getElementById('modalCoverUrlInput');
-      saveModalCoverImage(input?.value || '').catch(() => {
+    async function saveModalCoverColor(value) {
+      if (projectModalReadOnly || !currentProjectId) return;
+      const coverColor = String(value || '').trim() || `${PROJECT_COVER_PALETTES[0][0]}|${PROJECT_COVER_PALETTES[0][1]}`;
+      const project = projects.find(x => String(x.id) === String(currentProjectId));
+      if (project) {
+        project.cover_image = '';
+        project.cover_color = coverColor;
+      }
+      renderModalCoverPicker(project);
+      await updateProjectField('cover_image', null);
+      const updated = await updateProjectField('cover_color', coverColor);
+      if (updated) renderModalCoverPicker(updated);
+      renderKanban(projects);
+      if (String(currentBoardProjectId || '') === String(currentProjectId || '')) {
+        renderProjectBoard(currentProjectId);
+      }
+    }
+
+    function toggleModalCoverGallery(forceState = null) {
+      const gallery = document.getElementById('modalCoverGallery');
+      if (!gallery) return;
+      const shouldShow = forceState === null ? gallery.classList.contains('hidden') : !!forceState;
+      if (shouldShow) document.getElementById('newProjectCoverGallery')?.classList.add('hidden');
+      gallery.classList.toggle('hidden', !shouldShow);
+      if (shouldShow) {
+        renderModalCoverPicker();
+        positionOpenProjectCoverPicker('modal');
+      }
+    }
+    window.toggleModalCoverGallery = toggleModalCoverGallery;
+
+    function closeProjectCoverPickers() {
+      document.getElementById('newProjectCoverGallery')?.classList.add('hidden');
+      document.getElementById('modalCoverGallery')?.classList.add('hidden');
+    }
+
+    function selectModalCoverPreset(index) {
+      const preset = PROJECT_COVER_PRESETS[Number(index)];
+      if (!preset) return;
+      toggleModalCoverGallery(false);
+      saveModalCoverImage(preset.url).catch(() => {
         if (window.showNotification) window.showNotification('No se pudo actualizar la portada', 'error');
       });
     }
-    window.updateModalCoverFromUrl = updateModalCoverFromUrl;
+    window.selectModalCoverPreset = selectModalCoverPreset;
+
+    function selectModalCoverColor(value) {
+      toggleModalCoverGallery(false);
+      saveModalCoverColor(value).catch(() => {
+        if (window.showNotification) window.showNotification('No se pudo actualizar el color de portada', 'error');
+      });
+    }
+    window.selectModalCoverColor = selectModalCoverColor;
 
     function clearModalCoverImage() {
+      toggleModalCoverGallery(false);
       saveModalCoverImage('').catch(() => {
         if (window.showNotification) window.showNotification('No se pudo quitar la portada', 'error');
       });
     }
     window.clearModalCoverImage = clearModalCoverImage;
 
-    function handleModalCoverImage(event) {
-      const file = event?.target?.files?.[0];
-      if (!file || !file.type?.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        saveModalCoverImage(String(reader.result || '')).catch(() => {
-          if (window.showNotification) window.showNotification('No se pudo actualizar la portada', 'error');
-        });
-      };
-      reader.readAsDataURL(file);
-      if (event?.target) event.target.value = '';
-    }
-    window.handleModalCoverImage = handleModalCoverImage;
-
     function openNewProjectModal(stage = '') {
         const modal = document.getElementById('newProjectModal');
+        clearNewProjectCoverFile();
         newProjectCoverColor = `${PROJECT_COVER_PALETTES[0][0]}|${PROJECT_COVER_PALETTES[0][1]}`;
         newProjectCoverImage = '';
-        const coverInput = document.getElementById('newProjectCoverImage');
-        if (coverInput) coverInput.value = '';
         renderNewProjectCoverPicker();
+        toggleNewProjectCoverGallery(false);
         document.getElementById('newProjectTitle').value = '';
         document.getElementById('newProjectDescription').value = '';
         document.getElementById('newProjectPriority').value = 'Con calma';
@@ -5575,12 +6373,13 @@
     function closeNewProjectModal() {
       if (newProjectStartPicker) newProjectStartPicker.close();
       if (newProjectDuePicker) newProjectDuePicker.close();
+      clearNewProjectCoverFile();
         document.getElementById('newProjectModal').classList.add('hidden');
     }
 
     function handleNewProjectModalBackdropClick() {}
 
-    function createProjectFromModal() {
+    async function createProjectFromModal() {
         const titulo = document.getElementById('newProjectTitle').value.trim();
         const descripcion = document.getElementById('newProjectDescription').value.trim();
         const etapa = (stages && stages[0]) || 'Prospecto';
@@ -5591,9 +6390,9 @@
       const plannedDays = Math.max(0, Number(document.getElementById('newProjectPlannedDays').value || 0));
       const plannedHours = Math.max(0, Number(document.getElementById('newProjectPlannedHours').value || 0));
       const plannedMinutes = Math.max(0, Number(document.getElementById('newProjectPlannedMinutes').value || 0));
-      const plannedSeconds = Math.floor((plannedDays * 86400) + (plannedHours * 3600) + (plannedMinutes * 60));
+        const plannedSeconds = Math.floor((plannedDays * 86400) + (plannedHours * 3600) + (plannedMinutes * 60));
         if (!titulo) return;
-        fetch('/api/proyectos/crear', {
+        const response = await fetch('/api/proyectos/crear', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
             body: JSON.stringify({
@@ -5605,13 +6404,21 @@
                 inicio,
                 vencimiento,
                 cover_color: newProjectCoverColor,
-                cover_image: newProjectCoverImage,
+                cover_image: newProjectCoverFile ? '' : newProjectCoverImage,
                 planned_seconds: plannedSeconds
             })
-        }).then(() => {
-            closeNewProjectModal();
-            loadData();
         });
+
+        const payload = await response.json().catch(() => ({}));
+        const createdProjectId = payload?.item?.id;
+        if (response.ok && createdProjectId && newProjectCoverFile) {
+          await uploadAndApplyProjectCover(newProjectCoverFile, createdProjectId, { silent: true }).catch(() => {
+            if (window.showNotification) window.showNotification('El proyecto se creó, pero no se pudo subir la portada', 'error');
+          });
+        }
+
+        closeNewProjectModal();
+        loadData();
     }
 
     function setProjectModalReadOnly(readOnly = false) {
@@ -5619,7 +6426,6 @@
 
       const titleInput = document.getElementById('modalTitle');
       const clientSelect = document.getElementById('modalClientSelect');
-      const stageSelect = document.getElementById('modalStage');
       const desc = document.getElementById('modalDesc');
       const descAutosaveStatus = document.getElementById('modalDescAutosaveStatus');
       const taskInput = document.getElementById('newTaskInput');
@@ -5638,7 +6444,6 @@
         titleInput.classList.toggle('pointer-events-none', projectModalReadOnly);
       }
       if (clientSelect) clientSelect.disabled = projectModalReadOnly;
-      if (stageSelect) stageSelect.disabled = projectModalReadOnly;
       if (desc) setCompactDescEditable('modalDesc', !projectModalReadOnly);
       if (descAutosaveStatus) descAutosaveStatus.classList.toggle('hidden', projectModalReadOnly);
       if (taskInput) taskInput.disabled = projectModalReadOnly;
@@ -5694,15 +6499,6 @@
         clientSelect.value = p.cliente_id || '';
         clientSelect.onchange = (e) => updateProjectClient(e.target.value, e.target.options[e.target.selectedIndex]?.text || 'Sin Cliente');
         
-        // Stage Select
-        const stageSelect = document.getElementById('modalStage');
-        stageSelect.innerHTML = stages.map(s => `<option value="${s}" ${p.etapa === s ? 'selected' : ''}>${s}</option>`).join('');
-        stageSelect.onchange = (e) => {
-          refreshProjectStageUI();
-          updateProjectField('etapa', e.target.value);
-        };
-        refreshProjectStageUI();
-
         // Description
         const descInput = document.getElementById('modalDesc');
         const hasPendingDesc = Object.prototype.hasOwnProperty.call(pendingProjectDescriptions, String(id));
@@ -9385,13 +10181,7 @@
       const parentIsOverdue = getEffectiveTaskPriority(task || {}, project) === 'Vencido';
       const priorityControl = parentIsOverdue
         ? getTaskPriorityBadge('Vencido', 'xs')
-        : `<label class="relative inline-flex h-8 w-[9.25rem] shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600 shadow-sm transition-colors focus-within:border-lime-300 focus-within:ring-2 focus-within:ring-lime-100">
-            <span id="editSubtaskPriorityIcon" class="inline-flex shrink-0">${getTaskPriorityIcon(priority, 'w-3.5 h-3.5 shrink-0 self-center')}</span>
-            <select id="editSubtaskPriority" class="h-7 min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 pr-5 text-xs font-extrabold text-slate-700 focus:ring-0" onchange="updateSubtaskPriorityPill(this.value); setSubtaskAutosaveStatus('Guardando...'); saveSubtaskDetails({ closeAfter: false, rerender: false });">
-              ${['Con calma', 'Atención', 'Urgente'].map((option) => `<option value="${option}" ${rawPriority === option ? 'selected' : ''}>${option}</option>`).join('')}
-            </select>
-            <svg class="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
-          </label>`;
+        : renderSubtaskPriorityPicker(rawPriority || priority || 'Con calma');
       const text = escapeHtml(String(subtask.texto || ''));
       const due = escapeHtml(String(subtask.due_date || ''));
       return `
@@ -9425,10 +10215,74 @@
       return normalizeTaskPriority(subtask?.priority || task?.priority || parentPriority || 'Con calma');
     }
 
+    function subtaskPriorityClass(value) {
+      const priority = normalizeTaskPriority(value);
+      if (priority === 'Urgente') return 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100';
+      if (priority === 'Atención') return 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100';
+      return 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100';
+    }
+
+    function renderSubtaskPriorityPicker(value = 'Con calma') {
+      const current = normalizeTaskPriority(value || 'Con calma');
+      const option = (priority) => {
+        const normalized = normalizeTaskPriority(priority);
+        const isActive = normalized === current;
+        const color = normalized === 'Urgente' ? 'text-rose-700 hover:bg-rose-50'
+          : normalized === 'Atención' ? 'text-amber-700 hover:bg-amber-50'
+          : 'text-emerald-700 hover:bg-emerald-50';
+        const activeBg = isActive
+          ? (normalized === 'Urgente' ? 'bg-rose-50' : normalized === 'Atención' ? 'bg-amber-50' : 'bg-emerald-50')
+          : '';
+        return `<button type="button" onclick="selectSubtaskPriority('${normalized}')" class="flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-xs font-extrabold ${color} ${activeBg}">
+          <span class="inline-flex items-center gap-1.5">${getTaskPriorityIcon(normalized, 'h-3 w-3 shrink-0 self-center')}${escapeHtml(normalized)}</span>
+          <span class="${isActive ? '' : 'hidden'} text-slate-900">✓</span>
+        </button>`;
+      };
+      return `<div class="relative shrink-0" data-subtask-priority-wrap>
+        <input type="hidden" id="editSubtaskPriority" value="${escapeHtml(current)}">
+        <button id="editSubtaskPriorityButton" type="button" onclick="toggleSubtaskPriorityMenu(event)" class="inline-flex h-8 min-w-[8.8rem] items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-extrabold shadow-sm transition-colors ${subtaskPriorityClass(current)}">
+          <span id="editSubtaskPriorityIcon" class="inline-flex shrink-0">${getTaskPriorityIcon(current, 'w-3.5 h-3.5 shrink-0 self-center')}</span>
+          <span id="editSubtaskPriorityLabel">${escapeHtml(current || 'Prioridad')}</span>
+          <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div id="editSubtaskPriorityMenu" class="hidden absolute left-0 top-[calc(100%+0.35rem)] z-40 w-48 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl">
+          ${option('Con calma')}
+          ${option('Atención')}
+          ${option('Urgente')}
+        </div>
+      </div>`;
+    }
+
+    function closeSubtaskPriorityMenu() {
+      document.getElementById('editSubtaskPriorityMenu')?.classList.add('hidden');
+    }
+
+    function toggleSubtaskPriorityMenu(event = null) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      document.getElementById('subtaskOwnerSearchPanel')?.classList.add('hidden');
+      document.getElementById('editSubtaskPriorityMenu')?.classList.toggle('hidden');
+    }
+
+    function selectSubtaskPriority(value) {
+      updateSubtaskPriorityPill(value);
+      closeSubtaskPriorityMenu();
+      setSubtaskAutosaveStatus('Guardando...');
+      saveSubtaskDetails({ closeAfter: false, rerender: false });
+    }
+
     function updateSubtaskPriorityPill(value) {
+      const normalized = normalizeTaskPriority(value || 'Con calma');
+      const input = document.getElementById('editSubtaskPriority');
       const icon = document.getElementById('editSubtaskPriorityIcon');
-      if (!icon) return;
-      icon.innerHTML = getTaskPriorityIcon(normalizeTaskPriority(value), 'w-3.5 h-3.5 shrink-0 self-center');
+      const label = document.getElementById('editSubtaskPriorityLabel');
+      const button = document.getElementById('editSubtaskPriorityButton');
+      if (input) input.value = normalized;
+      if (icon) icon.innerHTML = getTaskPriorityIcon(normalized, 'w-3.5 h-3.5 shrink-0 self-center');
+      if (label) label.textContent = normalized || 'Prioridad';
+      if (button) {
+        button.className = `inline-flex h-8 min-w-[8.8rem] items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-extrabold shadow-sm transition-colors ${subtaskPriorityClass(normalized)}`;
+      }
     }
 
     function renderSubtaskOwnerEditor(subtask) {
@@ -9987,6 +10841,7 @@
     function toggleSubtaskOwnerSearch() {
       const panel = document.getElementById('subtaskOwnerSearchPanel');
       if (!panel) return;
+      closeSubtaskPriorityMenu();
       panel.classList.toggle('hidden');
       if (!panel.classList.contains('hidden')) {
         const input = document.getElementById('subtaskOwnerSearchInput');
@@ -10599,11 +11454,11 @@
       }
     }
 
-    function uploadProjectFile(file, row) {
+    function uploadProjectFile(file, row, projectId = currentProjectId) {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const formData = new FormData();
-        formData.append('id', currentProjectId);
+        formData.append('id', projectId);
         formData.append('file', file);
         formData.append('_token', window.csrfToken);
 
@@ -10626,6 +11481,57 @@
         xhr.addEventListener('error', () => reject(new Error('upload_failed')));
         xhr.send(formData);
       });
+    }
+
+    async function uploadAndApplyProjectCover(file, projectId = currentProjectId, options = {}) {
+      if (!file || !projectId) return;
+      if (!String(file.type || '').startsWith('image/')) {
+        if (window.showNotification) window.showNotification('Elige una imagen para la portada', 'error');
+        return;
+      }
+
+      const panel = document.getElementById('projectUploadProgress');
+      const list = document.getElementById('projectUploadProgressList');
+      const summary = document.getElementById('projectUploadSummary');
+      if (list) list.innerHTML = '';
+      if (panel && String(projectId) === String(currentProjectId || '')) panel.classList.remove('hidden');
+      const row = String(projectId) === String(currentProjectId || '') ? createProjectUploadRow(file, 0) : null;
+
+      try {
+        if (summary && String(projectId) === String(currentProjectId || '')) summary.textContent = 'Subiendo portada...';
+        const updatedProject = await uploadProjectFile(file, row, projectId);
+        const imageFile = [...(updatedProject?.files || [])].reverse().find((item) => {
+          const mime = String(item?.mime || '');
+          return mime.startsWith('image/');
+        });
+        const coverUrl = imageFile?.preview_url || imageFile?.url || '';
+        if (!coverUrl) throw new Error('cover_url_missing');
+        const updated = await updateProjectField('cover_image', coverUrl, projectId);
+
+        const localProject = projects.find(x => String(x.id) === String(projectId));
+        if (localProject) {
+          localProject.files = updatedProject?.files || localProject.files || [];
+          localProject.cover_image = coverUrl;
+        }
+        if (String(projectId) === String(currentProjectId || '')) {
+          renderModalFiles(updatedProject?.files || []);
+          renderModalCoverPicker(updated || localProject || updatedProject);
+          renderKanban(projects);
+          if (String(currentBoardProjectId || '') === String(projectId)) renderProjectBoard(projectId);
+        }
+        if (!options.silent && window.showNotification) window.showNotification('Portada actualizada', 'success');
+      } catch (error) {
+        if (!options.silent && window.showNotification) window.showNotification('No se pudo subir la portada', 'error');
+        throw error;
+      } finally {
+        if (String(projectId) === String(currentProjectId || '')) {
+          setTimeout(() => {
+            panel?.classList.add('hidden');
+            if (list) list.innerHTML = '';
+            if (summary) summary.textContent = 'Preparando...';
+          }, 900);
+        }
+      }
     }
 
     async function handleModalFileUpload(files) {
@@ -10866,7 +11772,7 @@
           clearOpenProjectQueryParam();
           setTimeout(() => {
             if (!taskIdToOpen) {
-              openProject(projectIdToOpen);
+              openProjectBoard(projectIdToOpen, { replaceUrl: true });
               return;
             }
             const targetProject = projects.find((p) => String(p.id) === String(projectIdToOpen));
@@ -10941,6 +11847,18 @@
       const taskBox = document.getElementById('taskOwnerSearchResults');
       if (taskWrap && taskBox && !taskWrap.contains(e.target)) {
         taskBox.classList.add('hidden');
+      }
+
+      if (!e.target?.closest?.('#projectClientFilter')) {
+        closeProjectClientFilter();
+      }
+
+      if (!e.target?.closest?.('[data-subtask-priority-wrap]')) {
+        closeSubtaskPriorityMenu();
+      }
+
+      if (!e.target?.closest?.('.project-cover-trigger-wrap')) {
+        closeProjectCoverPickers();
       }
 
       const filterWrap = e.target?.closest?.('[data-list-filter-wrap]');
