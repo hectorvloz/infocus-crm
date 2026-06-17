@@ -192,6 +192,29 @@ class ReunionesController extends Controller
         return back()->with('success', 'Reunion eliminada.');
     }
 
+    public function resendInvitations(string $id)
+    {
+        $meeting = $this->store->find($id);
+        abort_if(!$meeting, 404);
+
+        $timezone = $this->timezone();
+        $meeting = $this->normalizeMeeting($meeting, $timezone);
+        $emails = array_merge($meeting['invitados'] ?? [], $meeting['responsable_emails'] ?? []);
+        $recipientCount = collect($emails)
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->count();
+
+        if ($recipientCount === 0) {
+            return back()->with('warning', 'Agrega al menos un invitado o un encargado con correo para reenviar invitaciones.');
+        }
+
+        $mailError = $this->sendInvitations($meeting, $emails, $timezone);
+
+        return back()->with($mailError ? 'warning' : 'success', $mailError ?: 'Invitaciones reenviadas.');
+    }
+
     public function update(Request $request, string $id)
     {
         if (str_starts_with($id, 'google:')) {

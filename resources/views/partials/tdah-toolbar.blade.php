@@ -487,12 +487,38 @@
         .qn-card-wrapper:hover .qn-card-delete-btn { opacity: 1; }
         .qn-card-delete-btn:hover { background: rgba(220,38,38,0.12); color: #dc2626; }
         .qn-card-title { font-size: 0.95rem; font-weight: 800; color: #1f2d49; line-height: 1.2; }
-    .qn-card-body { margin-top: 0.35rem; color: #1f2d49; font-size: 0.84rem; line-height: 1.38; white-space: pre-wrap; }
+    #quick-notes-panel:not(.hidden) {
+        display: flex;
+        flex-direction: column;
+        max-height: min(42rem, calc(100vh - 8rem));
+        overflow: hidden;
+    }
+    #quick-notes-editor-view:not(.hidden) {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+    }
+    #quick-note-editor-canvas {
+        min-height: 0;
+        max-height: min(27rem, calc(100vh - 18rem));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+    .qn-card-body { margin-top: 0.35rem; color: #1f2d49; font-size: 0.84rem; line-height: 1.38; white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
     .qn-card-client { margin-top: 0.4rem; }
     .qn-card-client-badge { display: inline-flex; align-items: center; border-radius: 999px; border: 1px solid #c7d2fe; background: #eef2ff; color: #4f46e5; font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.42rem; max-width: 100%; }
     .qn-card-client-badge > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .qn-card-meta { margin-top: 0.42rem; padding-top: 0.38rem; border-top: 1px solid rgba(31,45,73,.14); display: flex; align-items: center; justify-content: space-between; color: #8da0b9; font-weight: 600; font-size: 0.72rem; }
 
+    #quick-note-editor,
+    #quick-note-editor * {
+        font-family: inherit !important;
+    }
+    #quick-note-editor span,
+    #quick-note-editor font {
+        font-size: inherit !important;
+        line-height: inherit;
+    }
     #quick-note-editor h1,
     #quick-note-editor h2,
     #quick-note-editor h3 {
@@ -867,9 +893,207 @@
         }
 
         function normalizeQuickNoteHtml(html) {
-            return String(html || '')
-                .replace(/<div><br><\/div>/g, '<div></div>')
-                .trim();
+            const holder = document.createElement('div');
+            holder.innerHTML = String(html || '').replace(/<div><br><\/div>/g, '<div></div>');
+            scrubQuickNoteHtml(holder);
+            return holder.innerHTML.trim();
+        }
+
+        function isSafeQuickNoteHref(href) {
+            if (!href) return false;
+            return /^(https?:|mailto:|tel:|#|\/)/i.test(href);
+        }
+
+        function buildSafeQuickNoteStyle(el) {
+            const tag = el.tagName.toLowerCase();
+            const styles = [];
+            const backgroundColor = el.style?.backgroundColor;
+            if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+                styles.push('background-color: ' + backgroundColor);
+            }
+            if (tag === 'img') {
+                const width = el.style?.width || '';
+                const maxWidth = el.style?.maxWidth || '';
+                if (/^\d+(\.\d+)?%$/.test(width)) styles.push('width: ' + width);
+                if (maxWidth === '100%') styles.push('max-width: 100%');
+            }
+            return styles.length ? styles.join('; ') : '';
+        }
+
+        function scrubQuickNoteHtml(root) {
+            if (!root) return;
+            root.querySelectorAll('script,style,meta,link,title,xml,o\\:p').forEach((node) => node.remove());
+            root.querySelectorAll('font').forEach((node) => {
+                const fragment = document.createDocumentFragment();
+                while (node.firstChild) fragment.appendChild(node.firstChild);
+                node.replaceWith(fragment);
+            });
+            root.querySelectorAll('*').forEach((el) => {
+                const tag = el.tagName.toLowerCase();
+                const safeStyle = buildSafeQuickNoteStyle(el);
+                const allowedClasses = Array.from(el.classList || []).filter((className) => {
+                    return className.startsWith('qn-') || className === 'is-empty';
+                });
+                Array.from(el.attributes).forEach((attr) => {
+                    const name = attr.name.toLowerCase();
+                    const keepLinkAttr = tag === 'a' && ['href', 'target', 'rel'].includes(name);
+                    const keepImageAttr = tag === 'img' && ['src', 'alt', 'loading'].includes(name);
+                    const keepCheckboxAttr = tag === 'input' && ['type', 'checked', 'contenteditable'].includes(name);
+                    const keepEditorData = ['data-placeholder', 'data-qn-number', 'data-qn-scale'].includes(name);
+                    if (!keepLinkAttr && !keepImageAttr && !keepCheckboxAttr && !keepEditorData) {
+                        el.removeAttribute(attr.name);
+                    }
+                });
+                if (safeStyle) el.setAttribute('style', safeStyle);
+                if (allowedClasses.length > 0) {
+                    el.className = allowedClasses.join(' ');
+                } else {
+                    el.removeAttribute('class');
+                }
+                if (tag === 'a') {
+                    const href = String(el.getAttribute('href') || '').trim();
+                    if (!isSafeQuickNoteHref(href)) {
+                        el.removeAttribute('href');
+                    } else {
+                        el.setAttribute('rel', 'noopener noreferrer');
+                    }
+                }
+                if (tag === 'input' && !el.classList.contains('qn-checkbox')) {
+                    el.remove();
+                }
+            });
+        }
+
+        function cleanQuickPastedNode(node) {
+            if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.nodeValue || '');
+            if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment();
+            const sourceTag = node.tagName.toLowerCase();
+            if (['script', 'style', 'meta', 'link', 'title', 'xml', 'o:p'].includes(sourceTag)) {
+                return document.createDocumentFragment();
+            }
+            if (sourceTag === 'br') return document.createElement('br');
+            const sourceStyle = String(node.getAttribute('style') || '');
+            const sourceText = (node.textContent || '').trim();
+            const isBoldStyle = /font-weight\s*:\s*(bold|bolder|[6-9]00)/i.test(sourceStyle);
+            const isItalicStyle = /font-style\s*:\s*italic/i.test(sourceStyle);
+            const isUnderlineStyle = /text-decoration[^;]*underline/i.test(sourceStyle);
+            const isStrikeStyle = /text-decoration[^;]*(line-through|strike)/i.test(sourceStyle);
+            const isHighlightStyle = /background(?:-color)?\s*:\s*(?:rgb\(254,\s*240,\s*138\)|#?fef08a|yellow)/i.test(sourceStyle);
+            const isHeadingLike = ['p', 'div', 'span'].includes(sourceTag)
+                && isBoldStyle
+                && sourceText.length > 0
+                && sourceText.length <= 120
+                && !/[.!?]$/.test(sourceText);
+            const tagMap = {
+                h1: 'h2',
+                h2: 'h2',
+                h3: 'h3',
+                h4: 'h3',
+                h5: 'h3',
+                h6: 'h3',
+                p: 'p',
+                div: 'p',
+                section: 'p',
+                article: 'p',
+                main: 'p',
+                header: 'p',
+                footer: 'p',
+                address: 'p',
+                pre: 'p',
+                blockquote: 'blockquote',
+                ul: 'ul',
+                ol: 'ol',
+                li: 'li',
+                b: 'strong',
+                strong: 'strong',
+                i: 'em',
+                em: 'em',
+                s: 's',
+                strike: 's',
+                del: 's',
+                u: 'u',
+                span: 'span',
+                mark: 'mark',
+                a: 'a',
+            };
+            const targetTag = isHeadingLike ? 'h2' : (tagMap[sourceTag] || null);
+            const target = targetTag ? document.createElement(targetTag) : document.createDocumentFragment();
+            Array.from(node.childNodes).forEach((child) => target.appendChild(cleanQuickPastedNode(child)));
+            if (target.nodeType === Node.ELEMENT_NODE) {
+                if (targetTag === 'a') {
+                    const href = String(node.getAttribute('href') || '').trim();
+                    if (isSafeQuickNoteHref(href)) {
+                        target.setAttribute('href', href);
+                        target.setAttribute('rel', 'noopener noreferrer');
+                        target.setAttribute('target', '_blank');
+                    }
+                }
+                if (!['h2', 'h3', 'strong', 'b'].includes(targetTag) && isBoldStyle) {
+                    const strong = document.createElement('strong');
+                    while (target.firstChild) strong.appendChild(target.firstChild);
+                    target.appendChild(strong);
+                }
+                if (!['em', 'i'].includes(targetTag) && isItalicStyle) {
+                    const em = document.createElement('em');
+                    while (target.firstChild) em.appendChild(target.firstChild);
+                    target.appendChild(em);
+                }
+                if (targetTag !== 'u' && isUnderlineStyle) {
+                    const underline = document.createElement('u');
+                    while (target.firstChild) underline.appendChild(target.firstChild);
+                    target.appendChild(underline);
+                }
+                if (!['s', 'strike'].includes(targetTag) && isStrikeStyle) {
+                    const strike = document.createElement('s');
+                    while (target.firstChild) strike.appendChild(target.firstChild);
+                    target.appendChild(strike);
+                }
+                if (isHighlightStyle) {
+                    target.setAttribute('style', 'background-color:#fef08a');
+                }
+                if (['p', 'h2', 'h3', 'blockquote', 'li'].includes(targetTag) && !(target.textContent || '').trim() && !target.querySelector('br')) {
+                    target.innerHTML = '<br>';
+                }
+            }
+            return target;
+        }
+
+        function normalizeQuickPastedHtml(html) {
+            const source = document.createElement('div');
+            source.innerHTML = String(html || '');
+            const holder = document.createElement('div');
+            Array.from(source.childNodes).forEach((node) => holder.appendChild(cleanQuickPastedNode(node)));
+            scrubQuickNoteHtml(holder);
+            return holder.innerHTML;
+        }
+
+        function quickPlainTextToHtml(text) {
+            return String(text || '')
+                .replace(/\r\n?/g, '\n')
+                .split(/\n{2,}/)
+                .map((paragraph) => {
+                    const lines = paragraph.split('\n').map((line) => escapeHtml(line));
+                    return '<p>' + (lines.join('<br>') || '<br>') + '</p>';
+                })
+                .join('');
+        }
+
+        function handleQuickNotePaste(event) {
+            if (!quickNoteEditor) return;
+            const clipboard = event.clipboardData || window.clipboardData;
+            if (!clipboard) return;
+            const html = clipboard.getData('text/html');
+            const text = clipboard.getData('text/plain');
+            if (!html && !text) return;
+            event.preventDefault();
+            const cleanHtml = html ? normalizeQuickPastedHtml(html) : quickPlainTextToHtml(text);
+            document.execCommand('insertHTML', false, cleanHtml || '<p><br></p>');
+            ensureQuickNoteHeadingStructure();
+            renumberQuickNumberLines();
+            syncQuickChecklistStateForSave();
+            updateQuickTitlePlaceholder();
+            saveQuickNoteFromEditor({ returnToList: false });
+            updateQuickToolbarActiveStates();
         }
 
         function getQuickTitlePlaceholderHtml() {
@@ -1267,10 +1491,13 @@
                 bodyDiv.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
                     cb.replaceWith(document.createTextNode(cb.checked ? '☑ ' : '□ '));
                 });
-                const bodyLinesQn = Array.from(bodyDiv.querySelectorAll('p,div,li'))
+                const allBodyLinesQn = Array.from(bodyDiv.querySelectorAll('p,div,li'))
                     .map((el) => el.textContent?.replace(/\u00a0/g, ' ').trim())
-                    .filter(Boolean)
-                    .slice(0, 3);
+                    .filter(Boolean);
+                const bodyLinesQn = allBodyLinesQn.slice(0, 2);
+                if (allBodyLinesQn.length > 2 && bodyLinesQn.length > 0) {
+                    bodyLinesQn[bodyLinesQn.length - 1] = bodyLinesQn[bodyLinesQn.length - 1].replace(/\s*$/, '') + '...';
+                }
                 const body = escapeHtml(bodyLinesQn.join('\n')).replace(/\n/g, '<br>');
                 const stats = getChecklistStats(plain);
                 const progress = stats.total > 0 ? `${stats.done}/${stats.total}` : '';
@@ -1282,7 +1509,7 @@
                         <div class="qn-card-wrapper">
                             <button type="button" data-qn-open="${escapeHtml(note.id)}" class="qn-card w-full text-left" style="background:${palette.cardBg}; border-color:${palette.cardBorder}; padding-right:2.2rem;">
                                 <div class="qn-card-title">${title}</div>
-                                <div class="qn-card-body">${body}</div>
+                                ${body ? `<div class="qn-card-body">${body}</div>` : ''}
                                 ${linkedClientMarkup}
                                 <div class="qn-card-meta">
                                     <span>${formatQuickDate(note.updatedAt)}</span>
@@ -1601,6 +1828,7 @@
             }
         });
         quickNoteEditor?.addEventListener('keydown', handleQuickEditorEnter);
+        quickNoteEditor?.addEventListener('paste', handleQuickNotePaste);
         quickNoteEditor?.addEventListener('keyup', updateQuickToolbarActiveStates);
         quickNoteEditor?.addEventListener('mouseup', updateQuickToolbarActiveStates);
         quickNoteEditor?.addEventListener('focus', updateQuickToolbarActiveStates);

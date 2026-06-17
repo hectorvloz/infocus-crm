@@ -329,7 +329,220 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function normalizeHtml(html) {
-    return String(html || '').replace(/<div><br><\/div>/g, '<div></div>').trim();
+    const holder = document.createElement('div');
+    holder.innerHTML = String(html || '').replace(/<div><br><\/div>/g, '<div></div>');
+    scrubNoteHtml(holder);
+    return holder.innerHTML.trim();
+  }
+
+  function scrubNoteHtml(root) {
+    if (!root) return;
+    root.querySelectorAll('script,style,meta,link,title,xml,o\\:p').forEach((node) => node.remove());
+    root.querySelectorAll('font').forEach((node) => {
+      const fragment = document.createDocumentFragment();
+      while (node.firstChild) fragment.appendChild(node.firstChild);
+      node.replaceWith(fragment);
+    });
+    root.querySelectorAll('*').forEach((el) => {
+      const tag = el.tagName.toLowerCase();
+      const safeStyle = buildSafeNoteStyle(el);
+      const allowedClasses = Array.from(el.classList || []).filter((className) => {
+        return className.startsWith('note-') || className === 'is-empty';
+      });
+      Array.from(el.attributes).forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        const keepLinkAttr = tag === 'a' && ['href', 'target', 'rel'].includes(name);
+        const keepImageAttr = tag === 'img' && ['src', 'alt', 'loading'].includes(name);
+        const keepCheckboxAttr = tag === 'input' && ['type', 'checked', 'contenteditable'].includes(name);
+        const keepEditorData = ['data-placeholder', 'data-note-number', 'data-note-scale'].includes(name);
+        if (!keepLinkAttr && !keepImageAttr && !keepCheckboxAttr && !keepEditorData) {
+          el.removeAttribute(attr.name);
+        }
+      });
+      if (safeStyle) el.setAttribute('style', safeStyle);
+      if (allowedClasses.length > 0) {
+        el.className = allowedClasses.join(' ');
+      } else {
+        el.removeAttribute('class');
+      }
+      if (tag === 'a') {
+        const href = String(el.getAttribute('href') || '').trim();
+        if (!isSafeNoteHref(href)) {
+          el.removeAttribute('href');
+        } else {
+          el.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      if (tag === 'input' && !el.classList.contains('note-checkbox')) {
+        el.remove();
+      }
+    });
+  }
+
+  function buildSafeNoteStyle(el) {
+    const tag = el.tagName.toLowerCase();
+    const styles = [];
+    const backgroundColor = el.style?.backgroundColor;
+    if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+      styles.push('background-color: ' + backgroundColor);
+    }
+    if (tag === 'img') {
+      const width = el.style?.width || '';
+      const maxWidth = el.style?.maxWidth || '';
+      if (/^\d+(\.\d+)?%$/.test(width)) styles.push('width: ' + width);
+      if (maxWidth === '100%') styles.push('max-width: 100%');
+    }
+    return styles.length ? styles.join('; ') : '';
+  }
+
+  function isSafeNoteHref(href) {
+    if (!href) return false;
+    return /^(https?:|mailto:|tel:|#|\/)/i.test(href);
+  }
+
+  function cleanPastedNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return document.createTextNode(node.nodeValue || '');
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return document.createDocumentFragment();
+    }
+
+    const sourceTag = node.tagName.toLowerCase();
+    if (['script', 'style', 'meta', 'link', 'title', 'xml', 'o:p'].includes(sourceTag)) {
+      return document.createDocumentFragment();
+    }
+    if (sourceTag === 'br') return document.createElement('br');
+
+    const sourceStyle = String(node.getAttribute('style') || '');
+    const sourceText = (node.textContent || '').trim();
+    const isBoldStyle = /font-weight\s*:\s*(bold|bolder|[6-9]00)/i.test(sourceStyle);
+    const isItalicStyle = /font-style\s*:\s*italic/i.test(sourceStyle);
+    const isUnderlineStyle = /text-decoration[^;]*underline/i.test(sourceStyle);
+    const isStrikeStyle = /text-decoration[^;]*(line-through|strike)/i.test(sourceStyle);
+    const isHighlightStyle = /background(?:-color)?\s*:\s*(?:rgb\(254,\s*240,\s*138\)|#?fef08a|yellow)/i.test(sourceStyle);
+    const isHeadingLike = ['p', 'div', 'span'].includes(sourceTag)
+      && isBoldStyle
+      && sourceText.length > 0
+      && sourceText.length <= 120
+      && !/[.!?]$/.test(sourceText);
+
+    const tagMap = {
+      h1: 'h2',
+      h2: 'h2',
+      h3: 'h3',
+      h4: 'h3',
+      h5: 'h3',
+      h6: 'h3',
+      p: 'p',
+      div: 'p',
+      section: 'p',
+      article: 'p',
+      main: 'p',
+      header: 'p',
+      footer: 'p',
+      address: 'p',
+      pre: 'p',
+      blockquote: 'blockquote',
+      ul: 'ul',
+      ol: 'ol',
+      li: 'li',
+      b: 'strong',
+      strong: 'strong',
+      i: 'em',
+      em: 'em',
+      s: 's',
+      strike: 's',
+      del: 's',
+      u: 'u',
+      span: 'span',
+      mark: 'mark',
+      a: 'a',
+    };
+
+    const targetTag = isHeadingLike ? 'h2' : (tagMap[sourceTag] || null);
+    const target = targetTag ? document.createElement(targetTag) : document.createDocumentFragment();
+    Array.from(node.childNodes).forEach((child) => target.appendChild(cleanPastedNode(child)));
+
+    if (target.nodeType === Node.ELEMENT_NODE) {
+      if (targetTag === 'a') {
+        const href = String(node.getAttribute('href') || '').trim();
+        if (isSafeNoteHref(href)) {
+          target.setAttribute('href', href);
+          target.setAttribute('rel', 'noopener noreferrer');
+          target.setAttribute('target', '_blank');
+        }
+      }
+      if (!['h2', 'h3', 'strong', 'b'].includes(targetTag) && isBoldStyle) {
+        const strong = document.createElement('strong');
+        while (target.firstChild) strong.appendChild(target.firstChild);
+        target.appendChild(strong);
+      }
+      if (!['em', 'i'].includes(targetTag) && isItalicStyle) {
+        const em = document.createElement('em');
+        while (target.firstChild) em.appendChild(target.firstChild);
+        target.appendChild(em);
+      }
+      if (targetTag !== 'u' && isUnderlineStyle) {
+        const underline = document.createElement('u');
+        while (target.firstChild) underline.appendChild(target.firstChild);
+        target.appendChild(underline);
+      }
+      if (!['s', 'strike'].includes(targetTag) && isStrikeStyle) {
+        const strike = document.createElement('s');
+        while (target.firstChild) strike.appendChild(target.firstChild);
+        target.appendChild(strike);
+      }
+      if (isHighlightStyle) {
+        target.setAttribute('style', 'background-color:#fef08a');
+      }
+      if (['p', 'h2', 'h3', 'blockquote', 'li'].includes(targetTag) && !(target.textContent || '').trim() && !target.querySelector('br')) {
+        target.innerHTML = '<br>';
+      }
+    }
+
+    return target;
+  }
+
+  function normalizePastedHtml(html) {
+    const source = document.createElement('div');
+    source.innerHTML = String(html || '');
+    const holder = document.createElement('div');
+    Array.from(source.childNodes).forEach((node) => holder.appendChild(cleanPastedNode(node)));
+    scrubNoteHtml(holder);
+    return holder.innerHTML;
+  }
+
+  function plainTextToNoteHtml(text) {
+    return String(text || '')
+      .replace(/\r\n?/g, '\n')
+      .split(/\n{2,}/)
+      .map((paragraph) => {
+        const lines = paragraph.split('\n').map((line) => escapeNoteHtml(line));
+        return '<p>' + (lines.join('<br>') || '<br>') + '</p>';
+      })
+      .join('');
+  }
+
+  function handleNotePaste(event) {
+    if (!canEditCurrentNote()) return;
+    const clipboard = event.clipboardData || window.clipboardData;
+    if (!clipboard) return;
+    const html = clipboard.getData('text/html');
+    const text = clipboard.getData('text/plain');
+    if (!html && !text) return;
+
+    event.preventDefault();
+    const cleanHtml = html ? normalizePastedHtml(html) : plainTextToNoteHtml(text);
+    document.execCommand('insertHTML', false, cleanHtml || '<p><br></p>');
+    ensureHeadingStructure();
+    enforceSingleLineTitle();
+    renumberNumberLines();
+    syncChecklistVisualState();
+    updateTitlePlaceholder();
+    queueAutosave();
+    updateToolbarActiveStates();
+    updateInfocusAiCurrentNoteContext();
   }
 
   function htmlToPlainText(html) {
@@ -1576,6 +1789,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   noteEditor.addEventListener('keydown', handleEditorEnter);
+  noteEditor.addEventListener('paste', handleNotePaste);
   noteEditor.addEventListener('keyup', updateToolbarActiveStates);
   noteEditor.addEventListener('mouseup', updateToolbarActiveStates);
   noteEditor.addEventListener('focus', updateToolbarActiveStates);
@@ -2114,6 +2328,15 @@ document.addEventListener('DOMContentLoaded', function () {
 #note-edit-view .note-color-dot:hover { transform: scale(1.05); }
 #note-edit-view .note-color-dot.is-active { border-color: #111728; box-shadow: 0 0 0 2px rgba(17,23,40,0.3); }
 
+#note-editor,
+#note-editor * {
+  font-family: inherit !important;
+}
+#note-editor span,
+#note-editor font {
+  font-size: inherit !important;
+  line-height: inherit;
+}
 #note-editor h1, #note-editor h2, #note-editor h3 {
   margin: 0 0 .4rem;
   line-height: 1.2;

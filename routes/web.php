@@ -67,6 +67,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/reuniones', [ReunionesController::class, 'index'])->name('reuniones.index');
     Route::post('/reuniones', [ReunionesController::class, 'store'])->name('reuniones.store');
     Route::post('/reuniones/{id}', [ReunionesController::class, 'update'])->name('reuniones.update');
+    Route::post('/reuniones/{id}/invitaciones', [ReunionesController::class, 'resendInvitations'])->name('reuniones.invitations.resend');
     Route::delete('/reuniones/{id}', [ReunionesController::class, 'destroy'])->name('reuniones.destroy');
     Route::get('/documentos', [DocumentosController::class, 'index'])->name('documentos.index');
     Route::post('/documentos/carpetas', [DocumentosController::class, 'storeFolder'])->name('documentos.folders.store');

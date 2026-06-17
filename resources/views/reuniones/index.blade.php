@@ -918,7 +918,13 @@
         <div class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-400">Notas</div>
         <div id="meetingDetailNotes" class="mt-1 text-sm font-semibold text-slate-600 whitespace-pre-wrap">Sin notas</div>
       </div>
-      <div class="flex justify-end gap-3 pt-1">
+      <div class="flex flex-wrap justify-end gap-3 pt-1">
+        <form id="meetingDetailInviteForm" method="POST" action="#" class="hidden">
+          @csrf
+          <button type="submit" class="px-5 py-3 rounded-full border border-lime-200 bg-lime-50 font-extrabold text-slate-900 hover:bg-[#ecfe88]">
+            Enviar invitaciones
+          </button>
+        </form>
         <button type="button" data-close-meeting-detail class="px-5 py-3 rounded-full border border-slate-200 font-bold text-slate-600 hover:bg-slate-50">Cerrar</button>
         <button id="meetingDetailEdit" type="button" class="px-5 py-3 rounded-full border border-slate-200 font-bold text-slate-700 hover:bg-slate-50">Editar</button>
         <a id="meetingDetailJoin" href="#" target="_blank" class="hidden px-6 py-3 rounded-full bg-[#ecfe88] text-slate-950 font-extrabold hover:bg-lime-300">Entrar a reunion</a>
@@ -957,6 +963,7 @@
     const detailNotes = document.getElementById('meetingDetailNotes');
     const detailJoin = document.getElementById('meetingDetailJoin');
     const detailEdit = document.getElementById('meetingDetailEdit');
+    const detailInviteForm = document.getElementById('meetingDetailInviteForm');
     const meetingForm = document.getElementById('meetingForm');
     const meetingFormTitle = document.getElementById('meetingFormTitle');
     const meetingTitleInput = document.getElementById('meetingTitleInput');
@@ -1309,6 +1316,13 @@
       detailNotes.textContent = card.dataset.notes || 'Sin notas';
       if (detailEdit) {
         detailEdit.classList.toggle('hidden', (card.dataset.source || '') === 'lead');
+      }
+      if (detailInviteForm) {
+        const canResendInvites = (card.dataset.source || 'meeting') === 'meeting' && !!card.dataset.id;
+        detailInviteForm.classList.toggle('hidden', !canResendInvites);
+        if (canResendInvites) {
+          detailInviteForm.action = `/reuniones/${encodeURIComponent(card.dataset.id)}/invitaciones`;
+        }
       }
       const meet = card.dataset.meet || '';
       if (meet) {

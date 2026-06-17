@@ -645,7 +645,10 @@ class AiActionExecutor
         }
         $hasTaskCreation = !empty(array_filter($taskItems));
         $title = $this->stripMarkdown($this->field($proposal, ['Nuevo nombre', 'Titulo nuevo', 'Título nuevo']));
-        $description = $this->stripMarkdown($this->field($proposal, ['Descripción', 'Descripcion', 'Nueva descripción', 'Nueva descripcion']));
+        $description = $this->richDescriptionHtmlFromMarkup(
+            $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion', 'Nueva descripción', 'Nueva descripcion'])
+                ?: $this->field($proposal, ['Descripción', 'Descripcion', 'Nueva descripción', 'Nueva descripcion'])
+        );
         $stage = $this->stripMarkdown($this->field($proposal, ['Estado', 'Etapa']));
         $priority = $this->stripMarkdown($this->field($proposal, ['Prioridad']));
         $due = $this->parseDate($this->field($proposal, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']));
@@ -707,7 +710,9 @@ class AiActionExecutor
             $taskPriority = $priority !== '' ? $this->normalizePriority($priority) : (string) ($project['prioridad'] ?? 'Con calma');
             $explicitTaskStage = $this->stripMarkdown($this->field($proposal, ['Columna', 'Lista', 'Estado de tarea']));
             $activeTaskStages = $updates['task_stages'] ?? $taskStages;
-            $taskDescription = $this->extractSectionAfter($proposal, ['Descripción', 'Descripcion'], ['Subtareas a agregar', 'Subtareas', 'Checklist', 'Tareas a agregar', 'Notas', 'Nota', '¿Quieres', 'Quieres', 'Confirmas', 'Puedes tocar']);
+            $taskDescription = $this->richDescriptionHtmlFromMarkup(
+                $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion'], ['Subtareas a agregar', 'Subtareas', 'Checklist', 'Tareas a agregar', 'Notas', 'Nota', '¿Quieres', 'Quieres', 'Confirmas', 'Puedes tocar'])
+            );
             $subtaskItemsForNewTask = $this->extractListAfter($proposal, ['Subtareas a agregar', 'Subtareas', 'Checklist']);
             foreach (array_values(array_unique(array_filter($taskItems))) as $taskText) {
                 $taskText = trim((string) $taskText);
@@ -875,9 +880,11 @@ class AiActionExecutor
         $priority = $this->normalizePriority($this->field($proposal, ['Prioridad']));
         $taskStages = $this->projectTaskStages($project);
         $explicitTaskStage = $this->stripMarkdown($this->field($proposal, ['Columna', 'Lista', 'Estado de tarea']));
-        $description = $this->extractSectionAfter($proposal, ['Descripción', 'Descripcion'], ['Subtareas a agregar', 'Subtareas', 'Checklist', 'Tareas a agregar', 'Notas', 'Nota', '¿Quieres', 'Quieres', 'Confirmas', 'Puedes tocar']);
+        $description = $this->richDescriptionHtmlFromMarkup(
+            $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion'], ['Subtareas a agregar', 'Subtareas', 'Checklist', 'Tareas a agregar', 'Notas', 'Nota', '¿Quieres', 'Quieres', 'Confirmas', 'Puedes tocar'])
+        );
         if ($description === '') {
-            $description = $this->stripMarkdown($this->field($proposal, ['Descripción', 'Descripcion']));
+            $description = $this->richDescriptionHtmlFromMarkup($this->field($proposal, ['Descripción', 'Descripcion']));
         }
         $subtaskItems = $this->extractListAfter($proposal, ['Subtareas a agregar', 'Subtareas', 'Checklist']);
         $tasks = array_values($project['tareas'] ?? []);
@@ -1061,14 +1068,15 @@ class AiActionExecutor
         }
 
         $title = $this->stripMarkdown($this->field($proposal, ['Título', 'Titulo', 'Nota', 'Nombre']));
-        $plain = $this->extractBody($proposal);
-        if ($plain === '') {
-            $plain = $this->stripMarkdown($this->field($proposal, ['Contenido', 'Texto', 'Descripción', 'Descripcion']));
+        $content = $this->extractPersonalNoteBody($proposal);
+        if ($content === '') {
+            $content = $this->field($proposal, ['Contenido', 'Texto', 'Descripción', 'Descripcion']);
         }
-        if ($plain === '' && $title !== '') {
-            $plain = $title;
+        if ($content === '' && $title !== '') {
+            $content = $title;
         }
-        $plain = $this->cleanPersonalNotePlain($plain);
+        $content = $this->cleanPersonalNoteMarkup($content);
+        $plain = $this->cleanPersonalNotePlain($content);
         if ($plain === '') {
             return $this->failure('No encontré el contenido de la nota personal.');
         }
@@ -1091,7 +1099,7 @@ class AiActionExecutor
             'ownerKey' => $ownerKey,
             'ownerName' => $ownerName,
             'title' => Str::limit($title, 160, ''),
-            'html' => $this->noteHtmlFromPlain($title, $plain),
+            'html' => $this->noteHtmlFromPlain($title, $content),
             'plainText' => $plain,
             'color' => $color,
             'linkedClient' => ($client['id'] ?? 'general') !== 'general' ? (string) $client['id'] : '',
@@ -1142,14 +1150,15 @@ class AiActionExecutor
         $noteBefore = $all[$index];
 
         $title = $this->stripMarkdown($this->field($proposal, ['Título', 'Titulo', 'Nuevo título', 'Nuevo titulo']));
-        $plain = $this->extractBody($proposal);
-        if ($plain === '') {
-            $plain = $this->stripMarkdown($this->field($proposal, ['Contenido', 'Texto', 'Nueva versión', 'Nueva version', 'Mensaje']));
+        $content = $this->extractPersonalNoteBody($proposal);
+        if ($content === '') {
+            $content = $this->field($proposal, ['Contenido', 'Texto', 'Nueva versión', 'Nueva version', 'Mensaje']);
         }
-        if ($plain === '') {
+        if ($content === '') {
             return $this->failure('No encontré el contenido final para reemplazar la nota.');
         }
-        $plain = $this->cleanPersonalNotePlain($plain);
+        $content = $this->cleanPersonalNoteMarkup($content);
+        $plain = $this->cleanPersonalNotePlain($content);
         if ($plain === '') {
             return $this->failure('No encontré el contenido final para reemplazar la nota.');
         }
@@ -1161,7 +1170,7 @@ class AiActionExecutor
             $title = (string) ($all[$index]['title'] ?? 'Nota sin titulo');
         }
 
-        $html = $this->noteHtmlFromPlain($title, $plain);
+        $html = $this->noteHtmlFromPlain($title, $content);
         $nowMs = (int) floor(microtime(true) * 1000);
         $client = $this->clientFromPersonalNoteProposal($proposal);
         $all[$index] = [
@@ -1773,7 +1782,10 @@ class AiActionExecutor
             'start_date' => $this->stripMarkdown($this->field($proposal, ['Fecha inicio', 'Inicio'])),
             'due_date' => $this->stripMarkdown($this->field($proposal, ['Fecha fin', 'Vencimiento', 'Vence', 'Fecha de entrega'])),
             'responsibles' => $this->splitPeople($this->field($proposal, ['Responsables', 'Asignados', 'Encargados'])),
-            'description' => $this->stripMarkdown($this->field($proposal, ['Descripción', 'Descripcion'])),
+            'description' => $this->richDescriptionHtmlFromMarkup(
+                $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion'], ['Columnas', 'Tareas sugeridas', 'Tareas', 'Lista de tareas'])
+                    ?: $this->field($proposal, ['Descripción', 'Descripcion'])
+            ),
             'columns' => $columns,
             'tasks' => $this->uniqueTaskDrafts($tasks),
         ];
@@ -2009,7 +2021,7 @@ class AiActionExecutor
 
             if (!$capturing) {
                 foreach ($labels as $label) {
-                    if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($label, '/') . '\**\s*:\s*(.*)$/iu', $clean, $match)) {
+                    if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($label, '/') . '\**\s*:\**\s*(.*)$/iu', $clean, $match)) {
                         $capturing = true;
                         $inline = trim((string) ($match[1] ?? ''));
                         if ($inline !== '') {
@@ -2028,6 +2040,58 @@ class AiActionExecutor
             }
 
             $items[] = $this->stripMarkdown($clean);
+        }
+
+        $text = trim(implode("\n", $items));
+        $text = preg_split('/\R\s*(?:¿?Quieres|¿?Deseas|Confirmas|Puedes tocar|Agregar ahora)\b/iu', $text)[0] ?? $text;
+
+        return trim($text);
+    }
+
+    private function extractSectionAfterRaw(string $proposal, array $labels, array $stopLabels = []): string
+    {
+        $lines = preg_split('/\R+/', $proposal) ?: [];
+        $items = [];
+        $capturing = false;
+        $defaultStops = [
+            'Proyecto', 'Tablero', 'Cliente', 'Columna', 'Lista', 'Estado', 'Prioridad', 'Responsables',
+            'Asignados', 'Encargados', 'Vencimiento', 'Fecha fin', 'Fecha de entrega', 'Fecha inicio',
+            'Tarea', 'Tarea a agregar', 'Nueva tarea', 'Tareas', 'Tareas a agregar', 'Subtarea',
+            'Subtareas', 'Subtareas a agregar', 'Checklist', 'Nota', 'Notas', 'Contenido',
+            '¿Quieres', 'Quieres', '¿Deseas', 'Deseas', 'Confirmas', 'Puedes tocar',
+        ];
+        $stops = array_values(array_unique(array_merge($defaultStops, $stopLabels)));
+
+        foreach ($lines as $line) {
+            $clean = trim((string) $line);
+            if ($clean === '') {
+                if ($capturing && !empty($items)) {
+                    $items[] = '';
+                }
+                continue;
+            }
+
+            if (!$capturing) {
+                foreach ($labels as $label) {
+                    if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($label, '/') . '\**\s*:\**\s*(.*)$/iu', $clean, $match)) {
+                        $capturing = true;
+                        $inline = trim((string) ($match[1] ?? ''));
+                        if ($inline !== '') {
+                            $items[] = $inline;
+                        }
+                        continue 2;
+                    }
+                }
+                continue;
+            }
+
+            foreach ($stops as $stop) {
+                if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($stop, '/') . '\**\s*:?\s*/iu', $clean)) {
+                    break 2;
+                }
+            }
+
+            $items[] = $clean;
         }
 
         $text = trim(implode("\n", $items));
@@ -2269,39 +2333,202 @@ class AiActionExecutor
 
     private function noteHtmlFromPlain(string $title, string $plain): string
     {
-        $plain = $this->cleanPersonalNotePlain($plain);
+        $plain = $this->cleanPersonalNoteMarkup($plain);
         $lines = collect(preg_split('/\R+/', $plain) ?: [])
             ->map(fn ($line) => trim((string) $line))
             ->filter()
             ->values();
 
         $html = '<h1>' . e($title) . '</h1>';
+        $openList = null;
+        $closeList = function () use (&$html, &$openList): void {
+            if ($openList !== null) {
+                $html .= '</' . $openList . '>';
+                $openList = null;
+            }
+        };
+
         foreach ($lines as $index => $line) {
-            if ($index === 0 && Str::lower($line) === Str::lower($title)) {
+            $plainLine = $this->stripMarkdown($line);
+            if ($index === 0 && Str::lower($plainLine) === Str::lower($title)) {
                 continue;
             }
 
-            if (preg_match('/^\[\s?[xX]\s?\]\s*(.+)$/u', $line, $match)) {
-                $html .= '<div class="note-checkline is-checked"><input type="checkbox" class="note-checkbox" contenteditable="false" checked="checked"> <span>' . e($match[1]) . '</span></div>';
+            if (preg_match('/^[-*•]?\s*\[\s?[xX]\s?\]\s*(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<div class="note-checkline is-checked"><input type="checkbox" class="note-checkbox" contenteditable="false" checked="checked"> <span>' . $this->noteInlineHtml($match[1]) . '</span></div>';
                 continue;
             }
 
-            if (preg_match('/^\[\s?\]\s*(.+)$/u', $line, $match)) {
-                $html .= '<div class="note-checkline"><input type="checkbox" class="note-checkbox" contenteditable="false"> <span>' . e($match[1]) . '</span></div>';
+            if (preg_match('/^[-*•]?\s*\[\s?\]\s*(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<div class="note-checkline"><input type="checkbox" class="note-checkbox" contenteditable="false"> <span>' . $this->noteInlineHtml($match[1]) . '</span></div>';
                 continue;
             }
 
             if (preg_match('/^(\d+)[\.)]\s+(.+)$/u', $line, $match)) {
-                $html .= '<div class="note-numberline" data-note-number="' . e($match[1]) . '"><span class="note-number-marker" contenteditable="false">' . e($match[1]) . '.</span><span class="note-number-content">' . e($match[2]) . '</span></div>';
+                $closeList();
+                $html .= '<div class="note-numberline" data-note-number="' . e($match[1]) . '"><span class="note-number-marker" contenteditable="false">' . e($match[1]) . '.</span><span class="note-number-content">' . $this->noteInlineHtml($match[2]) . '</span></div>';
                 continue;
             }
 
-            if (Str::length($line) <= 90 && str_ends_with($line, ':') && ! str_contains($line, '.')) {
-                $html .= '<h2>' . e(rtrim($line, ':')) . '</h2>';
+            if (preg_match('/^#{1,2}\s+(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<h2>' . $this->noteInlineHtml($match[1]) . '</h2>';
                 continue;
             }
 
-            $html .= '<p>' . e($line) . '</p>';
+            if (preg_match('/^#{3,6}\s+(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<h3>' . $this->noteInlineHtml($match[1]) . '</h3>';
+                continue;
+            }
+
+            if (preg_match('/^[-*•]\s+(.+)$/u', $line, $match)) {
+                if ($openList !== 'ul') {
+                    $closeList();
+                    $html .= '<ul>';
+                    $openList = 'ul';
+                }
+                $html .= '<li>' . $this->noteInlineHtml($match[1]) . '</li>';
+                continue;
+            }
+
+            if (preg_match('/^-{3,}$/u', $line)) {
+                $closeList();
+                $html .= '<hr class="note-divider">';
+                continue;
+            }
+
+            if (Str::length($plainLine) <= 90 && str_ends_with($plainLine, ':') && ! str_contains($plainLine, '.')) {
+                $closeList();
+                $html .= '<h2>' . $this->noteInlineHtml(rtrim($line, ':')) . '</h2>';
+                continue;
+            }
+
+            $closeList();
+            $html .= '<p>' . $this->noteInlineHtml($line) . '</p>';
+        }
+        $closeList();
+
+        return $html;
+    }
+
+    private function richDescriptionHtmlFromMarkup(string $markup): string
+    {
+        $markup = $this->cleanRichDescriptionMarkup($markup);
+        if ($markup === '') {
+            return '';
+        }
+
+        $lines = collect(preg_split('/\R+/', $markup) ?: [])
+            ->map(fn ($line) => trim((string) $line))
+            ->filter()
+            ->values();
+
+        $html = '';
+        $openList = null;
+        $closeList = function () use (&$html, &$openList): void {
+            if ($openList !== null) {
+                $html .= '</' . $openList . '>';
+                $openList = null;
+            }
+        };
+
+        foreach ($lines as $line) {
+            $plainLine = $this->stripMarkdown($line);
+
+            if (preg_match('/^[-*•]?\s*\[\s?[xX]\s?\]\s*(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<div class="note-checkline is-checked"><input type="checkbox" class="note-checkbox" contenteditable="false" checked="checked"> <span>' . $this->noteInlineHtml($match[1]) . '</span></div>';
+                continue;
+            }
+
+            if (preg_match('/^[-*•]?\s*\[\s?\]\s*(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<div class="note-checkline"><input type="checkbox" class="note-checkbox" contenteditable="false"> <span>' . $this->noteInlineHtml($match[1]) . '</span></div>';
+                continue;
+            }
+
+            if (preg_match('/^(\d+)[\.)]\s+(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<div class="note-numberline" data-note-number="' . e($match[1]) . '"><span class="note-number-marker" contenteditable="false">' . e($match[1]) . '.</span><span class="note-number-content">' . $this->noteInlineHtml($match[2]) . '</span></div>';
+                continue;
+            }
+
+            if (preg_match('/^#{1,2}\s+(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<h1>' . $this->noteInlineHtml($match[1]) . '</h1>';
+                continue;
+            }
+
+            if (preg_match('/^#{3,6}\s+(.+)$/u', $line, $match)) {
+                $closeList();
+                $html .= '<h2>' . $this->noteInlineHtml($match[1]) . '</h2>';
+                continue;
+            }
+
+            if (preg_match('/^[-*•]\s+(.+)$/u', $line, $match)) {
+                if ($openList !== 'ul') {
+                    $closeList();
+                    $html .= '<ul>';
+                    $openList = 'ul';
+                }
+                $html .= '<li>' . $this->noteInlineHtml($match[1]) . '</li>';
+                continue;
+            }
+
+            if (preg_match('/^-{3,}$/u', $line)) {
+                $closeList();
+                $html .= '<hr class="note-divider">';
+                continue;
+            }
+
+            if (Str::length($plainLine) <= 90 && str_ends_with($plainLine, ':') && ! str_contains($plainLine, '.')) {
+                $closeList();
+                $html .= '<h2>' . $this->noteInlineHtml(rtrim($line, ':')) . '</h2>';
+                continue;
+            }
+
+            $closeList();
+            $html .= '<p>' . $this->noteInlineHtml($line) . '</p>';
+        }
+        $closeList();
+
+        return trim($html);
+    }
+
+    private function noteInlineHtml(string $text): string
+    {
+        $tokens = [];
+        $text = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/u', function ($match) use (&$tokens) {
+            $href = trim((string) ($match[2] ?? ''));
+            if (! preg_match('/^(https?:|mailto:|tel:|#|\/)/i', $href)) {
+                return (string) ($match[1] ?? '');
+            }
+            $token = '%%NOTE_LINK_' . count($tokens) . '%%';
+            $tokens[$token] = '<a href="' . e($href) . '" rel="noopener noreferrer" target="_blank">' . e((string) ($match[1] ?? '')) . '</a>';
+            return $token;
+        }, $text) ?? $text;
+
+        $html = e($text);
+        foreach ($tokens as $token => $replacement) {
+            $html = str_replace(e($token), $replacement, $html);
+        }
+
+        $patterns = [
+            '/&lt;u&gt;(.+?)&lt;\/u&gt;/su' => '<u>$1</u>',
+            '/\+\+(.+?)\+\+/su' => '<u>$1</u>',
+            '/~~(.+?)~~/su' => '<s>$1</s>',
+            '/==(.+?)==/su' => '<span style="background-color: #fff59d">$1</span>',
+            '/\*\*(.+?)\*\*/su' => '<strong>$1</strong>',
+            '/__(.+?)__/su' => '<strong>$1</strong>',
+            '/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/su' => '<em>$1</em>',
+            '/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/su' => '<em>$1</em>',
+        ];
+
+        foreach ($patterns as $pattern => $replacement) {
+            $html = preg_replace($pattern, $replacement, $html) ?? $html;
         }
 
         return $html;
@@ -2318,6 +2545,46 @@ class AiActionExecutor
         $plain = preg_replace("/\R{3,}/u", "\n\n", $plain) ?? $plain;
 
         return trim($plain);
+    }
+
+    private function cleanPersonalNoteMarkup(string $plain): string
+    {
+        $plain = preg_split('/\R?\s*(?:Siguiente paso|¿?Confirmas|Puedes tocar|Crear ahora|Enviar ahora|Aplicar cambios|No crear|No enviar)\b/iu', $plain)[0] ?? $plain;
+        $plain = preg_replace('/\[(?:Abrir|Enviar|Crear)[^\]]*\]\([^)]+\)/iu', '', $plain) ?? $plain;
+        $plain = preg_replace('/(?:^|\R)\s*(?:[-*•]\s*)?(?:Color|Cliente|Nota ID|ID)\s*:\s*[^\r\n]*/iu', "\n", $plain) ?? $plain;
+        $plain = preg_replace('/(?:^|\R)\s*(?:Actualizar nota personal|Editar nota personal|Reescribir nota personal|Nota personal propuesta|Nota personal)\s*:\s*/iu', "\n", $plain) ?? $plain;
+        $plain = preg_replace('/(?<!^)(?<!\R)\s+(\d{1,2})[\.)]\s+/u', "\n$1. ", $plain) ?? $plain;
+        $plain = preg_replace("/[ \t]+\R/u", "\n", $plain) ?? $plain;
+        $plain = preg_replace("/\R{3,}/u", "\n\n", $plain) ?? $plain;
+
+        return trim($plain);
+    }
+
+    private function cleanRichDescriptionMarkup(string $markup): string
+    {
+        $markup = preg_split('/\R?\s*(?:Siguiente paso|¿?Confirmas|Puedes tocar|Crear ahora|Enviar ahora|Aplicar cambios|Agregar ahora|No crear|No enviar)\b/iu', $markup)[0] ?? $markup;
+        $markup = preg_replace('/\[(?:Abrir|Enviar|Crear|Agregar|Aplicar)[^\]]*\]\([^)]+\)/iu', '', $markup) ?? $markup;
+        $markup = preg_replace('/(?:^|\R)\s*(?:[-*•]\s*)?(?:Proyecto|Tablero|Cliente|Columna|Lista|Estado|Prioridad|Responsables|Asignados|Encargados|Vencimiento|Fecha inicio|Fecha fin)\s*:\s*[^\r\n]*/iu', "\n", $markup) ?? $markup;
+        $markup = preg_replace('/(?:^|\R)\s*(?:Actualizar proyecto|Editar proyecto|Tarea propuesta|Nueva tarea propuesta)\s*:\s*/iu', "\n", $markup) ?? $markup;
+        $markup = preg_replace('/(?<!^)(?<!\R)\s+(\d{1,2})[\.)]\s+/u', "\n$1. ", $markup) ?? $markup;
+        $markup = preg_replace("/[ \t]+\R/u", "\n", $markup) ?? $markup;
+        $markup = preg_replace("/\R{3,}/u", "\n\n", $markup) ?? $markup;
+
+        return trim($markup);
+    }
+
+    private function extractPersonalNoteBody(string $proposal): string
+    {
+        $body = '';
+        if (preg_match('/(?:^|\R)\s*(?:[-*•]\s*)?\**(?:Contenido|Mensaje|Cuerpo|Body)\**\s*:\s*(.+)$/isu', $proposal, $match)) {
+            $body = trim((string) ($match[1] ?? ''));
+        }
+
+        if ($body === '') {
+            return '';
+        }
+
+        return $this->cleanPersonalNoteMarkup($body);
     }
 
     private function extractBody(string $proposal): string
@@ -2370,11 +2637,21 @@ class AiActionExecutor
 
     private function stripMarkdown(string $value): string
     {
+        $value = preg_replace('/\[([^\]]+)\]\([^)]+\)/u', '$1', $value) ?? $value;
+        $value = preg_replace('/^\s*#{1,6}\s+/m', '', $value) ?? $value;
+        $value = preg_replace('/^\s*[-*•]\s+\[\s?[xX]?\s?\]\s*/m', '', $value) ?? $value;
+        $value = preg_replace('/^\s*[-*•]\s+/m', '', $value) ?? $value;
+        $value = preg_replace('/~~(.*?)~~/s', '$1', $value) ?? $value;
+        $value = preg_replace('/\+\+(.*?)\+\+/s', '$1', $value) ?? $value;
+        $value = preg_replace('/==(.*?)==/s', '$1', $value) ?? $value;
+        $value = preg_replace('/<u>(.*?)<\/u>/is', '$1', $value) ?? $value;
         $value = preg_replace('/\*\*(.*?)\*\*/s', '$1', $value) ?? $value;
+        $value = preg_replace('/__(.*?)__/s', '$1', $value) ?? $value;
         $value = preg_replace('/\*(.*?)\*/s', '$1', $value) ?? $value;
+        $value = preg_replace('/_(.*?)_/s', '$1', $value) ?? $value;
         $value = preg_replace('/\s*\([^)]*sugerid[^)]*\)/iu', '', $value) ?? $value;
         $value = preg_replace('/\s*\([^)]*cliente activo[^)]*\)/iu', '', $value) ?? $value;
-        return trim($value, " \t\n\r\0\x0B-•*");
+        return trim($value, " \t\n\r\0\x0B-•*#");
     }
 
     private function normalizePriority(string $value): string

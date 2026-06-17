@@ -3110,8 +3110,6 @@
     }
 
     function normalizeClipboardDescriptionHtml(html = '', plainText = '') {
-      const cleanPlainText = normalizeDescriptionPlainText(plainText).trim();
-      if (cleanPlainText) return plainTextToDescriptionHtml(cleanPlainText);
       if (!String(html || '').trim()) return plainTextToDescriptionHtml(plainText);
       const template = document.createElement('template');
       template.innerHTML = String(html || '');
@@ -3141,6 +3139,45 @@
           span.innerHTML = node.innerHTML;
           node.replaceWith(span);
           return;
+        }
+        const sourceStyle = String(node.getAttribute('style') || '');
+        const isBoldStyle = /font-weight\s*:\s*(bold|bolder|[6-9]00)/i.test(sourceStyle);
+        const isItalicStyle = /font-style\s*:\s*italic/i.test(sourceStyle);
+        const isUnderlineStyle = /text-decoration[^;]*underline/i.test(sourceStyle);
+        const isStrikeStyle = /text-decoration[^;]*(line-through|strike)/i.test(sourceStyle);
+        const isHeadingLike = ['P', 'DIV', 'SPAN'].includes(tag)
+          && isBoldStyle
+          && (node.textContent || '').trim().length <= 120
+          && !/[.!?]$/.test((node.textContent || '').trim());
+        if (isHeadingLike) {
+          const h2 = document.createElement('h2');
+          h2.innerHTML = node.innerHTML;
+          node.replaceWith(h2);
+          return;
+        }
+        if (isBoldStyle && !['STRONG', 'B', 'H1', 'H2', 'H3'].includes(tag)) {
+          const strong = document.createElement('strong');
+          strong.innerHTML = node.innerHTML;
+          node.innerHTML = '';
+          node.appendChild(strong);
+        }
+        if (isItalicStyle && !['EM', 'I'].includes(tag)) {
+          const em = document.createElement('em');
+          em.innerHTML = node.innerHTML;
+          node.innerHTML = '';
+          node.appendChild(em);
+        }
+        if (isUnderlineStyle && tag !== 'U') {
+          const underline = document.createElement('u');
+          underline.innerHTML = node.innerHTML;
+          node.innerHTML = '';
+          node.appendChild(underline);
+        }
+        if (isStrikeStyle && !['S', 'STRIKE'].includes(tag)) {
+          const strike = document.createElement('s');
+          strike.innerHTML = node.innerHTML;
+          node.innerHTML = '';
+          node.appendChild(strike);
         }
         Array.from(node.attributes).forEach((attr) => {
           const name = attr.name.toLowerCase();
@@ -3213,6 +3250,8 @@
       const editor = document.getElementById(editorId);
       const shell = editor?.closest?.('[data-desc-editor-shell]');
       shell?.classList.add('is-active');
+      resetCompactDescToolbarState(editorId);
+      requestAnimationFrame(() => updateCompactDescFormatState(editorId));
     }
 
     function isCompactDescEditorFocused(editorId) {
@@ -3232,6 +3271,27 @@
 
     function getCompactDescEditor(editorId) {
       return document.getElementById(editorId);
+    }
+
+    function isSelectionInsideCompactDescEditor(editorId) {
+      const editor = getCompactDescEditor(editorId);
+      const selection = window.getSelection?.();
+      if (!editor || !selection || !selection.rangeCount) return false;
+      const anchor = selection.anchorNode;
+      const focus = selection.focusNode;
+      return !!((anchor && editor.contains(anchor)) || (focus && editor.contains(focus)));
+    }
+
+    function resetCompactDescToolbarState(editorId) {
+      const label = document.querySelector(`[data-compact-desc-format-label="${editorId}"]`);
+      if (label) label.textContent = 'Texto';
+      document.querySelectorAll(`[data-compact-desc-format-option="${editorId}"]`).forEach((option) => {
+        option.classList.toggle('is-selected', option.getAttribute('data-format') === 'p');
+      });
+      document.querySelectorAll(`[data-desc-editor-shell] [data-compact-desc-cmd]`).forEach((button) => {
+        const toolbarEditor = button.closest('[data-desc-editor-shell]')?.querySelector('.compact-rich-editor')?.id;
+        if (toolbarEditor === editorId) button.classList.remove('is-active');
+      });
     }
 
     function placeCompactDescCaret(target) {
@@ -3443,7 +3503,8 @@
 
     function updateCompactDescFormatState(editorId) {
       const labels = { p: 'Texto', h1: 'Titulo', h2: 'Subtitulo' };
-      const block = getCompactDescCurrentBlock(editorId);
+      const selectionInsideEditor = isSelectionInsideCompactDescEditor(editorId);
+      const block = selectionInsideEditor ? getCompactDescCurrentBlock(editorId) : null;
       const tag = ['H1', 'H2'].includes(block?.tagName) ? block.tagName.toLowerCase() : 'p';
       const label = document.querySelector(`[data-compact-desc-format-label="${editorId}"]`);
       if (label) label.textContent = labels[tag] || 'Texto';
@@ -3455,13 +3516,15 @@
       let italic = false;
       let strike = false;
       let highlight = false;
-      try {
-        bold = document.queryCommandState('bold');
-        italic = document.queryCommandState('italic');
-        strike = document.queryCommandState('strikeThrough');
-        const backColor = String(document.queryCommandValue('backColor') || '').toLowerCase();
-        highlight = backColor.includes('254') || backColor.includes('fef08a') || backColor.includes('yellow');
-      } catch (_) {}
+      if (selectionInsideEditor) {
+        try {
+          bold = document.queryCommandState('bold');
+          italic = document.queryCommandState('italic');
+          strike = document.queryCommandState('strikeThrough');
+          const backColor = String(document.queryCommandValue('backColor') || '').toLowerCase();
+          highlight = backColor.includes('254') || backColor.includes('fef08a') || backColor.includes('yellow');
+        } catch (_) {}
+      }
       const inChecklist = !!block?.classList?.contains('note-checkline');
       const inNumberline = !!block?.classList?.contains('note-numberline');
       document.querySelectorAll(`[data-desc-editor-shell] [data-compact-desc-cmd]`).forEach((button) => {
