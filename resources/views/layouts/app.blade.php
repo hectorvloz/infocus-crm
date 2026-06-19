@@ -4038,6 +4038,7 @@
         const insideDate = target?.closest?.('[data-reminder-date], #reminderNewDate, .flatpickr-input, .reminder-date-trigger, .flatpickr-calendar');
         const insideComposer = reminderComposer?.contains(target);
         const insideAddZone = target?.closest?.('[data-reminder-section-add]');
+        const insideEditableTitle = target?.closest?.('[data-reminder-active-category-title], [data-reminder-section-title]');
         const insideComposerControl = target?.closest?.('#reminderNewText, #reminderAddBtn, #reminderPriorityBtn, #reminderPriorityDropdown, #reminderNewDate, .reminder-date-trigger, .flatpickr-calendar, #reminderLinkDropdown');
         if (!insidePriority) {
           hideReminderPriorityDropdown();
@@ -4049,7 +4050,7 @@
         if (!insideDate) {
           closeReminderDatePickers();
         }
-        if ((!insideComposer || !insideComposerControl) && !insideAddZone && !insidePriority && !insideDate && !insideLink) {
+        if ((!insideComposer || !insideComposerControl) && !insideAddZone && !insideEditableTitle && !insidePriority && !insideDate && !insideLink) {
           if (document.activeElement instanceof HTMLElement && remindersPanel.contains(document.activeElement)) {
             document.activeElement.blur();
           }

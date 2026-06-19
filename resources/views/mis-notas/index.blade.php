@@ -50,7 +50,7 @@
     </button>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+  <div class="note-cards-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
     <div id="notes-container" class="contents"></div>
   </div>
 </div>
@@ -1558,13 +1558,13 @@ document.addEventListener('DOMContentLoaded', function () {
       const titleHtml = highlightSearchHtml(escapeNoteHtml(title), query);
       const linkedClientName = resolveNoteClientName(note);
       const linkedClientPillHtml = currentFilter === 'todos'
-        ? '<button type="button" class="note-client-pill" data-note-client-pill="' + escapeNoteHtml(linkedClientName || '') + '">' + highlightSearchHtml(escapeNoteHtml(linkedClientName || 'Sin cliente'), query) + '</button>'
+        ? '<button type="button" class="note-client-pill" data-note-client-pill="' + escapeNoteHtml(linkedClientName || '') + '" title="' + escapeNoteHtml(linkedClientName || 'Sin cliente') + '"><span class="note-client-pill-label">' + highlightSearchHtml(escapeNoteHtml(linkedClientName || 'Sin cliente'), query) + '</span></button>'
         : '';
 
       const card = document.createElement('div');
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
-      card.className = 'rounded-xl p-5 border text-left transition-all hover:shadow-lg flex flex-col';
+      card.className = 'note-card-item rounded-xl p-5 border text-left transition-all hover:shadow-lg flex flex-col';
       card.style.backgroundColor = tone.cardBg;
       card.style.borderColor = tone.cardBorder;
       const ownerName = String(note.ownerName || 'Usuario');
@@ -2026,10 +2026,17 @@ document.addEventListener('DOMContentLoaded', function () {
   text-decoration-thickness: 2px;
   text-underline-offset: .16em;
 }
+.note-cards-grid {
+  align-items: start;
+}
+.note-card-item {
+  align-self: start;
+  height: auto;
+}
 .note-card-footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: .6rem;
   margin-top: 1rem;
   padding-top: .75rem;
@@ -2041,8 +2048,9 @@ document.addEventListener('DOMContentLoaded', function () {
 .note-client-pill {
   display: inline-flex;
   align-items: center;
+  justify-self: end;
+  width: min(100%, 10rem);
   min-width: 0;
-  max-width: 10rem;
   height: 1.55rem;
   border-radius: 999px;
   border: 1px solid rgba(71, 85, 105, .18);
@@ -2053,10 +2061,15 @@ document.addEventListener('DOMContentLoaded', function () {
   font-weight: 900;
   line-height: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   cursor: pointer;
   transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.note-client-pill-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .note-client-pill:hover,
 .note-client-pill:focus-visible {
