@@ -94,6 +94,7 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/api/proyectos/tareas/agregar', [ProyectosController::class, 'tareaAgregar'])->name('api.proyectos.tareas.agregar');
     Route::post('/api/proyectos/tareas/toggle', [ProyectosController::class, 'tareaToggle'])->name('api.proyectos.tareas.toggle');
     Route::post('/api/proyectos/tareas/actualizar', [ProyectosController::class, 'tareaActualizar'])->name('api.proyectos.tareas.actualizar');
+    Route::post('/api/proyectos/tareas/duplicar', [ProyectosController::class, 'tareaDuplicar'])->name('api.proyectos.tareas.duplicar');
     Route::post('/api/proyectos/tareas/ia-apoyo', [ProyectosController::class, 'tareaIaApoyo'])->name('api.proyectos.tareas.ia-apoyo');
     Route::post('/api/proyectos/tareas/mover', [ProyectosController::class, 'tareaMover'])->name('api.proyectos.tareas.mover');
     Route::post('/api/proyectos/tareas/eliminar', [ProyectosController::class, 'tareaEliminar'])->name('api.proyectos.tareas.eliminar');

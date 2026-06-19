@@ -280,14 +280,8 @@ class ProyectosController extends Controller
                 continue;
             }
 
-            $totalSeconds = $logs->reduce(function ($carry, $log) {
-                $start = (int) ($log['start'] ?? 0);
-                $end = (int) ($log['end'] ?? now()->timestamp);
-                if ($start <= 0 || $end < $start) {
-                    return $carry;
-                }
-                return $carry + ($end - $start);
-            }, 0);
+            $runningStart = (int) ($running['start'] ?? now()->timestamp);
+            $currentSeconds = max(0, now()->timestamp - $runningStart);
 
             $candidate = [
                 'project_id' => (string) ($project['id'] ?? ''),
@@ -296,8 +290,8 @@ class ProyectosController extends Controller
                 'task_id' => (string) ($running['task_id'] ?? ''),
                 'task_name' => (string) ($running['task_name'] ?? 'Temporizador activo'),
                 'running' => true,
-                'start' => (int) ($running['start'] ?? now()->timestamp),
-                'current_seconds' => (int) $totalSeconds,
+                'start' => $runningStart,
+                'current_seconds' => $currentSeconds,
             ];
 
             if (!$active || $candidate['start'] > ($active['start'] ?? 0)) {
@@ -898,6 +892,7 @@ class ProyectosController extends Controller
             'owner_ids' => 'nullable|array',
             'owner_ids.*' => 'string',
             'board_stage' => 'nullable|string',
+            'task_type' => 'nullable|in:task,card',
         ]);
         $p = $this->store->find($data['id']);
         abort_if(!$p, 404);
@@ -914,6 +909,7 @@ class ProyectosController extends Controller
             'owners' => array_values(array_filter($data['owners'] ?? [])),
             'owner_ids' => array_values(array_filter($data['owner_ids'] ?? [])),
             'board_stage' => trim((string) ($data['board_stage'] ?? '')) ?: 'Por hacer',
+            'task_type' => $data['task_type'] ?? 'task',
             'board_order' => count($tasks),
             'total_seconds' => 0,
             'subtasks' => [],
@@ -934,6 +930,9 @@ class ProyectosController extends Controller
         $tasks = $p['tareas'] ?? [];
         foreach ($tasks as &$t) {
             if ($t['id'] === $data['tarea_id']) {
+                if (($t['task_type'] ?? 'task') === 'card') {
+                    break;
+                }
                 $t['done'] = !($t['done'] ?? false);
                 break;
             }
@@ -959,6 +958,7 @@ class ProyectosController extends Controller
             'owner_ids.*' => 'string',
             'board_stage' => 'nullable|string',
             'board_order' => 'nullable|integer|min:0',
+            'task_type' => 'nullable|in:task,card',
         ]);
 
         $p = $this->store->find($data['id']);
@@ -979,6 +979,7 @@ class ProyectosController extends Controller
             $t['owners'] = array_values(array_filter($data['owners'] ?? ($t['owners'] ?? [])));
             $t['owner_ids'] = array_values(array_filter($data['owner_ids'] ?? ($t['owner_ids'] ?? [])));
             $t['board_stage'] = trim((string) ($data['board_stage'] ?? ($t['board_stage'] ?? 'Por hacer'))) ?: 'Por hacer';
+            $t['task_type'] = $data['task_type'] ?? ($t['task_type'] ?? 'task');
             if (array_key_exists('board_order', $data)) {
                 $t['board_order'] = (int) $data['board_order'];
             }
@@ -989,6 +990,57 @@ class ProyectosController extends Controller
 
         $updated = $this->store->update($data['id'], ['tareas' => $tasks]);
         return response()->json(['ok' => true, 'item' => $updated]);
+    }
+
+    public function tareaDuplicar(Request $request)
+    {
+        $data = $request->validate([
+            'id' => 'required|string',
+            'tarea_id' => 'required|string',
+        ]);
+
+        $p = $this->store->find($data['id']);
+        abort_if(!$p, 404);
+
+        $tasks = array_values($p['tareas'] ?? []);
+        $source = null;
+        foreach ($tasks as $task) {
+            if ((string) ($task['id'] ?? '') === (string) $data['tarea_id']) {
+                $source = $task;
+                break;
+            }
+        }
+        abort_if(!$source, 404);
+
+        $stage = trim((string) ($source['board_stage'] ?? 'Por hacer')) ?: 'Por hacer';
+        $nextOrder = collect($tasks)
+            ->filter(fn ($task) => (trim((string) ($task['board_stage'] ?? 'Por hacer')) ?: 'Por hacer') === $stage)
+            ->map(fn ($task) => (int) ($task['board_order'] ?? 0))
+            ->max();
+
+        $copy = $source;
+        $copy['id'] = (string) Str::ulid();
+        $copy['texto'] = trim((string) ($source['texto'] ?? 'Tarjeta')) . ' copia';
+        $copy['done'] = false;
+        $copy['board_stage'] = $stage;
+        $copy['board_order'] = ((int) $nextOrder) + 1;
+        $copy['task_type'] = $source['task_type'] ?? 'task';
+        $copy['total_seconds'] = 0;
+        $copy['time_logs'] = [];
+        $copy['subtasks'] = array_map(function ($subtask) {
+            $subtask['id'] = (string) Str::ulid();
+            return $subtask;
+        }, array_values($source['subtasks'] ?? []));
+        $copy['notes'] = array_map(function ($note) {
+            $note['id'] = (string) Str::ulid();
+            $note['created_at'] = now()->toIso8601String();
+            return $note;
+        }, array_values($source['notes'] ?? []));
+        unset($copy['archived_at'], $copy['archived_from_stage']);
+
+        $tasks[] = $copy;
+        $updated = $this->store->update($data['id'], ['tareas' => $tasks]);
+        return response()->json(['ok' => true, 'item' => $updated, 'duplicated_id' => $copy['id']]);
     }
 
     public function tareaIaApoyo(Request $request)
@@ -1070,6 +1122,7 @@ class ProyectosController extends Controller
                     'owner_ids' => [],
                     'board_stage' => $task['board_stage'] ?? 'Por hacer',
                     'board_order' => count($tasks),
+                    'task_type' => 'task',
                     'total_seconds' => 0,
                     'subtasks' => [],
                     'notes' => [],

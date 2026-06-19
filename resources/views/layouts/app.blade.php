@@ -1085,6 +1085,18 @@
       color: #94a3b8;
       font-size: 0.8125rem;
     }
+
+    body.timer-fullscreen-open {
+      overflow: hidden;
+    }
+
+    body.timer-fullscreen-open header {
+      z-index: 1 !important;
+    }
+
+    body.timer-fullscreen-open #globalTimerFullscreenPanel {
+      z-index: 2147483650 !important;
+    }
   </style>
   <script>
     tailwind.config = {
@@ -1873,7 +1885,7 @@
               </svg>
               <span>Mi perfil</span>
             </button>
-            <div id="headerProfileMenu" class="hidden absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[130]">
+            <div id="headerProfileMenu" class="hidden absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-2" style="z-index:2147483400">
               <div class="px-3 py-2 border-b border-slate-100">
                 <div class="flex items-center gap-3">
                   <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm font-extrabold">{{ $headerUserInitials }}</div>
@@ -1982,13 +1994,55 @@
       </main>
     </div>
   </div>
-  <div id="globalTimerFullscreenPanel" class="fixed inset-0 z-[80] hidden bg-slate-950/90 backdrop-blur-sm">
-    <button type="button" id="globalTimerFullscreenCloseBtn" class="absolute top-4 right-4 px-3 py-2 rounded-lg bg-white/10 text-white text-sm font-semibold hover:bg-white/20">Cerrar</button>
-    <div class="h-full w-full flex items-center justify-center p-6">
-      <div class="text-center">
-        <div id="globalTimerFsProject" class="text-3xl md:text-5xl font-extrabold text-white mb-2">Proyecto</div>
-        <div id="globalTimerFsClient" class="text-sm md:text-lg text-slate-300 mb-8">Cliente</div>
-        <div id="globalTimerFsDisplay" class="text-[72px] md:text-[120px] leading-none font-mono font-extrabold text-lime-300 tracking-tight">00:00:00</div>
+  <div id="globalTimerFullscreenPanel" class="fixed inset-0 z-[2147483650] hidden overflow-y-auto bg-slate-950/95 text-white backdrop-blur-sm">
+    <div class="absolute top-4 right-4 z-10 flex items-center gap-2">
+      <button type="button" id="globalTimerFullscreenPipBtn" class="grid h-10 w-10 place-items-center rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/15" title="Modo PiP" aria-label="Modo PiP">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
+      </button>
+      <button type="button" id="globalTimerFullscreenCloseBtn" class="grid h-10 w-10 place-items-center rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/15" title="Cerrar" aria-label="Cerrar temporizador">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mx-auto flex min-h-full w-full max-w-6xl flex-col justify-center px-4 py-12 md:px-8">
+      <div class="mx-auto w-full max-w-4xl text-center">
+        <div id="globalTimerFsProject" class="truncate text-xl font-extrabold text-white md:text-3xl">Proyecto</div>
+        <div id="globalTimerFsClient" class="mt-1 truncate text-xs text-slate-300 md:text-base">Cliente</div>
+        <div class="mt-4 flex flex-col items-center justify-center gap-3 md:flex-row">
+          <div id="globalTimerFsDisplay" class="font-mono text-4xl font-extrabold leading-none tracking-tight text-lime-300 md:text-6xl">00:00:00</div>
+          <div class="flex items-center justify-center gap-2">
+          <button type="button" id="globalTimerFsPauseBtn" class="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/15" title="Pausar/continuar" aria-label="Pausar o continuar temporizador"></button>
+          <button type="button" id="globalTimerFsSaveBtn" class="inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-extrabold text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-45">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 13l4 4L19 7"/></svg>
+            Guardar
+          </button>
+          <button type="button" id="globalTimerFsDeleteBtn" class="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/35 bg-rose-500/10 px-4 text-sm font-extrabold text-rose-200 hover:bg-rose-500/15">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3m-8 0h10"/></svg>
+            Eliminar
+          </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 grid gap-4 md:grid-cols-2">
+        <section class="min-h-[320px] rounded-2xl bg-white/7 p-4 shadow-2xl">
+          <h3 class="mb-3 text-lg font-extrabold uppercase tracking-[0.2em] text-white">Checklist</h3>
+          <div id="globalTimerFsSubtasksList" class="max-h-64 space-y-2 overflow-y-auto pr-1 text-left"></div>
+          <div class="mt-2 flex gap-2">
+            <input id="globalTimerFsNewSubtaskInput" type="text" class="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs text-white outline-none placeholder:text-slate-400 focus:border-lime-300" placeholder="Añadir elemento">
+            <button id="globalTimerFsAddSubtaskBtn" type="button" class="rounded-lg bg-lime-300 px-3 py-2 text-xs font-extrabold text-slate-950 hover:bg-lime-200">Añadir</button>
+          </div>
+        </section>
+
+        <section class="min-h-[320px] rounded-2xl bg-white/7 p-4 shadow-2xl">
+          <h3 class="mb-3 text-lg font-extrabold uppercase tracking-[0.2em] text-white">Notas</h3>
+          <div id="globalTimerFsNotesList" class="max-h-56 space-y-1.5 overflow-y-auto pr-1 text-left"></div>
+          <div class="mt-2">
+            <textarea id="globalTimerFsNewNoteInput" rows="2" class="w-full resize-y rounded-lg border border-white/20 bg-white/10 px-2.5 py-2 text-xs text-white outline-none placeholder:text-slate-400 focus:border-lime-300" placeholder="Escribe una nota de pipeline..."></textarea>
+            <div class="mt-2 flex justify-end">
+              <button id="globalTimerFsAddNoteBtn" type="button" class="rounded-lg bg-lime-300 px-3 py-2 text-xs font-extrabold text-slate-950 hover:bg-lime-200">Guardar nota</button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -2361,6 +2415,10 @@
         return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
       }
 
+      function hasReminderText(item) {
+        return String(item?.text || '').trim() !== '';
+      }
+
       function loadReminders() {
         try {
           const parsed = JSON.parse(localStorage.getItem(REMINDERS_KEY) || '{}');
@@ -2384,7 +2442,7 @@
           sectionId: reminderSections[0]?.id || 'default',
           ...item,
           priority: normalizeReminderPriority(item?.priority),
-        }));
+        })).filter(hasReminderText);
         activeReminderCategoryId = ALL_REMINDERS_CATEGORY_ID;
         activeReminderSectionId = reminderSections[0]?.id || 'default';
       }
@@ -2676,7 +2734,7 @@
 
       function renderRemindersCounter() {
         if (!remindersCount) return;
-        const pending = reminders.filter((item) => !item.done).length;
+        const pending = reminders.filter((item) => hasReminderText(item) && !item.done).length;
         remindersCount.classList.toggle('hidden', pending === 0);
         remindersCount.textContent = String(pending > 99 ? '99+' : pending);
       }
@@ -2869,7 +2927,7 @@
         };
 
         const sectionHtml = (section, siblingSections, compact = false) => {
-          const items = reminders.filter((item) => String(item.sectionId || 'default') === String(section.id));
+          const items = reminders.filter((item) => String(item.sectionId || 'default') === String(section.id) && hasReminderText(item));
           const collapsed = !!section.collapsed;
           const title = String(section.title || '').trim();
           const isImplicitSection = !title || title.toLowerCase() === 'recordatorios';
@@ -2895,7 +2953,7 @@
           ? reminderCategoriesData.map((category) => {
               const sections = ensureReminderSectionForCategory(category.id);
               const sectionIds = sections.map((section) => String(section.id));
-              const categoryPending = reminders.filter((item) => sectionIds.includes(String(item.sectionId || '')) && !item.done).length;
+              const categoryPending = reminders.filter((item) => sectionIds.includes(String(item.sectionId || '')) && hasReminderText(item) && !item.done).length;
               const collapsed = !!category.collapsed;
               return `<section class="rounded-2xl border border-slate-100 bg-white/70 px-3 py-2.5 shadow-sm" data-reminder-category-group="${escapeHtml(category.id)}">
                 <div class="flex items-center gap-2">
@@ -3310,6 +3368,13 @@
         });
         remindersList?.querySelectorAll('[data-reminder-text]').forEach((input) => {
           autoSizeReminderText(input);
+          const removeReminderIfEmpty = () => {
+            const id = input.getAttribute('data-reminder-text') || '';
+            if (!id || String(input.value || '').trim()) return false;
+            reminders = reminders.filter((item) => String(item.id || '') !== String(id));
+            saveReminders();
+            return true;
+          };
           input.addEventListener('input', () => {
             const id = input.getAttribute('data-reminder-text');
             autoSizeReminderText(input);
@@ -3323,12 +3388,21 @@
             const id = input.getAttribute('data-reminder-text') || '';
             const row = input.closest('[data-reminder-id]');
             const sectionId = row?.getAttribute('data-reminder-section-id') || activeReminderSectionId;
+            if (!String(input.value || '').trim()) {
+              reminders = reminders.filter((item) => String(item.id || '') !== String(id));
+              saveReminders();
+              openReminderComposer(sectionId);
+              return;
+            }
             reminders = reminders.map((item) => item.id === id ? { ...item, text: input.value, updatedAt: Date.now() } : item);
             persistRemindersOnly();
             hideReminderLinkDropdown();
             hideReminderPriorityDropdown();
             hideReminderRowPriorityDropdowns();
             openReminderComposer(sectionId, id);
+          });
+          input.addEventListener('blur', () => {
+            setTimeout(() => removeReminderIfEmpty(), 80);
           });
         });
         remindersList?.querySelectorAll('[data-reminder-priority]').forEach((select) => {
@@ -3728,6 +3802,7 @@
         notificationsBackdrop?.classList.remove('hidden');
         notificationsPanel.classList.remove('translate-x-full');
         profileMenu.classList.add('hidden');
+        document.body.classList.remove('header-profile-menu-open');
       }
 
       function closeNotificationsPanel() {
@@ -3746,6 +3821,7 @@
         remindersBackdrop?.classList.remove('hidden');
         remindersPanel?.classList.remove('translate-x-[calc(100%+2rem)]');
         profileMenu.classList.add('hidden');
+        document.body.classList.remove('header-profile-menu-open');
         renderReminders();
       }
 
@@ -3770,7 +3846,9 @@
       function toggleProfileMenu() {
         closeNotificationsPanel();
         closeRemindersPanel();
-        profileMenu.classList.toggle('hidden');
+        const shouldOpen = profileMenu.classList.contains('hidden');
+        profileMenu.classList.toggle('hidden', !shouldOpen);
+        document.body.classList.toggle('header-profile-menu-open', shouldOpen);
       }
 
       notificationsBtn.addEventListener('click', toggleNotificationsPanel);
@@ -3956,6 +4034,7 @@
           return;
         }
         profileMenu.classList.add('hidden');
+        document.body.classList.remove('header-profile-menu-open');
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
         hideReminderRowPriorityDropdowns();
@@ -4001,6 +4080,7 @@
           closeNotificationsPanel();
           closeRemindersPanel();
           profileMenu.classList.add('hidden');
+          document.body.classList.remove('header-profile-menu-open');
           return;
         }
 
@@ -4115,8 +4195,7 @@
         const filtered = headerTimerPickerState.projects.filter((project) => {
           const title = String(project?.titulo || '').toLowerCase();
           const client = String(project?.cliente || '').toLowerCase();
-          const stage = String(project?.etapa || '').toLowerCase();
-          return !q || title.includes(q) || client.includes(q) || stage.includes(q);
+          return !q || title.includes(q) || client.includes(q);
         });
 
         if (!filtered.length) {
@@ -4129,14 +4208,13 @@
           const id = String(project?.id || '');
           const title = String(project?.titulo || 'Proyecto sin nombre').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
           const client = String(project?.cliente || 'Sin cliente').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const stage = String(project?.etapa || 'Sin etapa').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
           const tasksTotal = Array.isArray(project?.tareas) ? project.tareas.length : 0;
           const selected = String(headerTimerPickerState.selectedProjectId) === id;
           return `<button type="button" data-header-timer-project-id="${id}" class="w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${selected ? 'border-lime-300 bg-lime-50' : 'border-slate-200 bg-white hover:bg-slate-100'}">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="truncate text-sm font-bold text-slate-800">${title}</div>
-                <div class="text-[11px] text-slate-500 mt-0.5">${client} · ${stage}</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">${client}</div>
               </div>
               <span class="text-[10px] font-bold text-slate-500 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 whitespace-nowrap">${tasksTotal} tareas</span>
             </div>
@@ -4356,7 +4434,7 @@
         let modal = document.getElementById('timerChoiceModal');
         if (!modal) {
           const wrapper = document.createElement('div');
-          wrapper.innerHTML = `<div id="timerChoiceModal" class="fixed inset-0 z-[1450] hidden">
+          wrapper.innerHTML = `<div id="timerChoiceModal" class="fixed inset-0 hidden" style="z-index:2147483500">
             <div class="absolute inset-0 bg-slate-950/55" id="timerChoiceBackdrop"></div>
             <div class="absolute inset-0 flex items-center justify-center p-4">
               <div class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -4384,19 +4462,29 @@
           </div>`;
           document.body.appendChild(wrapper.firstElementChild);
           modal = document.getElementById('timerChoiceModal');
-          document.getElementById('timerChoiceBackdrop')?.addEventListener('click', () => modal.classList.add('hidden'));
-          document.getElementById('timerChoiceCancel')?.addEventListener('click', () => modal.classList.add('hidden'));
-          document.getElementById('timerChoiceProyecto')?.addEventListener('click', () => {
+          const closeTimerChoiceModal = () => {
             modal.classList.add('hidden');
+            document.body.classList.remove('timer-choice-modal-open');
+          };
+          document.getElementById('timerChoiceBackdrop')?.addEventListener('click', closeTimerChoiceModal);
+          document.getElementById('timerChoiceCancel')?.addEventListener('click', closeTimerChoiceModal);
+          document.getElementById('timerChoiceProyecto')?.addEventListener('click', () => {
+            closeTimerChoiceModal();
             if (typeof window.openQuickProjectActionModal === 'function') window.openQuickProjectActionModal('start-timer');
             else openHeaderTimerPickerModal();
           });
           document.getElementById('timerChoiceLead')?.addEventListener('click', () => {
-            modal.classList.add('hidden');
+            closeTimerChoiceModal();
             if (typeof window.openLeadTimerModal === 'function') window.openLeadTimerModal();
             else if (window.showNotification) window.showNotification('Abre la página de Leads para usar el timer de leads.', 'info');
           });
+          document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+              closeTimerChoiceModal();
+            }
+          });
         }
+        document.body.classList.add('timer-choice-modal-open');
         modal.classList.remove('hidden');
       };
 
@@ -4424,6 +4512,9 @@
       let globalPipAudioTrack = null;
       let globalPipAudioPrimed = false;
       let suppressGlobalPipPlaybackSync = false;
+      let globalTimerProjectSnapshot = null;
+      let globalTimerFsShowAllSubtasks = false;
+      let globalTimerFsShowAllNotes = false;
 
       function formatTimer(totalSeconds) {
         const sec = Math.max(0, Number(totalSeconds) || 0);
@@ -4581,20 +4672,20 @@
         window.updateHeaderTimerButtonVisibility?.(false);
 
         if (!host.querySelector('#globalHeaderTimerCard')) {
-          host.innerHTML = `<div id="globalHeaderTimerCard" class="group relative rounded-2xl border border-[#2b3658] bg-[#101729] px-2 py-1.5 shadow-[0_10px_22px_rgba(16,23,41,0.32)] min-w-0">
+          host.innerHTML = `<div id="globalHeaderTimerCard" role="button" tabindex="0" class="group relative w-full max-w-full cursor-pointer overflow-hidden rounded-2xl border border-[#2b3658] bg-[#101729] px-2 py-1.5 shadow-[0_10px_22px_rgba(16,23,41,0.32)] min-w-0 focus:outline-none focus:ring-2 focus:ring-lime-300/40">
             <div class="absolute top-1.5 right-1.5 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0">
               <button id="globalHeaderTimerPipBtn" type="button" class="w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 flex items-center justify-center" title="Modo PiP" aria-label="Modo PiP">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
               </button>
             </div>
-            <div class="flex items-center gap-2 min-w-0">
+            <div class="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)_8.75rem] items-center gap-2">
               <button id="globalHeaderTimerToggleBtn" type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f0fe97] text-[#101729]" title="${globalTimerState.isRunning ? 'Pausar temporizador' : 'Continuar temporizador'}">${globalTimerState.isRunning ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>'}</button>
-              <div class="min-w-0 flex-1">
-                <div class="text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#f0fe97]/70">En foco</div>
-                <button id="globalHeaderTimerTask" type="button" class="truncate text-left text-xs lg:text-sm font-extrabold text-[#f0fe97] hover:underline">${globalTimerState.taskName || 'Temporizador activo'}</button>
-                <div id="globalHeaderTimerProject" class="truncate text-[10px] lg:text-[11px] font-semibold text-[#f0fe97]/60">${globalTimerState.projectTitle || 'Proyecto'}</div>
+              <div class="min-w-0 overflow-hidden">
+                <div class="truncate text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#f0fe97]/70">En foco</div>
+                <button id="globalHeaderTimerTask" type="button" class="block w-full max-w-full truncate text-left text-xs lg:text-sm font-extrabold text-[#f0fe97] hover:underline">${globalTimerState.taskName || 'Temporizador activo'}</button>
+                <div id="globalHeaderTimerProject" class="w-full max-w-full truncate text-[10px] lg:text-[11px] font-semibold text-[#f0fe97]/60">${globalTimerState.projectTitle || 'Proyecto'}</div>
               </div>
-              <div class="shrink-0 text-right min-w-[98px] lg:min-w-[112px]">
+              <div class="min-w-0 text-right">
                 <div id="globalHeaderTimerValue" class="text-2xl lg:text-[30px] font-mono font-extrabold tracking-tight text-[#f0fe97] leading-none">${formatTimer(getDisplayedSeconds())}</div>
                 <div class="mt-1 flex items-center justify-end gap-1.5">
                   <button id="globalHeaderTimerSaveBtn" type="button" class="text-[10px] lg:text-[11px] font-bold text-[#f0fe97]/75 hover:text-[#f0fe97]">Guardar</button>
@@ -4604,11 +4695,33 @@
             </div>
           </div>`;
 
-          host.querySelector('#globalHeaderTimerToggleBtn')?.addEventListener('click', toggleGlobalTimer);
-          host.querySelector('#globalHeaderTimerTask')?.addEventListener('click', openGlobalTimerTaskDetail);
-          host.querySelector('#globalHeaderTimerSaveBtn')?.addEventListener('click', saveGlobalTimerLog);
-          host.querySelector('#globalHeaderTimerDeleteBtn')?.addEventListener('click', deleteGlobalTimerLog);
-          host.querySelector('#globalHeaderTimerPipBtn')?.addEventListener('click', toggleGlobalTimerMiniPip);
+          host.querySelector('#globalHeaderTimerCard')?.addEventListener('click', openGlobalTimerFullscreen);
+          host.querySelector('#globalHeaderTimerCard')?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openGlobalTimerFullscreen();
+            }
+          });
+          host.querySelector('#globalHeaderTimerToggleBtn')?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            toggleGlobalTimer();
+          });
+          host.querySelector('#globalHeaderTimerTask')?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openGlobalTimerFullscreen();
+          });
+          host.querySelector('#globalHeaderTimerSaveBtn')?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            saveGlobalTimerLog();
+          });
+          host.querySelector('#globalHeaderTimerDeleteBtn')?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            deleteGlobalTimerLog();
+          });
+          host.querySelector('#globalHeaderTimerPipBtn')?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            toggleGlobalTimerMiniPip();
+          });
         }
 
         const taskNode = host.querySelector('#globalHeaderTimerTask');
@@ -4676,27 +4789,252 @@
         if (pipProject) pipProject.textContent = projectTitle;
         if (pipClient) pipClient.textContent = clientName;
         if (pipDisplay) pipDisplay.textContent = display;
+        syncGlobalTimerFullscreenControls();
         drawGlobalTimerPipCanvas(display);
       }
 
-      function openGlobalTimerFullscreen() {
+      function globalTimerEscapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;',
+        }[char]));
+      }
+
+      function formatGlobalTimerNoteDate(value) {
+        if (!value) return '';
+        try {
+          return new Intl.DateTimeFormat('es-CO', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          }).format(new Date(value));
+        } catch (_) {
+          return '';
+        }
+      }
+
+      function getGlobalTimerTaskFromSnapshot() {
+        if (!globalTimerProjectSnapshot || !globalTimerState?.taskId) return null;
+        return (Array.isArray(globalTimerProjectSnapshot.tareas) ? globalTimerProjectSnapshot.tareas : [])
+          .find((task) => String(task?.id || '') === String(globalTimerState.taskId || '')) || null;
+      }
+
+      async function fetchGlobalTimerProjectSnapshot(force = false) {
+        if (!globalTimerState?.projectId) return null;
+        if (!force && globalTimerProjectSnapshot && String(globalTimerProjectSnapshot.id) === String(globalTimerState.projectId)) {
+          return globalTimerProjectSnapshot;
+        }
+
+        const res = await fetch(`/api/proyectos/${encodeURIComponent(globalTimerState.projectId)}`, {
+          headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.data) throw new Error('No se pudo cargar el proyecto activo.');
+        globalTimerProjectSnapshot = data.data;
+        return globalTimerProjectSnapshot;
+      }
+
+      function renderGlobalTimerFullscreenSubtasks() {
+        const list = document.getElementById('globalTimerFsSubtasksList');
+        if (!list) return;
+
+        const task = getGlobalTimerTaskFromSnapshot();
+        if (!globalTimerState?.taskId) {
+          list.innerHTML = '<div class="text-sm text-slate-300">Sin tarea vinculada para este temporizador.</div>';
+          return;
+        }
+        if (!globalTimerProjectSnapshot) {
+          list.innerHTML = '<div class="text-sm text-slate-300">Cargando checklist...</div>';
+          return;
+        }
+        if (!task) {
+          list.innerHTML = '<div class="text-sm text-slate-300">No encontré la tarea vinculada.</div>';
+          return;
+        }
+
+        const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+        if (!subtasks.length) {
+          list.innerHTML = '<div class="text-sm text-slate-300">No hay elementos en el checklist todavía.</div>';
+          return;
+        }
+
+        const hasMore = subtasks.length > 6;
+        const visibleSubtasks = globalTimerFsShowAllSubtasks ? subtasks : subtasks.slice(0, 6);
+        list.innerHTML = visibleSubtasks.map((subtask) => {
+          const id = globalTimerEscapeHtml(String(subtask.id || ''));
+          const done = !!subtask.done;
+          return `<button type="button" data-global-timer-subtask-id="${id}" class="w-full flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2 text-left hover:bg-white/20 transition-colors">
+            <span class="w-5 h-5 rounded border ${done ? 'bg-lime-300 border-lime-300 text-slate-950' : 'border-slate-400 text-transparent'} flex items-center justify-center shrink-0">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+            </span>
+            <span class="min-w-0 text-base ${done ? 'line-through text-slate-400' : 'text-white'}">${globalTimerEscapeHtml(String(subtask.texto || ''))}</span>
+          </button>`;
+        }).join('');
+
+        list.querySelectorAll('[data-global-timer-subtask-id]').forEach((button) => {
+          button.addEventListener('click', () => toggleGlobalTimerFullscreenSubtask(button.getAttribute('data-global-timer-subtask-id')));
+        });
+
+        if (hasMore) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'mt-1 text-xs font-bold text-lime-300 hover:text-lime-200';
+          button.textContent = globalTimerFsShowAllSubtasks ? 'Ver menos' : 'Ver todas';
+          button.addEventListener('click', () => {
+            globalTimerFsShowAllSubtasks = !globalTimerFsShowAllSubtasks;
+            renderGlobalTimerFullscreenSubtasks();
+          });
+          list.appendChild(button);
+        }
+      }
+
+      function renderGlobalTimerFullscreenNotes() {
+        const list = document.getElementById('globalTimerFsNotesList');
+        if (!list) return;
+
+        const task = getGlobalTimerTaskFromSnapshot();
+        if (!globalTimerState?.taskId) {
+          list.innerHTML = '<div class="text-sm text-slate-300">Sin tarea vinculada para este temporizador.</div>';
+          return;
+        }
+        if (!globalTimerProjectSnapshot) {
+          list.innerHTML = '<div class="text-sm text-slate-300">Cargando notas...</div>';
+          return;
+        }
+        if (!task) {
+          list.innerHTML = '<div class="text-sm text-slate-300">No encontré la tarea vinculada.</div>';
+          return;
+        }
+
+        const notes = (Array.isArray(task.notes) ? task.notes : [])
+          .slice()
+          .sort((a, b) => new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime());
+
+        if (!notes.length) {
+          list.innerHTML = '<div class="text-sm text-slate-300">No hay notas de pipeline todavía.</div>';
+          return;
+        }
+
+        const hasMore = notes.length > 4;
+        const visibleNotes = globalTimerFsShowAllNotes ? notes : notes.slice(0, 4);
+        list.innerHTML = visibleNotes.map((note) => `
+          <div class="rounded-lg border border-white/15 bg-white/10 px-3 py-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-[11px] font-bold text-slate-100">${globalTimerEscapeHtml(String(note.author_name || note.user || 'Usuario'))}</div>
+              <div class="text-[10px] text-slate-300">${globalTimerEscapeHtml(formatGlobalTimerNoteDate(note.created_at))}</div>
+            </div>
+            <div class="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-100">${globalTimerEscapeHtml(String(note.texto || ''))}</div>
+          </div>
+        `).join('');
+
+        if (hasMore) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'mt-1 text-xs font-bold text-lime-300 hover:text-lime-200';
+          button.textContent = globalTimerFsShowAllNotes ? 'Ver menos' : 'Ver todas';
+          button.addEventListener('click', () => {
+            globalTimerFsShowAllNotes = !globalTimerFsShowAllNotes;
+            renderGlobalTimerFullscreenNotes();
+          });
+          list.appendChild(button);
+        }
+      }
+
+      function renderGlobalTimerFullscreenData() {
+        renderGlobalTimerFullscreenSubtasks();
+        renderGlobalTimerFullscreenNotes();
+      }
+
+      function syncGlobalTimerFullscreenControls() {
+        const pauseBtn = document.getElementById('globalTimerFsPauseBtn');
+        const saveBtn = document.getElementById('globalTimerFsSaveBtn');
+        if (pauseBtn) {
+          pauseBtn.innerHTML = globalTimerState?.isRunning
+            ? '<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
+            : '<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>';
+        }
+        if (saveBtn) {
+          saveBtn.disabled = getDisplayedSeconds() <= 0;
+        }
+      }
+
+      async function openGlobalTimerFullscreen() {
         if (!globalTimerState?.projectId) return;
-        syncGlobalTimerPanels();
         const panel = document.getElementById('globalTimerFullscreenPanel');
         if (!panel) return;
         panel.classList.remove('hidden');
-        if (panel.requestFullscreen) {
-          panel.requestFullscreen().catch(() => {});
+        document.body.classList.add('timer-fullscreen-open');
+        syncGlobalTimerPanels();
+        globalTimerFsShowAllSubtasks = false;
+        globalTimerFsShowAllNotes = false;
+        renderGlobalTimerFullscreenData();
+        try {
+          await fetchGlobalTimerProjectSnapshot(true);
+        } catch (error) {
+          console.error(error);
         }
+        renderGlobalTimerFullscreenData();
       }
 
       function closeGlobalTimerFullscreen() {
         const panel = document.getElementById('globalTimerFullscreenPanel');
         if (!panel) return;
         panel.classList.add('hidden');
+        document.body.classList.remove('timer-fullscreen-open');
         if (document.fullscreenElement && document.exitFullscreen) {
           document.exitFullscreen().catch(() => {});
         }
+      }
+
+      async function addGlobalTimerFullscreenSubtask() {
+        const input = document.getElementById('globalTimerFsNewSubtaskInput');
+        const texto = String(input?.value || '').trim();
+        if (!globalTimerState?.projectId || !globalTimerState?.taskId || !texto) return;
+
+        const res = await fetch('/api/proyectos/tareas/subtareas/agregar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken || '', 'X-Requested-With': 'XMLHttpRequest'},
+          body: JSON.stringify({id: globalTimerState.projectId, tarea_id: globalTimerState.taskId, texto}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) return;
+        if (input) input.value = '';
+        globalTimerProjectSnapshot = data.item;
+        renderGlobalTimerFullscreenData();
+      }
+
+      async function addGlobalTimerFullscreenNote() {
+        const input = document.getElementById('globalTimerFsNewNoteInput');
+        const texto = String(input?.value || '').trim();
+        if (!globalTimerState?.projectId || !globalTimerState?.taskId || !texto) return;
+
+        const res = await fetch('/api/proyectos/tareas/notas/agregar', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken || '', 'X-Requested-With': 'XMLHttpRequest'},
+          body: JSON.stringify({id: globalTimerState.projectId, tarea_id: globalTimerState.taskId, texto}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) return;
+        if (input) input.value = '';
+        globalTimerProjectSnapshot = data.item;
+        renderGlobalTimerFullscreenData();
+      }
+
+      async function toggleGlobalTimerFullscreenSubtask(subtaskId) {
+        if (!globalTimerState?.projectId || !globalTimerState?.taskId || !subtaskId) return;
+
+        const res = await fetch('/api/proyectos/tareas/subtareas/toggle', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken || '', 'X-Requested-With': 'XMLHttpRequest'},
+          body: JSON.stringify({id: globalTimerState.projectId, tarea_id: globalTimerState.taskId, subtarea_id: subtaskId}),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) return;
+        globalTimerProjectSnapshot = data.item;
+        renderGlobalTimerFullscreenData();
       }
 
       async function ensureGlobalPipSource() {
@@ -5026,17 +5364,11 @@
         fallback?.classList.toggle('hidden');
       }
 
-      function openGlobalTimerTaskDetail() {
-        if (!globalTimerState?.projectId) return;
-        const openTask = String(globalTimerState.taskId || '').trim();
-        const taskParam = openTask ? `&open_task=${encodeURIComponent(openTask)}` : '';
-        window.location.href = `/proyectos?view=kanban&open_project=${encodeURIComponent(globalTimerState.projectId)}${taskParam}`;
-      }
-
       async function saveGlobalTimerLog() {
         if (!globalTimerState?.projectId) return;
         const projectId = globalTimerState.projectId;
         const seconds = getDisplayedSeconds();
+        if (seconds <= 0) return;
         // Stop timer on server first if running
         if (globalTimerState.isRunning) {
           try {
@@ -5061,6 +5393,7 @@
           task_name: String(globalTimerState.taskName || ''),
         });
         localStorage.setItem(TIMER_HISTORY_PREFIX + projectId, JSON.stringify(entries));
+        closeGlobalTimerFullscreen();
         setStoredState(null);
         renderGlobalTimer();
         if (window.showNotification) window.showNotification('Tiempo guardado', 'success');
@@ -5143,18 +5476,13 @@
 
           if (item?.project_id) {
             const serverSeconds = Math.max(0, Number(item.current_seconds || 0));
-            const localSeconds = stored && String(stored.projectId || '') === String(item.project_id)
-              ? Math.max(0, Math.floor(getDisplayedSeconds()))
-              : 0;
-            const stableSeconds = Math.max(serverSeconds, localSeconds);
-
             setStoredState({
               projectId: String(item.project_id),
               projectTitle: String(item.project_title || 'Proyecto'),
               clientName: String(item.client || 'Sin Cliente'),
               taskId: String(item.task_id || ''),
               taskName: String(item.task_name || 'Temporizador activo'),
-              currentSeconds: stableSeconds,
+              currentSeconds: serverSeconds,
               isRunning: true,
               syncedAt: Date.now(),
             });
@@ -5177,11 +5505,34 @@
       }
 
       document.getElementById('globalTimerFullscreenCloseBtn')?.addEventListener('click', closeGlobalTimerFullscreen);
+      document.getElementById('globalTimerFullscreenPipBtn')?.addEventListener('click', toggleGlobalTimerMiniPip);
+      document.getElementById('globalTimerFsPauseBtn')?.addEventListener('click', toggleGlobalTimer);
+      document.getElementById('globalTimerFsSaveBtn')?.addEventListener('click', saveGlobalTimerLog);
+      document.getElementById('globalTimerFsDeleteBtn')?.addEventListener('click', deleteGlobalTimerLog);
+      document.getElementById('globalTimerFsAddSubtaskBtn')?.addEventListener('click', addGlobalTimerFullscreenSubtask);
+      document.getElementById('globalTimerFsAddNoteBtn')?.addEventListener('click', addGlobalTimerFullscreenNote);
+      document.getElementById('globalTimerFsNewSubtaskInput')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addGlobalTimerFullscreenSubtask();
+        }
+      });
+      document.getElementById('globalTimerFsNewNoteInput')?.addEventListener('keydown', (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          event.preventDefault();
+          addGlobalTimerFullscreenNote();
+        }
+      });
       document.getElementById('globalTimerPipToggleBtn')?.addEventListener('click', toggleGlobalTimer);
       document.getElementById('globalTimerPipCloseBtn')?.addEventListener('click', toggleGlobalTimerMiniPip);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !document.getElementById('globalTimerFullscreenPanel')?.classList.contains('hidden')) {
+          closeGlobalTimerFullscreen();
+        }
+      });
       document.addEventListener('fullscreenchange', () => {
         if (!document.fullscreenElement) {
-          document.getElementById('globalTimerFullscreenPanel')?.classList.add('hidden');
+          closeGlobalTimerFullscreen();
         }
       });
 
@@ -6257,9 +6608,7 @@
           title = aiExtractField(text, ['Nombre', 'Proyecto', 'Título', 'Titulo']) || 'Proyecto propuesto';
           rows = [
             ['Cliente', aiExtractField(text, ['Cliente', 'Empresa']) || 'Sin Cliente'],
-            ['Estado', aiExtractField(text, ['Estado', 'Etapa']) || 'INICIO'],
             ['Prioridad', aiExtractField(text, ['Prioridad']) || 'Con calma'],
-            ['Inicio', aiExtractField(text, ['Fecha inicio', 'Inicio']) || 'Hoy'],
             ['Vence', aiExtractField(text, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']) || 'Sin vencimiento'],
           ];
           listTitle = 'Tareas sugeridas';

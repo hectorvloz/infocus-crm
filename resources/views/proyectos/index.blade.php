@@ -609,16 +609,14 @@
       position: fixed;
       right: 1rem;
       bottom: 1rem;
-      z-index: 1700;
+      z-index: 2147482550;
       width: min(360px, calc(100vw - 2rem));
       border: 1px solid #e2e8f0;
       border-radius: 1.35rem;
       background: rgba(255,255,255,.96);
       box-shadow: 0 22px 54px rgba(15,23,42,.16);
       backdrop-filter: blur(10px);
-      padding: .8rem;
-      display: grid;
-      gap: .65rem;
+      overflow: hidden;
     }
 
     .project-upload-progress.hidden {
@@ -627,22 +625,30 @@
 
     .project-upload-row {
       display: grid;
-      grid-template-columns: 2.4rem 1fr;
-      gap: .7rem;
+      grid-template-columns: 2.15rem 1fr;
+      gap: .65rem;
       align-items: center;
-      padding: .6rem;
-      border-radius: .85rem;
-      background: #fff;
-      border: 1px solid #e2e8f0;
+      padding: .62rem;
+      border-radius: 1rem;
+      background: #f8fafc;
     }
 
     .project-upload-ghost {
-      width: 2.35rem;
-      height: 2.85rem;
-      border-radius: .55rem;
+      width: 2.15rem;
+      height: 2.65rem;
+      border-radius: .55rem .28rem .55rem .55rem;
       background: linear-gradient(180deg, #eef4fb, #e2e8f0);
       position: relative;
       overflow: hidden;
+    }
+
+    .project-upload-spinner {
+      width: 1.15rem;
+      height: 1.15rem;
+      border-radius: 999px;
+      border: 2px solid #dbe5f2;
+      border-top-color: #84cc16;
+      animation: projectUploadSpin .75s linear infinite;
     }
 
     .project-upload-ghost::after {
@@ -656,6 +662,10 @@
     @keyframes projectFileShimmer {
       from { transform: translateX(-100%); }
       to { transform: translateX(100%); }
+    }
+
+    @keyframes projectUploadSpin {
+      to { transform: rotate(360deg); }
     }
 
     @media (max-width: 520px) {
@@ -1097,6 +1107,27 @@
       overflow-y: hidden;
     }
 
+    body.timer-fullscreen-open,
+    body.project-modal-open {
+      overflow: hidden;
+    }
+
+    body.timer-fullscreen-open #projectBoardsHeader,
+    body.timer-fullscreen-open #projectBoardsView,
+    body.timer-fullscreen-open #projectBoardDetailView,
+    body.timer-fullscreen-open header {
+      z-index: 1 !important;
+    }
+
+    body.timer-fullscreen-open #timerFullscreenPanel {
+      z-index: 2147483650 !important;
+    }
+
+    body.project-modal-open #projectModal,
+    body.project-modal-open #taskDetailModal {
+      z-index: 2147483600 !important;
+    }
+
     .project-board-anim {
       transition: opacity .18s ease, transform .18s ease;
       will-change: opacity, transform;
@@ -1324,6 +1355,7 @@
       display: flex;
       flex: 0 0 auto;
       flex-direction: column;
+      position: relative;
       border-radius: .85rem;
       border: 1px solid #e2e8f0;
       background: #fff;
@@ -1331,6 +1363,11 @@
       box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
       cursor: default;
       overflow: hidden;
+    }
+
+    .project-task-card.has-cover .project-task-cover {
+      border-top-left-radius: .85rem;
+      border-top-right-radius: .85rem;
     }
 
     .project-task-card.is-entering {
@@ -1389,8 +1426,106 @@
       min-height: 5.25rem;
       flex: 0 0 auto;
       padding: .8rem;
+      padding-right: 2.35rem;
       background: #fff;
       gap: 0 !important;
+      border-bottom-left-radius: .85rem;
+      border-bottom-right-radius: .85rem;
+    }
+
+    .project-task-card-menu-wrap {
+      position: absolute;
+      right: .45rem;
+      top: .45rem;
+      z-index: 30;
+    }
+
+    .project-task-card-menu-btn {
+      width: 1.45rem;
+      height: 1.45rem;
+      border-radius: .5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      color: #94a3b8;
+      background: rgba(255,255,255,.86);
+      opacity: 0;
+      transform: translateY(-.18rem);
+      transition: opacity .18s ease, transform .2s ease, border-color .15s ease, color .15s ease, background-color .15s ease;
+    }
+
+    .project-task-card:hover .project-task-card-menu-btn,
+    .project-task-card:focus-within .project-task-card-menu-btn,
+    .project-task-card-menu-wrap.is-open .project-task-card-menu-btn {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .project-task-card-menu-btn:hover,
+    .project-task-card-menu-wrap.is-open .project-task-card-menu-btn {
+      border-color: #dbe5f2;
+      color: #334155;
+      background: #fff;
+    }
+
+    .project-task-card-menu {
+      position: fixed;
+      width: 9.25rem;
+      border-radius: .7rem;
+      border: 1px solid rgba(226, 232, 240, .95);
+      background: #fff;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, .16);
+      padding: .28rem;
+      color: #334155;
+      z-index: 2147483200;
+    }
+
+    .project-task-card-menu.hidden {
+      display: none !important;
+    }
+
+    .project-task-card-menu-label {
+      padding: .25rem .38rem .18rem;
+      color: #94a3b8;
+      font-size: .55rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .project-task-card-menu-item {
+      width: 100%;
+      min-height: 1.55rem;
+      border-radius: .52rem;
+      padding: .3rem .42rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      text-align: left;
+      font-size: .68rem;
+      font-weight: 650;
+      color: #334155;
+    }
+
+    .project-task-card-menu-item:hover {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .project-task-card-menu-item.is-active {
+      background: #ecfe88;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .project-task-card-menu-item.is-danger {
+      color: #e11d48;
+    }
+
+    .project-task-card.is-card-type .project-task-toggle {
+      display: none !important;
     }
 
     .project-task-toggle {
@@ -1488,6 +1623,10 @@
       pointer-events: none !important;
     }
 
+    .project-client-filter .app-select-wrap {
+      display: none !important;
+    }
+
     .project-client-filter-button {
       width: 100%;
       height: 2.65rem;
@@ -1566,6 +1705,28 @@
     .project-client-filter-option.is-active {
       background: #ecfe88;
     }
+
+    #newProjectModal {
+      z-index: 2147483600 !important;
+    }
+
+    body.project-new-modal-open #projectBoardsHeader,
+    body.timer-choice-modal-open #projectBoardsHeader {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    body.header-profile-menu-open #projectBoardsHeader {
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+
+    body.project-new-modal-open #projectClientFilterMenu,
+    body.timer-choice-modal-open #projectClientFilterMenu,
+    body.header-profile-menu-open #projectClientFilterMenu {
+      display: none !important;
+    }
   </style>
   <div id="stagesData" data-stages='{{ json_encode($stages) }}'></div>
   <div id="projectBoardsHeader" class="project-board-anim is-visible relative z-[2147482050] mb-4 flex items-center justify-between flex-wrap gap-3 overflow-visible">
@@ -1615,7 +1776,7 @@
     </div>
   </div>
 
-  <div id="newProjectModal" class="fixed inset-0 z-50 hidden" aria-labelledby="new-project-title" role="dialog" aria-modal="true">
+  <div id="newProjectModal" class="fixed inset-0 z-[2147482300] hidden" aria-labelledby="new-project-title" role="dialog" aria-modal="true">
     <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"></div>
     <div class="fixed inset-0 z-10 overflow-y-auto">
       <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
@@ -1936,11 +2097,14 @@
                            <p class="mt-1 text-xs text-slate-500">Haz clic o arrastra archivos aquí</p>
                        </div>
                        <div id="projectUploadProgress" class="project-upload-progress hidden">
-                         <div class="flex items-center justify-between">
-                           <div class="text-xs font-black text-slate-800">Subiendo archivos</div>
-                           <div id="projectUploadSummary" class="text-[11px] font-bold text-slate-400">0%</div>
+                         <div class="flex items-center justify-between border-b border-slate-100 p-4">
+                           <div>
+                             <div class="text-sm font-black text-slate-900">Subiendo archivos</div>
+                             <div id="projectUploadSummary" class="text-xs text-slate-500">Preparando...</div>
+                           </div>
+                           <div class="project-upload-spinner" aria-hidden="true"></div>
                          </div>
-                         <div id="projectUploadProgressList" class="grid gap-2"></div>
+                         <div id="projectUploadProgressList" class="max-h-72 space-y-2 overflow-y-auto p-3"></div>
                        </div>
                    </div>
                   </div>
@@ -2584,7 +2748,7 @@
     </div>
   </div>
 
-  <div id="timerFullscreenPanel" class="fixed inset-0 z-[80] hidden bg-slate-950/90 backdrop-blur-sm">
+  <div id="timerFullscreenPanel" class="fixed inset-0 z-[2147483650] hidden bg-slate-950/95 backdrop-blur-sm">
     <div class="absolute top-4 right-4 flex items-center gap-2">
       <button type="button" onclick="openTimerFullscreen()" class="w-10 h-10 rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20 flex items-center justify-center" title="Pantalla completa" aria-label="Pantalla completa">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 9V5a1 1 0 011-1h4m10 5V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4m10-5v4a1 1 0 01-1 1h-4"/></svg>
@@ -2621,10 +2785,10 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="bg-white/5 rounded-2xl p-4 text-left min-h-[320px]">
-            <div class="text-lg uppercase tracking-[0.2em] text-slate-100 font-extrabold mb-3">Sub tareas</div>
+            <div class="text-lg uppercase tracking-[0.2em] text-slate-100 font-extrabold mb-3">Checklist</div>
             <div id="timerFsSubtasksList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
             <div class="mt-2 flex items-center gap-2">
-              <input id="timerFsNewSubtaskInput" class="flex-1 h-9 rounded-lg border border-white/20 bg-white/10 px-2.5 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-300/40" placeholder="Añadir sub tarea" onkeydown="if(event.key==='Enter') addTimerFullscreenSubtask()">
+              <input id="timerFsNewSubtaskInput" class="flex-1 h-9 rounded-lg border border-white/20 bg-white/10 px-2.5 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-lime-300/40" placeholder="Añadir elemento" onkeydown="if(event.key==='Enter') addTimerFullscreenSubtask()">
               <button type="button" onclick="addTimerFullscreenSubtask()" class="h-9 px-3 rounded-lg bg-lime-300 text-slate-900 text-xs font-bold hover:bg-lime-200">Añadir</button>
             </div>
           </div>
@@ -2874,6 +3038,10 @@
     let openTaskFromQuery = urlParams.get('open_task') || '';
     let openNewProjectFromQuery = urlParams.get('new_project') === '1';
     let openHeaderTimerFromQuery = urlParams.get('header_timer') === '1';
+    let openPinnedTimerFromQuery = urlParams.get('open_timer') === '1';
+    try {
+      openPinnedTimerFromQuery = openPinnedTimerFromQuery || sessionStorage.getItem('infocus_open_project_timer_fullscreen') === '1';
+    } catch (_) {}
     let animateProgressBarsOnce = false;
 
     function clearOpenProjectQueryParam() {
@@ -2881,10 +3049,14 @@
       const hasOpenProject = nextUrl.searchParams.has('open_project');
       const hasOpenTask = nextUrl.searchParams.has('open_task');
       const hasNewProject = nextUrl.searchParams.has('new_project');
-      if (!hasOpenProject && !hasOpenTask && !hasNewProject) return;
+      const hasOpenTimer = nextUrl.searchParams.has('open_timer');
+      const hasHeaderTimer = nextUrl.searchParams.has('header_timer');
+      if (!hasOpenProject && !hasOpenTask && !hasNewProject && !hasOpenTimer && !hasHeaderTimer) return;
       nextUrl.searchParams.delete('open_project');
       nextUrl.searchParams.delete('open_task');
       nextUrl.searchParams.delete('new_project');
+      nextUrl.searchParams.delete('open_timer');
+      nextUrl.searchParams.delete('header_timer');
       window.history.replaceState({}, '', nextUrl);
     }
 
@@ -3731,7 +3903,7 @@
     let pinnedTimerTaskId = null;
     let timerFsShowAllSubtasks = false;
     let timerFsShowAllNotes = false;
-    let headerTimerLastProjectId = null;
+    let headerTimerLastKey = null;
     let headerTimerLastSeconds = 0;
     let kanbanDragPreviewEl = null;
     let currentTaskView = ['kanban', 'tareas', 'lista', 'archivados'].includes(urlParams.get('view')) ? urlParams.get('view') : 'kanban';
@@ -3837,6 +4009,7 @@
     const boardRecentTaskIds = new Set();
     let boardStageEditingName = '';
     let boardAiWorking = null;
+    const PROJECT_BOARD_RECENTS_KEY = 'infocus.projectBoardRecents.v1';
     const DEFAULT_PROJECT_TASK_STAGES = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
     window.history.replaceState({
       view: pendingBoardSlug || currentBoardProjectId ? 'project-board' : 'project-boards',
@@ -3997,10 +4170,20 @@
 
     function getProjectTaskStats(project) {
       const tasks = Array.isArray(project?.tareas) ? project.tareas : [];
-      const total = tasks.length;
-      const done = tasks.filter((task) => !!task?.done).length;
+      const progressTasks = tasks.filter((task) => isBoardProgressTask(task));
+      const total = progressTasks.length;
+      const done = progressTasks.filter((task) => !!task?.done).length;
       const pct = total === 0 ? 0 : Math.round((done / total) * 100);
-      return { total, done, pending: Math.max(total - done, 0), pct };
+      return { total, totalCards: tasks.length, done, pending: Math.max(total - done, 0), pct };
+    }
+
+    function normalizeBoardTaskType(value) {
+      const type = String(value || '').trim().toLowerCase();
+      return type === 'card' || type === 'tarjeta' ? 'card' : 'task';
+    }
+
+    function isBoardProgressTask(task) {
+      return normalizeBoardTaskType(task?.task_type || task?.type || 'task') !== 'card';
     }
 
     function progressBarColor(pct) {
@@ -4103,7 +4286,7 @@
           </div>
 
           <div class="font-extrabold text-slate-900 text-lg leading-tight mb-0.5 hover:text-blue-600 transition-colors cursor-pointer outline-none focus:bg-slate-50 focus:ring-2 focus:ring-lime-300 rounded px-1 -mx-1 project-title" data-project-id="${p.id}" ondblclick="event.stopPropagation(); editProjectTitle(this, '${p.id}')" onclick="event.stopPropagation(); handleCardClick(event, '${p.id}')">${escapeHtml(p.titulo || 'Proyecto')}</div>
-          <div class="text-sm text-slate-500 mb-3">${escapeHtml(p.etapa || 'Sin etapa')}</div>
+          <div class="text-sm text-slate-500 mb-3">${escapeHtml(p.cliente || 'Sin cliente')}</div>
 
           <div>
             <div class="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
@@ -4200,12 +4383,53 @@
       return String(params.get('board') || '').trim();
     }
 
+    function getProjectBoardRecents() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(PROJECT_BOARD_RECENTS_KEY) || '{}');
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function markProjectBoardOpened(projectId) {
+      const id = String(projectId || '').trim();
+      if (!id) return;
+      const recents = getProjectBoardRecents();
+      recents[id] = Date.now();
+      try {
+        localStorage.setItem(PROJECT_BOARD_RECENTS_KEY, JSON.stringify(recents));
+      } catch (error) {}
+    }
+
+    function projectBoardFallbackTime(project = {}) {
+      const value = project.updated_at || project.created_at || project.fecha_creacion || project.inicio || '';
+      const time = Date.parse(value);
+      return Number.isFinite(time) ? time : 0;
+    }
+
+    function sortProjectBoardsForDisplay(rows = []) {
+      const recents = getProjectBoardRecents();
+      return rows
+        .map((project, index) => ({ project, index }))
+        .sort((a, b) => {
+          const aRecent = Number(recents[String(a.project?.id || '')] || 0);
+          const bRecent = Number(recents[String(b.project?.id || '')] || 0);
+          if (aRecent !== bRecent) return bRecent - aRecent;
+          const aTime = projectBoardFallbackTime(a.project);
+          const bTime = projectBoardFallbackTime(b.project);
+          if (aTime !== bTime) return bTime - aTime;
+          return a.index - b.index;
+        })
+        .map(({ project }) => project);
+    }
+
     function renderProjectBoards(list) {
       const grid = document.getElementById('projectBoardsGrid');
       const count = document.getElementById('projectBoardsCount');
       if (!grid) return;
 
-      const rows = Array.isArray(list) ? list : [];
+      const rows = sortProjectBoardsForDisplay(Array.isArray(list) ? list : []);
       if (count) count.textContent = `${rows.length} tablero${rows.length === 1 ? '' : 's'}`;
 
       if (!rows.length) {
@@ -4227,7 +4451,6 @@
         const safeId = String(project.id || '').replace(/'/g, "\\'");
         const stats = getProjectTaskStats(project);
         const taskCount = Array.isArray(project.tareas) ? project.tareas.length : 0;
-        const stage = escapeHtml(project.etapa || 'Sin estado');
         const client = escapeHtml(project.cliente || 'Sin cliente');
         const due = formatBoardDate(project.vencimiento);
         return `<button type="button" onclick="openProjectBoard('${safeId}')" class="project-board-card text-left" style="--board-from:${from};--board-to:${to};">
@@ -4235,8 +4458,8 @@
           <div class="project-board-footer">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
-                <div class="truncate text-base font-black leading-tight sm:text-lg">${escapeHtml(project.titulo || 'Tablero sin titulo')}</div>
-                <div class="mt-0.5 truncate text-[11px] font-semibold text-slate-500">${client} · ${stage}</div>
+                <div class="truncate text-sm font-black leading-tight sm:text-base">${escapeHtml(project.titulo || 'Tablero sin titulo')}</div>
+                <div class="mt-0.5 truncate text-[11px] font-semibold text-slate-500">${client}</div>
               </div>
               <span class="rounded-full bg-lime-200 px-1.5 py-0.5 text-[11px] font-black leading-none text-slate-950">${stats.pct}%</span>
             </div>
@@ -4356,6 +4579,7 @@
       const project = projects.find((item) => String(item.id) === String(currentBoardProjectId));
       const slug = projectBoardSlug(project || { id: currentBoardProjectId });
       pendingBoardSlug = '';
+      markProjectBoardOpened(currentBoardProjectId);
       showProjectBoardLoading(project || null);
       if (!options.skipUrl) setBoardRoute(slug, options.replaceUrl ? 'replace' : 'push');
       renderProjectBoard(currentBoardProjectId, { preserveScroll: false });
@@ -4416,7 +4640,8 @@
       if (title) title.textContent = project.titulo || 'Tablero';
       if (meta) {
         const stats = getProjectTaskStats(project);
-        meta.textContent = `${project.cliente || 'Sin cliente'} · ${project.etapa || 'Sin estado'} · ${stats.total} tarjeta${stats.total === 1 ? '' : 's'} · ${stats.pct}% completado`;
+        const totalCards = Number(stats.totalCards ?? stats.total ?? 0);
+        meta.textContent = `${project.cliente || 'Sin cliente'} · ${totalCards} tarjeta${totalCards === 1 ? '' : 's'} · ${stats.pct}% completado`;
       }
       updateBoardTaskTrashCount(project);
 
@@ -4424,6 +4649,7 @@
       if (!container) return;
       const restoreScroll = options.preserveScroll !== false;
       const previousScrollLeft = restoreScroll ? Number(options.scrollLeft ?? container.scrollLeft ?? 0) : 0;
+      const previousColumnScrollTops = restoreScroll ? (options.columnScrollTops || getBoardColumnScrollState(container)) : {};
       const boardStages = getProjectBoardStages(project);
       const tasks = (Array.isArray(project.tareas) ? project.tareas : []).slice().sort((a, b) => Number(a.board_order || 0) - Number(b.board_order || 0));
       const aiState = getProjectBoardAiState(project);
@@ -4463,12 +4689,33 @@
       enableProjectBoardDnD();
       initProjectBoardDragScroll();
       fitProjectBoardViewport();
-      if (restoreScroll && previousScrollLeft > 0) {
+      if (restoreScroll) {
         requestAnimationFrame(() => {
-          container.scrollLeft = previousScrollLeft;
+          if (previousScrollLeft > 0) {
+            container.scrollLeft = previousScrollLeft;
+          }
+          restoreBoardColumnScrollState(previousColumnScrollTops, container);
         });
       }
       focusProjectBoardInlineControls();
+    }
+
+    function getBoardColumnScrollState(container = document.getElementById('projectBoardColumns')) {
+      if (!container) return {};
+      return Array.from(container.querySelectorAll('[data-board-drop-stage]')).reduce((state, columnBody) => {
+        const stage = columnBody.getAttribute('data-board-drop-stage') || '';
+        if (stage) state[stage] = Number(columnBody.scrollTop || 0);
+        return state;
+      }, {});
+    }
+
+    function restoreBoardColumnScrollState(state = {}, container = document.getElementById('projectBoardColumns')) {
+      if (!container || !state || typeof state !== 'object') return;
+      container.querySelectorAll('[data-board-drop-stage]').forEach((columnBody) => {
+        const stage = columnBody.getAttribute('data-board-drop-stage') || '';
+        if (!Object.prototype.hasOwnProperty.call(state, stage)) return;
+        columnBody.scrollTop = Number(state[stage] || 0);
+      });
     }
 
     function normalizeBoardStageText(value = '') {
@@ -4643,40 +4890,225 @@
       const done = !!task.done;
       const isPending = !!task._pending;
       const isEntering = isPending || boardRecentTaskIds.has(String(task.id || ''));
+      const taskType = normalizeBoardTaskType(task.task_type || task.type || 'task');
+      const isProgressTask = taskType !== 'card';
       const priority = normalizePriority(task.priority || project.prioridad || 'Con calma');
       const due = task.due_date || task.end_date || '';
       const owners = getTaskOwnerSources(task, project);
       const files = Array.isArray(task.files) ? task.files : [];
       const cover = getTaskCoverFile(task);
       const coverUrl = cover?.preview_url || cover?.url || '';
+      const taskTime = formatTimer(getTaskCardAccumulatedSeconds(project, task));
       const ownersHtml = renderResponsibleBadges(owners.names, owners.ids, {
         limit: 2,
         wrapperClass: 'flex -space-x-2',
         bubbleClass: 'w-6 h-6 rounded-full border-2 border-white bg-slate-200 text-slate-600 text-[8px] font-bold flex items-center justify-center overflow-hidden',
         emptyHtml: '<span class="text-[11px] font-semibold text-slate-400">Sin responsable</span>',
       });
-      return `<div class="project-task-card ${done ? 'is-done' : ''} ${coverUrl ? 'has-cover' : ''} ${isPending ? 'is-pending' : ''} ${isEntering ? 'is-entering' : ''}" draggable="${isPending ? 'false' : 'true'}" data-board-task-id="${escapeHtml(task.id || '')}" onclick="${isPending ? '' : `openProjectTask('${safeProjectId}', '${safeTaskId}')`}">
+      return `<div class="project-task-card ${done ? 'is-done' : ''} ${coverUrl ? 'has-cover' : ''} ${isPending ? 'is-pending' : ''} ${isEntering ? 'is-entering' : ''} ${!isProgressTask ? 'is-card-type' : ''}" draggable="${isPending ? 'false' : 'true'}" data-board-task-id="${escapeHtml(task.id || '')}" onclick="${isPending ? '' : `openProjectTask('${safeProjectId}', '${safeTaskId}')`}">
         ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="project-task-cover" alt="">` : ''}
+        ${isPending ? '' : projectBoardTaskMenu(project, task, taskType)}
         <div class="project-task-card-body flex items-start gap-2.5">
-          <button type="button" onclick="event.stopPropagation(); toggleTask('${safeTaskId}', '${safeProjectId}')" class="project-task-toggle h-5 w-5 shrink-0 rounded-full border-2 ${done ? 'border-lime-300 bg-lime-200 text-slate-950' : 'border-slate-300 bg-white'} flex items-center justify-center">
+          ${isProgressTask ? `<button type="button" onclick="event.stopPropagation(); toggleTask('${safeTaskId}', '${safeProjectId}')" class="project-task-toggle h-5 w-5 shrink-0 rounded-full border-2 ${done ? 'border-lime-300 bg-lime-200 text-slate-950' : 'border-slate-300 bg-white'} flex items-center justify-center" title="Completar tarea" aria-label="Completar tarea">
             ${done ? '<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
-          </button>
+          </button>` : ''}
           <div class="min-w-0 flex-1">
             <div class="project-task-title text-[13px] font-bold leading-snug ${done ? 'line-through text-slate-400' : 'text-slate-900'}">${escapeHtml(task.texto || 'Tarjeta sin titulo')}</div>
             <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
               ${getTaskPriorityBadge(priority)}
               ${due ? `<span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-500">${escapeHtml(formatBoardDate(due))}</span>` : ''}
             </div>
-            <div class="project-task-footer mt-2 flex items-center justify-between gap-2">
+            <div class="project-task-footer mt-2 flex items-center justify-between gap-3">
               ${ownersHtml}
-              <span class="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400">
+              <span class="ml-auto inline-flex shrink-0 items-center justify-end gap-1.5 whitespace-nowrap text-[11px] font-bold text-slate-500">
                 ${files.length ? `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.586-6.586a4 4 0 10-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20 13.486"/></svg>${files.length}` : ''}
                 <span>${(task.subtasks || []).length} Tareas</span>
+                <span class="text-slate-300">·</span>
+                <span class="font-mono text-[10px] font-black tracking-tight text-slate-700" title="Tiempo invertido">${taskTime}</span>
               </span>
             </div>
           </div>
         </div>
       </div>`;
+    }
+
+    function projectBoardTaskMenu(project, task, taskType = 'task') {
+      const safeProjectId = String(project.id || '').replace(/'/g, "\\'");
+      const safeTaskId = String(task.id || '').replace(/'/g, "\\'");
+      const isTask = taskType !== 'card';
+      return `<div class="project-task-card-menu-wrap" data-board-task-menu-wrap>
+        <button type="button" class="project-task-card-menu-btn" onclick="toggleBoardTaskMenu(event, '${safeTaskId}')" aria-label="Opciones de tarjeta" aria-expanded="false" title="Opciones">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path stroke-linecap="round" d="M5 7h14M5 12h14M5 17h14"/>
+          </svg>
+        </button>
+        <div class="project-task-card-menu hidden" data-board-task-menu="${escapeHtml(task.id || '')}" onclick="event.stopPropagation()">
+          <div class="project-task-card-menu-label">Tipo</div>
+          <button type="button" class="project-task-card-menu-item ${isTask ? 'is-active' : ''}" onclick="setBoardTaskType('${safeTaskId}', '${safeProjectId}', 'task')">
+            <span>Tarea</span>
+            ${isTask ? '<span>✓</span>' : ''}
+          </button>
+          <button type="button" class="project-task-card-menu-item ${!isTask ? 'is-active' : ''}" onclick="setBoardTaskType('${safeTaskId}', '${safeProjectId}', 'card')">
+            <span>Tarjeta</span>
+            ${!isTask ? '<span>✓</span>' : ''}
+          </button>
+          <div class="my-1 border-t border-slate-100"></div>
+          <button type="button" class="project-task-card-menu-item" onclick="duplicateBoardTask('${safeTaskId}', '${safeProjectId}')">
+            <span>Duplicar</span>
+          </button>
+          <button type="button" class="project-task-card-menu-item is-danger" onclick="archiveBoardTask('${safeTaskId}', '${safeProjectId}')">
+            <span>Archivar</span>
+          </button>
+        </div>
+      </div>`;
+    }
+
+    function closeBoardTaskMenus() {
+      document.querySelectorAll('[data-board-task-menu]').forEach((menu) => {
+        menu.classList.add('hidden');
+        menu.style.left = '';
+        menu.style.top = '';
+        menu.style.position = '';
+        menu.style.width = '';
+        if (menu.__boardTaskMenuWrap && menu.__boardTaskMenuWrap.isConnected && menu.parentElement !== menu.__boardTaskMenuWrap) {
+          menu.__boardTaskMenuWrap.appendChild(menu);
+        }
+      });
+      document.querySelectorAll('.project-task-card-menu-btn[aria-expanded="true"]').forEach((button) => {
+        button.setAttribute('aria-expanded', 'false');
+      });
+      document.querySelectorAll('[data-board-task-menu-wrap]').forEach((wrap) => wrap.classList.remove('is-open'));
+    }
+
+    function positionBoardTaskMenu(menu, button) {
+      if (!menu || !button) return;
+      const buttonRect = button.getBoundingClientRect();
+      const menuWidth = 148;
+      const estimatedHeight = 144;
+      const gap = 6;
+      const viewportPadding = 8;
+      menu.style.position = 'fixed';
+      menu.style.width = `${menuWidth}px`;
+      const left = Math.min(
+        Math.max(viewportPadding, buttonRect.right - menuWidth),
+        window.innerWidth - menuWidth - viewportPadding
+      );
+      const opensUp = buttonRect.bottom + gap + estimatedHeight > window.innerHeight - viewportPadding;
+      const top = opensUp
+        ? Math.max(viewportPadding, buttonRect.top - estimatedHeight - gap)
+        : Math.min(buttonRect.bottom + gap, window.innerHeight - estimatedHeight - viewportPadding);
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+    }
+
+    function toggleBoardTaskMenu(event, taskId) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      const button = event?.currentTarget || null;
+      const wrap = button?.closest?.('[data-board-task-menu-wrap]');
+      let menu = wrap?.querySelector?.('[data-board-task-menu]') || null;
+      if (!menu) {
+        menu = Array.from(document.querySelectorAll('[data-board-task-menu]'))
+          .find((item) => String(item.dataset.boardTaskMenu || '') === String(taskId || '')) || null;
+      }
+      const shouldOpen = !!menu?.classList.contains('hidden');
+      closeBoardTaskMenus();
+      if (menu && shouldOpen) {
+        if (wrap) menu.__boardTaskMenuWrap = wrap;
+        if (menu.parentElement !== document.body) {
+          document.body.appendChild(menu);
+        }
+        menu.classList.remove('hidden');
+        positionBoardTaskMenu(menu, button);
+        wrap?.classList.add('is-open');
+        button?.setAttribute?.('aria-expanded', 'true');
+      }
+    }
+
+    async function setBoardTaskType(taskId, projectId = currentBoardProjectId, type = 'task') {
+      const project = projects.find((item) => String(item.id) === String(projectId));
+      const task = (project?.tareas || []).find((item) => String(item.id) === String(taskId));
+      if (!project || !task) return;
+      const nextType = normalizeBoardTaskType(type);
+      closeBoardTaskMenus();
+      task.task_type = nextType;
+      if (nextType === 'card') task.done = false;
+      const boardColumns = document.getElementById('projectBoardColumns');
+      const scrollLeft = boardColumns?.scrollLeft || 0;
+      const columnScrollTops = getBoardColumnScrollState(boardColumns);
+      renderProjectBoard(project.id, { scrollLeft, columnScrollTops });
+
+      const response = await fetch('/api/proyectos/tareas/actualizar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({
+          id: project.id,
+          tarea_id: task.id,
+          texto: task.texto || 'Tarjeta',
+          descripcion: task.descripcion || '',
+          start_date: task.start_date || null,
+          end_date: task.end_date || task.due_date || null,
+          due_date: task.due_date || task.end_date || null,
+          priority: normalizeTaskPriority(task.priority || 'Con calma'),
+          owners: Array.isArray(task.owners) ? task.owners : [],
+          owner_ids: Array.isArray(task.owner_ids) ? task.owner_ids : [],
+          board_stage: task.board_stage || 'Por hacer',
+          board_order: Number(task.board_order || 0),
+          task_type: nextType,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo cambiar el tipo', 'error');
+        await loadProjects();
+        return;
+      }
+      patchBoardProject(data.item);
+      renderProjectBoard(project.id, { scrollLeft, columnScrollTops });
+      renderKanban(projects);
+    }
+
+    async function duplicateBoardTask(taskId, projectId = currentBoardProjectId) {
+      if (!projectId || !taskId) return;
+      closeBoardTaskMenus();
+      const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+      const response = await fetch('/api/proyectos/tareas/duplicar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({ id: projectId, tarea_id: taskId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo duplicar', 'error');
+        return;
+      }
+      if (data.duplicated_id) {
+        boardRecentTaskIds.add(String(data.duplicated_id));
+        window.setTimeout(() => boardRecentTaskIds.delete(String(data.duplicated_id)), 700);
+      }
+      patchBoardProject(data.item);
+      renderProjectBoard(projectId, { scrollLeft });
+      if (window.showNotification) window.showNotification('Tarjeta duplicada', 'success');
+    }
+
+    async function archiveBoardTask(taskId, projectId = currentBoardProjectId) {
+      if (!projectId || !taskId) return;
+      closeBoardTaskMenus();
+      const scrollLeft = document.getElementById('projectBoardColumns')?.scrollLeft || 0;
+      const response = await fetch('/api/proyectos/tareas/eliminar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+        body: JSON.stringify({ id: projectId, tarea_id: taskId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        if (window.showNotification) window.showNotification('No se pudo archivar', 'error');
+        return;
+      }
+      patchBoardProject(data.item);
+      renderProjectBoard(projectId, { scrollLeft });
+      updateBoardTaskTrashCount(data.item);
+      if (window.showNotification) window.showNotification('Tarjeta archivada', 'success');
     }
 
     function getNextBoardTaskOrder(project, stage) {
@@ -4741,6 +5173,7 @@
         priority: 'Con calma',
         board_stage: targetStage,
         board_order: getNextBoardTaskOrder(project, targetStage),
+        task_type: 'task',
         done: false,
         subtasks: [],
         files: [],
@@ -4758,6 +5191,7 @@
           texto: clean,
           priority: 'Con calma',
           board_stage: targetStage,
+          task_type: 'task',
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -5383,13 +5817,12 @@
         const safeId = String(project?.id || '').replace(/'/g, "\\'");
         const title = escapeHtml(project?.titulo || 'Proyecto');
         const client = escapeHtml(project?.cliente || 'Sin cliente');
-        const stage = escapeHtml(project?.etapa || 'Sin etapa');
         const tasksTotal = Array.isArray(project?.tareas) ? project.tareas.length : 0;
         return `<button type="button" onclick="confirmQuickProjectAction('${safeId}')" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:bg-slate-100 transition-colors">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="truncate text-sm font-bold text-slate-800">${title}</div>
-              <div class="text-[11px] text-slate-500 mt-0.5">${client} · ${stage}</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">${client}</div>
             </div>
             <span class="text-[10px] font-bold text-slate-500 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 whitespace-nowrap">${tasksTotal} tareas</span>
           </div>
@@ -6438,6 +6871,8 @@
 
     function openNewProjectModal(stage = '') {
         const modal = document.getElementById('newProjectModal');
+        document.body.classList.add('project-new-modal-open');
+        closeProjectClientFilter();
         clearNewProjectCoverFile();
         newProjectCoverColor = `${PROJECT_COVER_PALETTES[0][0]}|${PROJECT_COVER_PALETTES[0][1]}`;
         newProjectCoverImage = '';
@@ -6461,6 +6896,7 @@
       if (newProjectStartPicker) newProjectStartPicker.close();
       if (newProjectDuePicker) newProjectDuePicker.close();
       clearNewProjectCoverFile();
+        document.body.classList.remove('project-new-modal-open');
         document.getElementById('newProjectModal').classList.add('hidden');
     }
 
@@ -6498,6 +6934,9 @@
 
         const payload = await response.json().catch(() => ({}));
         const createdProjectId = payload?.item?.id;
+        if (response.ok && createdProjectId) {
+          markProjectBoardOpened(createdProjectId);
+        }
         if (response.ok && createdProjectId && newProjectCoverFile) {
           await uploadAndApplyProjectCover(newProjectCoverFile, createdProjectId, { silent: true }).catch(() => {
             if (window.showNotification) window.showNotification('El proyecto se creó, pero no se pudo subir la portada', 'error');
@@ -6624,7 +7063,12 @@
         setProjectModalTab(currentProjectModalTab);
         
         // Show
-        document.getElementById('projectModal').classList.remove('hidden');
+        const projectModal = document.getElementById('projectModal');
+        if (projectModal) {
+          if (projectModal.parentElement !== document.body) document.body.appendChild(projectModal);
+          document.body.classList.add('project-modal-open');
+          projectModal.classList.remove('hidden');
+        }
         requestAnimationFrame(refreshProjectDescriptionClamp);
     }
 
@@ -6642,7 +7086,8 @@
           await saveDescriptionAutosave(closingProjectId, pendingProjectDescriptions[closingProjectId]);
         } catch (_) {}
       }
-        document.getElementById('projectModal').classList.add('hidden');
+        document.getElementById('projectModal')?.classList.add('hidden');
+      document.body.classList.remove('project-modal-open');
       window.__infocusAiCurrentProject = null;
       if (typeof hideProjectDropOverlay === 'function') hideProjectDropOverlay();
       closeTaskModal();
@@ -7545,15 +7990,17 @@
       const isRunning = !!running;
       const currentSecondsRaw = getCurrentProjectTotalSeconds(project);
       const projectId = String(project.id || '');
+      const taskId = String(running?.task_id || task?.id || pinnedTimerTaskId || '');
+      const timerKey = `${projectId}:${taskId}`;
       let stableSeconds = currentSecondsRaw;
       if (isRunning) {
-        if (headerTimerLastProjectId === projectId) {
+        if (headerTimerLastKey === timerKey) {
           stableSeconds = Math.max(currentSecondsRaw, headerTimerLastSeconds);
         }
-        headerTimerLastProjectId = projectId;
+        headerTimerLastKey = timerKey;
         headerTimerLastSeconds = stableSeconds;
       } else {
-        headerTimerLastProjectId = projectId;
+        headerTimerLastKey = timerKey;
         headerTimerLastSeconds = currentSecondsRaw;
       }
       const timeValue = formatTimer(stableSeconds);
@@ -7577,7 +8024,7 @@
             <button id="headerTimerToggleBtn" type="button" onclick="event.stopPropagation(); togglePinnedTimerRun()" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f0fe97] text-[#101729]" title="${isRunning ? 'Pausar temporizador' : 'Continuar temporizador'}">${isRunning ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>'}</button>
             <div class="min-w-0 flex-1">
               <div class="text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#f0fe97]/70">En foco</div>
-              <div id="headerTimerTask" class="truncate text-left text-xs lg:text-sm font-extrabold text-[#f0fe97]">${compactTaskName}</div>
+              <button id="headerTimerTask" type="button" onclick="event.stopPropagation(); openActiveTaskFromFocus()" class="block max-w-full truncate text-left text-xs lg:text-sm font-extrabold text-[#f0fe97] underline-offset-2 hover:underline focus:outline-none focus:underline">${compactTaskName}</button>
               <div id="headerTimerProject" class="truncate text-[10px] lg:text-[11px] font-semibold text-[#f0fe97]/60">${projectName}</div>
             </div>
             <div class="shrink-0 text-right min-w-[86px] lg:min-w-[98px]">
@@ -7597,7 +8044,10 @@
       }
 
       const headerTask = host.querySelector('#headerTimerTask');
-      if (headerTask) headerTask.innerText = compactTaskName;
+      if (headerTask) {
+        headerTask.innerText = compactTaskName;
+        headerTask.title = compactTaskName;
+      }
 
       const headerProject = host.querySelector('#headerTimerProject');
       if (headerProject) headerProject.innerText = `${projectName}`;
@@ -7702,7 +8152,11 @@
       refreshTimerFullscreenColumns(project, task);
       syncTimerFullscreenActionButtons(!!getRunningLog(project));
       const panel = document.getElementById('timerFullscreenPanel');
-      if (panel) panel.classList.remove('hidden');
+      if (panel) {
+        if (panel.parentElement !== document.body) document.body.appendChild(panel);
+        document.body.classList.add('timer-fullscreen-open');
+        panel.classList.remove('hidden');
+      }
     }
 
     function openPinnedTimerFullscreen() {
@@ -7759,7 +8213,7 @@
 
       const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
       if (!subtasks.length) {
-        list.innerHTML = '<div class="text-sm text-slate-300">No hay sub tareas todavía.</div>';
+        list.innerHTML = '<div class="text-sm text-slate-300">No hay elementos en el checklist todavía.</div>';
         return;
       }
 
@@ -7767,7 +8221,7 @@
       const visibleSubtasks = timerFsShowAllSubtasks ? subtasks : subtasks.slice(0, 6);
 
       list.innerHTML = visibleSubtasks.map((subtask) => `
-        <button type="button" onclick="toggleTimerFullscreenSubtask('${String(subtask.id || '').replace(/'/g, "\\'")}")" class="w-full flex items-center gap-2 bg-white/10 px-3 py-2 text-left hover:bg-white/20 transition-colors">
+        <button type="button" onclick="toggleTimerFullscreenSubtask('${String(subtask.id || '').replace(/'/g, "\\'")}')" class="w-full flex items-center gap-2 bg-white/10 px-3 py-2 text-left hover:bg-white/20 transition-colors">
           <span class="w-5 h-5 rounded border ${subtask.done ? 'bg-lime-400 border-lime-400 text-slate-900' : 'border-slate-400 text-transparent'} flex items-center justify-center shrink-0">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
           </span>
@@ -8101,6 +8555,10 @@
     function openTimerFullscreen() {
       const panel = document.getElementById('timerFullscreenPanel');
       if (!panel) return;
+      if (panel.parentElement !== document.body) document.body.appendChild(panel);
+      document.body.classList.add('timer-fullscreen-open');
+      panel.classList.remove('hidden');
+      updatePinnedTimerUi();
       if (panel.requestFullscreen) {
         panel.requestFullscreen().catch(() => {});
       }
@@ -8108,7 +8566,8 @@
 
     function closeTimerFullscreen() {
       const panel = document.getElementById('timerFullscreenPanel');
-      panel.classList.add('hidden');
+      panel?.classList.add('hidden');
+      document.body.classList.remove('timer-fullscreen-open');
       if (document.fullscreenElement && document.exitFullscreen) {
         document.exitFullscreen().catch(() => {});
       }
@@ -9087,7 +9546,7 @@
                   <div class="min-w-0">
                     <button type="button" onclick="openProject('${p.id}')" class="block w-full text-left text-xl font-extrabold leading-tight text-slate-950 hover:text-slate-800">${escapeHtml(p.titulo || 'Proyecto')}</button>
                     <div>
-                      <button type="button" onclick="openProject('${p.id}')" class="mt-1 text-sm font-medium text-slate-500 hover:text-slate-700">${escapeHtml(p.cliente || 'Sin cliente')} · ${escapeHtml(p.etapa || 'Sin etapa')}</button>
+                      <button type="button" onclick="openProject('${p.id}')" class="mt-1 text-sm font-medium text-slate-500 hover:text-slate-700">${escapeHtml(p.cliente || 'Sin cliente')}</button>
                     </div>
                   </div>
                 </div>
@@ -9586,6 +10045,7 @@
           id: currentProjectId,
           texto: text,
           board_stage: 'Por hacer',
+          task_type: 'task',
         })
         });
         const data = await res.json();
@@ -9611,6 +10071,13 @@
     async function toggleTask(taskId, projectId = currentProjectId) {
       if (projectModalReadOnly) return;
         if (!projectId) return;
+        const boardColumns = document.getElementById('projectBoardColumns');
+        const shouldRestoreBoardScroll = String(currentBoardProjectId || '') === String(projectId || '') && !!boardColumns;
+        const boardScrollLeft = shouldRestoreBoardScroll ? Number(boardColumns.scrollLeft || 0) : 0;
+        const boardColumnScrollTops = shouldRestoreBoardScroll ? getBoardColumnScrollState(boardColumns) : {};
+        const project = projects.find(x => String(x.id) === String(projectId));
+        const current = (project?.tareas || []).find((task) => String(task.id || '') === String(taskId || ''));
+        if (current && !isBoardProgressTask(current)) return;
         const res = await fetch('/api/proyectos/tareas/toggle', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
@@ -9631,6 +10098,12 @@
             renderKanban(projects);
             renderGlobalTasksView(projects);
             renderProjectListView(projects);
+            if (shouldRestoreBoardScroll) {
+              renderProjectBoard(projectId, {
+                scrollLeft: boardScrollLeft,
+                columnScrollTops: boardColumnScrollTops,
+              });
+            }
             animateProgressBarsOnce = false;
         }
     }
@@ -9646,7 +10119,12 @@
       const task = (p.tareas || []).find(t => t.id === taskId);
       if (!task) return;
       renderTaskDetail(task);
-      document.getElementById('taskDetailModal')?.classList.remove('hidden');
+      const taskModal = document.getElementById('taskDetailModal');
+      if (taskModal) {
+        if (taskModal.parentElement !== document.body) document.body.appendChild(taskModal);
+        document.body.classList.add('project-modal-open');
+        taskModal.classList.remove('hidden');
+      }
       setTaskModalTab('info');
     }
 
@@ -9668,6 +10146,9 @@
       currentEditingSubtaskId = null;
       currentTaskModalTab = 'info';
       document.getElementById('taskDetailModal')?.classList.add('hidden');
+      if (document.getElementById('projectModal')?.classList.contains('hidden')) {
+        document.body.classList.remove('project-modal-open');
+      }
       document.getElementById('taskOwnerSearchResults')?.classList.add('hidden');
     }
 
@@ -10134,11 +10615,14 @@
       const prio = document.getElementById('taskModalPriority');
       const meta = document.getElementById('taskModalMeta');
       const doneBtn = document.getElementById('taskModalDoneBtn');
+      const isProgressTask = isBoardProgressTask(task);
       if (title) title.value = task.texto || '';
       if (description && !isCompactDescEditorFocused('taskModalDescription')) {
         setCompactDescValue('taskModalDescription', task.descripcion || '');
       }
       if (doneBtn) {
+        doneBtn.classList.toggle('hidden', !isProgressTask);
+        doneBtn.disabled = !isProgressTask;
         doneBtn.classList.toggle('border-lime-300', !!task.done);
         doneBtn.classList.toggle('bg-lime-200', !!task.done);
         doneBtn.classList.toggle('text-slate-950', !!task.done);
@@ -10571,6 +11055,22 @@
       return String(current.task_id || '') === String(taskId || '') ? current : null;
     }
 
+    function getTaskCardAccumulatedSeconds(project, task) {
+      const taskId = String(task?.id || '');
+      if (!taskId) return 0;
+      const explicitBase = Math.max(0, Number(task?.total_seconds || 0));
+      const endedLogBase = (Array.isArray(project?.time_logs) ? project.time_logs : [])
+        .filter((log) => String(log.task_id || '') === taskId && Number(log.start || 0) > 0 && Number(log.end || 0) > 0)
+        .reduce((total, log) => total + Math.max(0, Number(log.end || 0) - Number(log.start || 0)), 0);
+      const base = explicitBase > 0 ? explicitBase : endedLogBase;
+      const running = getTaskRunningLog(project, taskId);
+      const runningSeconds = running && Number(running.start || 0) > 0
+        ? Math.max(0, Math.floor(Date.now() / 1000) - Number(running.start || 0))
+        : 0;
+      const resetBase = getTaskTimerResetBase(project?.id || currentProjectId, taskId);
+      return Math.max(0, base + runningSeconds - resetBase);
+    }
+
     function getTaskDisplayedSeconds(project, task) {
       if (!task) return 0;
       const base = Math.max(0, Number(task.total_seconds || 0));
@@ -10782,12 +11282,13 @@
         task.priority = normalizeTaskPriority(priority);
         task.owners = owners;
         task.owner_ids = owner_ids;
+        task.task_type = normalizeBoardTaskType(task.task_type || 'task');
       }
 
       const res = await fetch('/api/proyectos/tareas/actualizar', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
-        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto: text, descripcion, start_date, end_date, due_date, priority, owners, owner_ids, board_stage, board_order})
+        body: JSON.stringify({id: currentProjectId, tarea_id: currentTaskId, texto: text, descripcion, start_date, end_date, due_date, priority, owners, owner_ids, board_stage, board_order, task_type: normalizeBoardTaskType(task?.task_type || 'task')})
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -10859,6 +11360,7 @@
             owner_ids: Array.isArray(task.owner_ids) ? task.owner_ids : [],
             board_stage: task.board_stage || 'Por hacer',
             board_order: Number(task.board_order || 0),
+            task_type: normalizeBoardTaskType(task.task_type || 'task'),
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -11364,11 +11866,7 @@
     async function handleTaskFileUpload(files) {
       if (!files || files.length === 0 || !currentProjectId || !currentTaskId) return;
       const fileList = Array.from(files);
-      const panel = document.getElementById('projectUploadProgress');
-      const list = document.getElementById('projectUploadProgressList');
-      const summary = document.getElementById('projectUploadSummary');
-      if (list) list.innerHTML = '';
-      if (panel) panel.classList.remove('hidden');
+      const { summary } = showProjectUploadPanel(fileList);
       const rows = fileList.map(createProjectUploadRow);
 
       try {
@@ -11385,16 +11883,12 @@
           }
           if (summary) summary.textContent = `${fileList.length} archivo${fileList.length === 1 ? '' : 's'} subido${fileList.length === 1 ? '' : 's'}`;
           if (window.showNotification) window.showNotification(fileList.length > 1 ? 'Adjuntos subidos' : 'Adjunto subido', 'success');
-          setTimeout(() => {
-            panel?.classList.add('hidden');
-            if (list) list.innerHTML = '';
-            if (summary) summary.textContent = 'Preparando...';
-          }, 900);
+          hideProjectUploadPanel();
         }
       } catch (error) {
         if (summary) summary.textContent = 'No se pudo completar la subida.';
         if (window.showNotification) window.showNotification('Error de conexión al subir', 'error');
-        setTimeout(() => panel?.classList.add('hidden'), 2200);
+        hideProjectUploadPanel(2200);
       }
     }
 
@@ -11507,8 +12001,37 @@
       }
     }
     
+    function getProjectUploadPanelParts() {
+      const panel = document.getElementById('projectUploadProgress');
+      if (panel && panel.parentElement !== document.body) {
+        document.body.appendChild(panel);
+      }
+      return {
+        panel,
+        list: document.getElementById('projectUploadProgressList'),
+        summary: document.getElementById('projectUploadSummary'),
+      };
+    }
+
+    function showProjectUploadPanel(files = []) {
+      const { panel, list, summary } = getProjectUploadPanelParts();
+      if (list) list.innerHTML = '';
+      if (summary) summary.textContent = files.length ? `Preparando ${files.length} archivo${files.length === 1 ? '' : 's'}...` : 'Preparando...';
+      if (panel) panel.classList.remove('hidden');
+      return { panel, list, summary };
+    }
+
+    function hideProjectUploadPanel(delay = 900) {
+      const { panel, list, summary } = getProjectUploadPanelParts();
+      window.setTimeout(() => {
+        panel?.classList.add('hidden');
+        if (list) list.innerHTML = '';
+        if (summary) summary.textContent = 'Preparando...';
+      }, delay);
+    }
+
     function createProjectUploadRow(file, index) {
-      const list = document.getElementById('projectUploadProgressList');
+      const { list } = getProjectUploadPanelParts();
       if (!list) return null;
       const row = document.createElement('div');
       row.className = 'project-upload-row';
@@ -11577,11 +12100,8 @@
         return;
       }
 
-      const panel = document.getElementById('projectUploadProgress');
-      const list = document.getElementById('projectUploadProgressList');
-      const summary = document.getElementById('projectUploadSummary');
-      if (list) list.innerHTML = '';
-      if (panel && String(projectId) === String(currentProjectId || '')) panel.classList.remove('hidden');
+      const shouldShowProgress = String(projectId) === String(currentProjectId || '');
+      const { summary } = shouldShowProgress ? showProjectUploadPanel([file]) : getProjectUploadPanelParts();
       const row = String(projectId) === String(currentProjectId || '') ? createProjectUploadRow(file, 0) : null;
 
       try {
@@ -11612,11 +12132,7 @@
         throw error;
       } finally {
         if (String(projectId) === String(currentProjectId || '')) {
-          setTimeout(() => {
-            panel?.classList.add('hidden');
-            if (list) list.innerHTML = '';
-            if (summary) summary.textContent = 'Preparando...';
-          }, 900);
+          hideProjectUploadPanel();
         }
       }
     }
@@ -11625,11 +12141,7 @@
       if (projectModalReadOnly) return;
       if (!files || files.length === 0 || !currentProjectId) return;
       const fileList = Array.from(files);
-      const panel = document.getElementById('projectUploadProgress');
-      const list = document.getElementById('projectUploadProgressList');
-      const summary = document.getElementById('projectUploadSummary');
-      if (list) list.innerHTML = '';
-      if (panel) panel.classList.remove('hidden');
+      const { summary } = showProjectUploadPanel(fileList);
       const rows = fileList.map(createProjectUploadRow);
 
       try {
@@ -11647,16 +12159,12 @@
           if (window.showNotification) {
             window.showNotification(fileList.length > 1 ? 'Archivos subidos correctamente' : 'Archivo subido correctamente', 'success');
           }
-          setTimeout(() => {
-            panel?.classList.add('hidden');
-            if (list) list.innerHTML = '';
-            if (summary) summary.textContent = 'Preparando...';
-          }, 900);
+          hideProjectUploadPanel();
         }
       } catch(e) {
         if (summary) summary.textContent = 'No se pudo completar la subida.';
         if (window.showNotification) window.showNotification('Error de conexión al subir', 'error');
-        setTimeout(() => panel?.classList.add('hidden'), 2200);
+        hideProjectUploadPanel(2200);
       }
     }
 
@@ -11832,6 +12340,21 @@
         currentTaskView = 'tareas';
       }
       setProjectView(currentTaskView);
+      if (openPinnedTimerFromQuery) {
+        openPinnedTimerFromQuery = false;
+        try {
+          sessionStorage.removeItem('infocus_open_project_timer_fullscreen');
+        } catch (_) {}
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.delete('open_timer');
+        window.history.replaceState({}, '', nextUrl);
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            syncPinnedTimerHud();
+            openTimerExpandedPanel();
+          }, 80);
+        });
+      }
 	      if (openHeaderTimerFromQuery) {
 	        openHeaderTimerFromQuery = false;
 	        const _htu = new URL(window.location.href);
@@ -11913,6 +12436,12 @@
         return;
       }
 
+      if (e.key === 'Escape' && document.querySelector('[data-board-task-menu]:not(.hidden)')) {
+        e.preventDefault();
+        closeBoardTaskMenus();
+        return;
+      }
+
       if (e.code !== 'Space') return;
       const modal = document.getElementById('projectModal');
       if (!modal || modal.classList.contains('hidden')) return;
@@ -11924,6 +12453,10 @@
     });
 
     document.addEventListener('click', (e) => {
+      if (!e.target?.closest?.('[data-board-task-menu-wrap]')) {
+        closeBoardTaskMenus();
+      }
+
       const wrap = document.getElementById('responsibleSearchWrap');
       const box = document.getElementById('responsibleSearchResults');
       if (wrap && box && !wrap.contains(e.target)) {
@@ -11957,6 +12490,7 @@
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) {
         document.getElementById('timerFullscreenPanel')?.classList.add('hidden');
+        document.body.classList.remove('timer-fullscreen-open');
       }
     });
 

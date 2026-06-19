@@ -587,15 +587,20 @@ class AiActionExecutor
         foreach ($draft['tasks'] as $taskDraft) {
             $taskText = is_array($taskDraft) ? (string) ($taskDraft['text'] ?? '') : (string) $taskDraft;
             $taskNote = is_array($taskDraft) ? trim((string) ($taskDraft['note'] ?? '')) : '';
+            $taskDescription = is_array($taskDraft) ? $this->richDescriptionHtmlFromMarkup((string) ($taskDraft['description'] ?? '')) : '';
             $taskStage = is_array($taskDraft) ? trim((string) ($taskDraft['stage'] ?? '')) : '';
             $taskText = $this->normalizeTaskTitle($taskText);
             if ($taskText === '') {
                 continue;
             }
 
-            $task = $this->taskPayload($taskText, $start, $due, $priority, $responsibles, $this->normalizeTaskStage($taskStage, $taskStages), count($tasks));
+            $task = $this->taskPayload($taskText, $start, $due, $priority, $responsibles, $this->normalizeTaskStage($taskStage, $taskStages), count($tasks), $taskDescription);
             if ($taskNote !== '') {
                 $task['notes'][] = $this->notePayload($taskNote);
+            }
+            $subtasks = is_array($taskDraft) ? (array) ($taskDraft['subtasks'] ?? []) : [];
+            if (!empty($subtasks)) {
+                $task['subtasks'] = $this->subtaskPayloadsFromTextList($subtasks);
             }
             $tasks[] = $task;
         }
@@ -638,12 +643,9 @@ class AiActionExecutor
         $projectBefore = $project;
 
         $updates = [];
-        $taskItems = $this->extractListAfter($proposal, ['Tareas a agregar', 'Tareas sugeridas', 'Tareas', 'Lista de tareas']);
-        $singleTask = $this->stripMarkdown($this->field($proposal, ['Tarea a agregar', 'Tarea para agregar', 'Nueva tarea', 'Nueva tarjeta', 'Tarjeta', 'Tarea nueva']));
-        if ($singleTask !== '') {
-            array_unshift($taskItems, $singleTask);
-        }
-        $hasTaskCreation = !empty(array_filter($taskItems));
+        $taskStages = $this->projectTaskStages($project);
+        $taskDrafts = $this->extractProjectTaskDrafts($proposal, $taskStages);
+        $hasTaskCreation = !empty($taskDrafts);
         $title = $this->stripMarkdown($this->field($proposal, ['Nuevo nombre', 'Titulo nuevo', 'Título nuevo']));
         $description = $this->richDescriptionHtmlFromMarkup(
             $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion', 'Nueva descripción', 'Nueva descripcion'])
@@ -652,7 +654,6 @@ class AiActionExecutor
         $stage = $this->stripMarkdown($this->field($proposal, ['Estado', 'Etapa']));
         $priority = $this->stripMarkdown($this->field($proposal, ['Prioridad']));
         $due = $this->parseDate($this->field($proposal, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']));
-        $taskStages = $this->projectTaskStages($project);
         $columns = $this->extractColumns($proposal);
         $renameColumnFrom = $this->stripMarkdown($this->field($proposal, ['Columna actual', 'Columna anterior', 'Renombrar columna', 'Lista actual']));
         $renameColumnTo = $this->stripMarkdown($this->field($proposal, ['Nueva columna', 'Nuevo nombre de columna', 'Nuevo nombre', 'Lista nueva']));
@@ -700,7 +701,7 @@ class AiActionExecutor
         $createdTaskIds = [];
         $lastTaskStage = '';
 
-        if (!empty($taskItems)) {
+        if (!empty($taskDrafts)) {
             if (!$canCreate) {
                 return $this->failure('Tu usuario no tiene permiso para agregar tareas al proyecto.');
             }
@@ -714,14 +715,18 @@ class AiActionExecutor
                 $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion'], ['Subtareas a agregar', 'Subtareas', 'Checklist', 'Tareas a agregar', 'Notas', 'Nota', '¿Quieres', 'Quieres', 'Confirmas', 'Puedes tocar'])
             );
             $subtaskItemsForNewTask = $this->extractListAfter($proposal, ['Subtareas a agregar', 'Subtareas', 'Checklist']);
-            foreach (array_values(array_unique(array_filter($taskItems))) as $taskText) {
-                $taskText = trim((string) $taskText);
+            foreach ($taskDrafts as $taskDraft) {
+                $taskText = trim((string) ($taskDraft['text'] ?? ''));
                 if ($taskText === '') {
                     continue;
                 }
 
                 $parsedTask = $this->taskLineWithStage($taskText, $activeTaskStages);
                 $taskStage = $parsedTask['stage'] ?: $explicitTaskStage;
+                $descriptionForTask = $this->richDescriptionHtmlFromMarkup((string) ($taskDraft['description'] ?? ''));
+                if ($descriptionForTask === '' && count($taskDrafts) === 1) {
+                    $descriptionForTask = $taskDescription;
+                }
                 $task = $this->taskPayload(
                     $parsedTask['text'],
                     $taskStart,
@@ -730,21 +735,14 @@ class AiActionExecutor
                     $responsibles,
                     $this->normalizeTaskStage($taskStage, $activeTaskStages),
                     count($tasks),
-                    count($taskItems) === 1 ? $taskDescription : ''
+                    $descriptionForTask
                 );
-                if (count($taskItems) === 1 && !empty($subtaskItemsForNewTask)) {
-                    $task['subtasks'] = collect($subtaskItemsForNewTask)
-                        ->map(fn ($item) => Str::limit(trim($this->stripMarkdown((string) $item)), 180, ''))
-                        ->filter()
-                        ->unique(fn ($item) => Str::lower(Str::ascii($item)))
-                        ->values()
-                        ->map(fn ($item) => [
-                            'id' => (string) Str::ulid(),
-                            'texto' => $item,
-                            'done' => false,
-                            'priority' => 'Con calma',
-                        ])
-                        ->all();
+                $subtasksForTask = (array) ($taskDraft['subtasks'] ?? []);
+                if (empty($subtasksForTask) && count($taskDrafts) === 1) {
+                    $subtasksForTask = $subtaskItemsForNewTask;
+                }
+                if (!empty($subtasksForTask)) {
+                    $task['subtasks'] = $this->subtaskPayloadsFromTextList($subtasksForTask);
                     $addedSubtasks += count($task['subtasks']);
                 }
                 $createdTaskIds[] = (string) ($task['id'] ?? '');
@@ -864,13 +862,9 @@ class AiActionExecutor
         }
         $projectBefore = $project;
 
-        $taskItems = $this->extractListAfter($proposal, ['Tareas a agregar', 'Tareas sugeridas', 'Tareas', 'Lista de tareas']);
-        $taskText = $this->stripMarkdown($this->field($proposal, ['Tarea a agregar', 'Tarea para agregar', 'Nueva tarea', 'Nueva tarjeta', 'Tarjeta', 'Tarea', 'Nombre', 'Texto']));
-        if ($taskText !== '') {
-            array_unshift($taskItems, $taskText);
-        }
-        $taskItems = array_values(array_unique(array_filter(array_map(fn ($item) => $this->normalizeTaskTitle((string) $item), $taskItems))));
-        if (empty($taskItems)) {
+        $taskStages = $this->projectTaskStages($project);
+        $taskDrafts = $this->extractProjectTaskDrafts($proposal, $taskStages);
+        if (empty($taskDrafts)) {
             return $this->failure('No encontré el texto de la tarea para agregar.');
         }
 
@@ -878,7 +872,6 @@ class AiActionExecutor
         $due = $this->parseDate($this->field($proposal, ['Vencimiento', 'Fecha fin', 'Fecha de entrega']));
         $start = $this->parseDate($this->field($proposal, ['Fecha inicio', 'Inicio']));
         $priority = $this->normalizePriority($this->field($proposal, ['Prioridad']));
-        $taskStages = $this->projectTaskStages($project);
         $explicitTaskStage = $this->stripMarkdown($this->field($proposal, ['Columna', 'Lista', 'Estado de tarea']));
         $description = $this->richDescriptionHtmlFromMarkup(
             $this->extractSectionAfterRaw($proposal, ['Descripción', 'Descripcion'], ['Subtareas a agregar', 'Subtareas', 'Checklist', 'Tareas a agregar', 'Notas', 'Nota', '¿Quieres', 'Quieres', 'Confirmas', 'Puedes tocar'])
@@ -889,9 +882,13 @@ class AiActionExecutor
         $subtaskItems = $this->extractListAfter($proposal, ['Subtareas a agregar', 'Subtareas', 'Checklist']);
         $tasks = array_values($project['tareas'] ?? []);
         $createdTaskIds = [];
-        foreach ($taskItems as $item) {
-            $parsedTask = $this->taskLineWithStage($item, $taskStages);
+        foreach ($taskDrafts as $taskDraft) {
+            $parsedTask = $this->taskLineWithStage((string) ($taskDraft['text'] ?? ''), $taskStages);
             $taskStage = $parsedTask['stage'] ?: $explicitTaskStage;
+            $descriptionForTask = $this->richDescriptionHtmlFromMarkup((string) ($taskDraft['description'] ?? ''));
+            if ($descriptionForTask === '' && count($taskDrafts) === 1) {
+                $descriptionForTask = $description;
+            }
             $task = $this->taskPayload(
                 $parsedTask['text'],
                 $start,
@@ -900,21 +897,15 @@ class AiActionExecutor
                 $responsibles,
                 $this->normalizeTaskStage($taskStage, $taskStages),
                 count($tasks),
-                count($taskItems) === 1 ? $description : ''
+                $descriptionForTask
             );
 
-            if (count($taskItems) === 1 && !empty($subtaskItems)) {
-                $task['subtasks'] = collect($subtaskItems)
-                    ->map(fn ($item) => Str::limit(trim($this->stripMarkdown((string) $item)), 180, ''))
-                    ->filter()
-                    ->unique(fn ($item) => Str::lower(Str::ascii($item)))
-                    ->values()
-                    ->map(fn ($item) => [
-                        'id' => (string) Str::ulid(),
-                        'texto' => $item,
-                        'done' => false,
-                    ])
-                    ->all();
+            $subtasksForTask = (array) ($taskDraft['subtasks'] ?? []);
+            if (empty($subtasksForTask) && count($taskDrafts) === 1) {
+                $subtasksForTask = $subtaskItems;
+            }
+            if (!empty($subtasksForTask)) {
+                $task['subtasks'] = $this->subtaskPayloadsFromTextList($subtasksForTask);
             }
 
             $createdTaskIds[] = (string) ($task['id'] ?? '');
@@ -923,10 +914,15 @@ class AiActionExecutor
 
         $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
         $url = '/proyectos?open_project=' . rawurlencode((string) $project['id']);
-        $taskLine = count($taskItems) === 1 ? $taskItems[0] : count($taskItems) . ' tareas';
+        $taskLine = count($taskDrafts) === 1 ? (string) ($taskDrafts[0]['text'] ?? '1 tarea') : count($taskDrafts) . ' tareas';
         $extra = [];
-        if ($description !== '' && count($taskItems) === 1) $extra[] = 'descripción agregada';
-        if (!empty($subtaskItems) && count($taskItems) === 1) $extra[] = count($subtaskItems) === 1 ? '1 subtarea agregada' : count($subtaskItems) . ' subtareas agregadas';
+        $descriptionCount = collect($taskDrafts)->filter(fn ($taskDraft) => trim((string) ($taskDraft['description'] ?? '')) !== '')->count();
+        $subtaskCount = collect($taskDrafts)->sum(fn ($taskDraft) => count((array) ($taskDraft['subtasks'] ?? [])));
+        if ($descriptionCount > 0 || ($description !== '' && count($taskDrafts) === 1)) $extra[] = $descriptionCount > 1 ? "{$descriptionCount} descripciones agregadas" : 'descripción agregada';
+        if ($subtaskCount > 0 || (!empty($subtaskItems) && count($taskDrafts) === 1)) {
+            $totalSubtasks = $subtaskCount > 0 ? $subtaskCount : count($subtaskItems);
+            $extra[] = $totalSubtasks === 1 ? '1 subtarea agregada' : "{$totalSubtasks} subtareas agregadas";
+        }
         $extraLine = $extra ? "\n- **Detalle:** " . implode(', ', $extra) : '';
 
         return [
@@ -1693,6 +1689,7 @@ class AiActionExecutor
             'owner_ids' => $responsibles['ids'] ?? [],
             'board_stage' => trim($boardStage) !== '' ? Str::limit(trim($boardStage), 60, '') : 'Por hacer',
             'board_order' => $boardOrder,
+            'task_type' => 'task',
             'total_seconds' => 0,
             'subtasks' => [],
             'notes' => [],
@@ -1722,52 +1719,8 @@ class AiActionExecutor
 
     private function parseProjectDraft(string $proposal): array
     {
-        $lines = preg_split('/\R+/', $proposal) ?: [];
-        $tasks = [];
-        $inTasks = false;
-        $currentTaskIndex = null;
         $columns = $this->extractColumns($proposal);
-
-        foreach ($lines as $line) {
-            $clean = trim(preg_replace('/^\s*[-*•]\s*/u', '', $line) ?? $line);
-            $clean = trim(preg_replace('/^\d+[\.)]\s*/', '', $clean) ?? $clean);
-            if ($clean === '') {
-                continue;
-            }
-
-            if (preg_match('/tareas?\s+(sugeridas|agregadas|relacionadas)|lista\s+de\s+tareas/i', $clean)) {
-                $inTasks = true;
-                continue;
-            }
-
-            if ($inTasks) {
-                if (preg_match('/^(¿?listo|listo|¿?deseas|deseas|prefieres|puedes tocar|confirmas|puedes|necesitas|opci[oó]n|cliente|estado|prioridad|fecha|responsables?|asignados?|nombre)\b/i', $clean)) {
-                    $inTasks = false;
-                    $currentTaskIndex = null;
-                } else {
-                    if (preg_match('/^(nota|informaci[oó]n|detalle)\s*:\s*(.+)$/iu', $clean, $match) && $currentTaskIndex !== null) {
-                        $tasks[$currentTaskIndex]['note'] = trim(($tasks[$currentTaskIndex]['note'] ?? '') . "\n" . $this->stripMarkdown((string) $match[2]));
-                        continue;
-                    }
-
-                    $taskText = $clean;
-                    $taskNote = '';
-                    if (preg_match('/^(.+?)\s*(?:\||[-–—])\s*(?:nota|informaci[oó]n|detalle)\s*:\s*(.+)$/iu', $clean, $match)) {
-                        $taskText = trim((string) $match[1]);
-                        $taskNote = trim((string) $match[2]);
-                    }
-
-                    $parsedTask = $this->taskLineWithStage($taskText, $columns);
-                    $tasks[] = [
-                        'text' => $this->normalizeTaskTitle($parsedTask['text']),
-                        'note' => $this->stripMarkdown($taskNote),
-                        'stage' => $parsedTask['stage'],
-                    ];
-                    $currentTaskIndex = array_key_last($tasks);
-                    continue;
-                }
-            }
-        }
+        $tasks = $this->extractProjectTaskDrafts($proposal, $columns);
 
         $title = $this->field($proposal, ['Nombre', 'Proyecto', 'Tablero', 'Título', 'Titulo']);
         if ($title === '') {
@@ -1789,6 +1742,195 @@ class AiActionExecutor
             'columns' => $columns,
             'tasks' => $this->uniqueTaskDrafts($tasks),
         ];
+    }
+
+    private function extractProjectTaskDrafts(string $proposal, array $stages = []): array
+    {
+        $labels = [
+            'Tarea a agregar',
+            'Tarea para agregar',
+            'Nueva tarea',
+            'Nueva tarjeta',
+            'Tarjeta',
+            'Tareas a agregar',
+            'Tareas sugeridas',
+            'Tareas',
+            'Lista de tareas',
+        ];
+        $stopPattern = '/^\s*(?:[-*•]\s*)?\**(?:Proyecto|Tablero|Cliente|Estado|Etapa|Prioridad|Responsables?|Asignados?|Encargados?|Fecha|Vencimiento|Columnas?|Listas?|Notas?|Contenido|¿?Quieres|Quieres|¿?Deseas|Deseas|¿?Te parece|Te parece|Si confirmas|¿?Confirmas|Confirmas|Puedes tocar|Agregar ahora|Cambios aplicados)\b/iu';
+        $drafts = [];
+        $current = null;
+        $capturing = false;
+        $mode = 'task';
+
+        $flush = function () use (&$drafts, &$current): void {
+            if (!$current) {
+                return;
+            }
+            $current['text'] = $this->normalizeTaskTitle((string) ($current['text'] ?? ''));
+            $current['description'] = trim((string) ($current['description'] ?? ''));
+            $current['note'] = trim((string) ($current['note'] ?? ''));
+            if (empty($current['subtasks']) && $current['description'] !== '') {
+                $current['subtasks'] = $this->deriveSubtasksFromTaskDescription($current['description']);
+            }
+            $current['subtasks'] = array_values(array_filter(array_map(
+                fn ($item) => Str::limit(trim($this->stripMarkdown((string) $item)), 180, ''),
+                (array) ($current['subtasks'] ?? [])
+            )));
+            if ($current['text'] !== '') {
+                $drafts[] = $current;
+            }
+            $current = null;
+        };
+
+        $startTask = function (string $text, string $stage = '') use (&$current, $flush): void {
+            $flush();
+            $parts = $this->splitTaskTextAndInlineDescription($text);
+            $current = [
+                'text' => $parts['text'],
+                'description' => $parts['description'],
+                'note' => '',
+                'subtasks' => [],
+                'stage' => $stage,
+            ];
+        };
+
+        foreach (preg_split('/\R+/', $proposal) ?: [] as $rawLine) {
+            $line = trim((string) $rawLine);
+            if ($line === '') {
+                continue;
+            }
+
+            $matchedLabel = false;
+            foreach ($labels as $label) {
+                if (preg_match('/^\s*(?:[-*•]\s*)?\**' . preg_quote($label, '/') . '\**\s*:\s*(.*)$/iu', $line, $match)) {
+                    $capturing = true;
+                    $mode = 'task';
+                    $inline = trim((string) ($match[1] ?? ''));
+                    if ($inline !== '') {
+                        $parsed = $this->taskLineWithStage($inline, $stages);
+                        $startTask((string) $parsed['text'], (string) $parsed['stage']);
+                    }
+                    $matchedLabel = true;
+                    break;
+                }
+            }
+            if ($matchedLabel) {
+                continue;
+            }
+
+            if (!$capturing) {
+                continue;
+            }
+
+            if (preg_match($stopPattern, $line)) {
+                break;
+            }
+
+            $hadListMarker = (bool) preg_match('/^\s*(?:[-*•]|\d+[\.)])\s+/u', $line);
+            $clean = trim(preg_replace('/^\s*[-*•]\s*/u', '', $line) ?? $line);
+            $clean = trim(preg_replace('/^\d+[\.)]\s*/u', '', $clean) ?? $clean);
+            if ($clean === '') {
+                continue;
+            }
+
+            if (preg_match('/^(descripci[oó]n|descripcion|detalle|informaci[oó]n)\s*:\s*(.*)$/iu', $clean, $match)) {
+                if ($current) {
+                    $desc = trim((string) ($match[2] ?? ''));
+                    if ($desc !== '') {
+                        $current['description'] = trim(($current['description'] ?? '') . "\n" . $desc);
+                    }
+                    $mode = 'description';
+                }
+                continue;
+            }
+
+            if (preg_match('/^(subtareas?(?:\s+a\s+agregar)?|checklist|lista de comprobaci[oó]n)\s*:\s*(.*)$/iu', $clean, $match)) {
+                if ($current) {
+                    $inline = trim((string) ($match[2] ?? ''));
+                    if ($inline !== '') {
+                        $current['subtasks'] = array_merge($current['subtasks'] ?? [], preg_split('/[,;|]/u', $inline) ?: []);
+                    }
+                    $mode = 'subtasks';
+                }
+                continue;
+            }
+
+            if (preg_match('/^(nota)\s*:\s*(.*)$/iu', $clean, $match)) {
+                if ($current) {
+                    $note = trim((string) ($match[2] ?? ''));
+                    if ($note !== '') {
+                        $current['description'] = trim(($current['description'] ?? '') . "\n" . $note);
+                        $mode = 'description';
+                    }
+                }
+                continue;
+            }
+
+            if (preg_match('/^(descripci[oó]n|descripcion|detalle|informaci[oó]n|subtareas?(?:\s+a\s+agregar)?|checklist|lista de comprobaci[oó]n|nota)\s*:?\s*$/iu', $clean)) {
+                continue;
+            }
+
+            $isProbablyTask = $hadListMarker && (
+                $current === null
+                || preg_match('/^\d+[\.)]\s+/u', $line)
+                || ($mode === 'description' && Str::length($clean) <= 140 && !preg_match('/[.!?]$/u', $clean))
+                || ($mode === 'task' && !preg_match('/^(y|adem[aá]s|con|para|que|si|revisar|configurar|realizar|definir)\b/iu', $clean))
+            );
+
+            if ($isProbablyTask) {
+                $taskText = $clean;
+                $taskDescription = '';
+                if (preg_match('/^(.+?)\s*(?:[-–—]|\|)\s*(?:descripci[oó]n|descripcion|detalle|informaci[oó]n)\s*:\s*(.+)$/iu', $clean, $match)) {
+                    $taskText = trim((string) $match[1]);
+                    $taskDescription = trim((string) $match[2]);
+                }
+                $parsed = $this->taskLineWithStage($taskText, $stages);
+                $startTask((string) $parsed['text'], (string) $parsed['stage']);
+                if ($taskDescription !== '' && $current) {
+                    $current['description'] = $taskDescription;
+                    $mode = 'description';
+                } elseif ($current && trim((string) ($current['description'] ?? '')) !== '') {
+                    $mode = 'description';
+                }
+                continue;
+            }
+
+            if ($current && $mode === 'subtasks' && $hadListMarker) {
+                $current['subtasks'][] = $clean;
+                continue;
+            }
+
+            if ($current && $mode === 'description') {
+                $current['description'] = trim(($current['description'] ?? '') . "\n" . $clean);
+                continue;
+            }
+
+            if ($current === null) {
+                $parsed = $this->taskLineWithStage($clean, $stages);
+                $startTask((string) $parsed['text'], (string) $parsed['stage']);
+            }
+        }
+
+        $flush();
+
+        return $this->uniqueTaskDrafts($drafts);
+    }
+
+    private function subtaskPayloadsFromTextList(array $items): array
+    {
+        return collect($items)
+            ->map(fn ($item) => Str::limit(trim($this->stripMarkdown((string) $item)), 180, ''))
+            ->filter()
+            ->unique(fn ($item) => Str::lower(Str::ascii($item)))
+            ->values()
+            ->map(fn ($item) => [
+                'id' => (string) Str::ulid(),
+                'texto' => $item,
+                'done' => false,
+                'priority' => 'Con calma',
+            ])
+            ->all();
     }
 
     private function uniqueTaskDrafts(array $tasks): array
@@ -1893,6 +2035,51 @@ class AiActionExecutor
         }
 
         return Str::limit($value, 60, '');
+    }
+
+    private function splitTaskTextAndInlineDescription(string $text): array
+    {
+        $clean = trim($this->stripMarkdown($text));
+        $description = '';
+
+        if (preg_match('/^(.+?)\s*(?:[-–—]|\|)\s*(?:nota|descripci[oó]n|descripcion|detalle|informaci[oó]n)\s*:\s*(.+)$/iu', $clean, $match)) {
+            $clean = trim((string) $match[1]);
+            $description = trim((string) $match[2]);
+        }
+
+        return [
+            'text' => $clean,
+            'description' => $description,
+        ];
+    }
+
+    private function deriveSubtasksFromTaskDescription(string $description): array
+    {
+        $plain = trim($this->stripMarkdown(strip_tags($description)));
+        if ($plain === '') {
+            return [];
+        }
+
+        $sentences = preg_split('/(?<=[.!?])\s+/u', $plain) ?: [];
+        $items = [];
+        foreach ($sentences as $sentence) {
+            $sentence = trim($sentence);
+            if ($sentence !== '') {
+                $items[] = $sentence;
+            }
+        }
+
+        if (count($items) < 2) {
+            $items = preg_split('/\s*(?:,|;|\s+y\s+|\s+e\s+)\s*/iu', $plain) ?: [];
+        }
+
+        $items = array_values(array_filter(array_map(function ($item) {
+            $item = trim((string) $item);
+            $item = preg_replace('/[.!?]+$/u', '', $item) ?? $item;
+            return Str::limit($item, 140, '');
+        }, $items), fn ($item) => Str::length($item) >= 12));
+
+        return array_slice(array_values(array_unique($items)), 0, 4);
     }
 
     private function taskLineWithStage(string $text, array $stages): array
