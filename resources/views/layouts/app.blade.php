@@ -2419,6 +2419,39 @@
         return String(item?.text || '').trim() !== '';
       }
 
+      function normalizeReminderStructure() {
+        const fallbackCategoryId = reminderCategoriesData[0]?.id || 'default-cat';
+        const validCategoryIds = new Set(reminderCategoriesData.map((category) => String(category.id || '')));
+
+        reminderSections = reminderSections
+          .filter((section) => section?.id)
+          .map((section) => ({
+            collapsed: false,
+            ...section,
+            categoryId: validCategoryIds.has(String(section.categoryId || ''))
+              ? section.categoryId
+              : fallbackCategoryId,
+          }));
+
+        reminderCategoriesData.forEach((category) => {
+          const categorySections = reminderSections.filter((section) => String(section.categoryId) === String(category.id));
+          const implicitSections = categorySections.filter((section) => {
+            const title = String(section.title || '').trim().toLowerCase();
+            return !title || title === 'recordatorios';
+          });
+          if (implicitSections.length <= 1) return;
+
+          const canonicalSection = implicitSections[0];
+          const duplicateIds = new Set(implicitSections.slice(1).map((section) => String(section.id)));
+          reminders = reminders.map((item) => (
+            duplicateIds.has(String(item.sectionId || ''))
+              ? { ...item, sectionId: canonicalSection.id }
+              : item
+          ));
+          reminderSections = reminderSections.filter((section) => !duplicateIds.has(String(section.id)));
+        });
+      }
+
       function loadReminders() {
         try {
           const parsed = JSON.parse(localStorage.getItem(REMINDERS_KEY) || '{}');
@@ -2443,8 +2476,10 @@
           ...item,
           priority: normalizeReminderPriority(item?.priority),
         })).filter(hasReminderText);
+        normalizeReminderStructure();
         activeReminderCategoryId = ALL_REMINDERS_CATEGORY_ID;
         activeReminderSectionId = reminderSections[0]?.id || 'default';
+        persistRemindersOnly();
       }
 
       function persistRemindersOnly() {
@@ -2869,12 +2904,16 @@
             if (reminderCategoriesData.length <= 1) return;
             const fallback = reminderCategoriesData.find((category) => category.id !== id);
             if (!fallback) return;
-            const deletedSectionIds = reminderSections.filter((section) => section.categoryId === id).map((section) => section.id);
-            reminderSections = reminderSections.map((section) => section.categoryId === id ? { ...section, categoryId: fallback.id } : section);
-            reminders = reminders.map((item) => deletedSectionIds.includes(item.sectionId) ? { ...item, sectionId: reminderSections.find((section) => section.categoryId === fallback.id)?.id || item.sectionId } : item);
+            const deletedSectionIds = new Set(
+              reminderSections
+                .filter((section) => String(section.categoryId) === String(id))
+                .map((section) => String(section.id))
+            );
+            reminders = reminders.filter((item) => !deletedSectionIds.has(String(item.sectionId || '')));
+            reminderSections = reminderSections.filter((section) => String(section.categoryId) !== String(id));
             reminderCategoriesData = reminderCategoriesData.filter((category) => category.id !== id);
             if (activeReminderCategoryId === id) activeReminderCategoryId = fallback.id;
-            activeReminderSectionId = reminderSections.find((section) => section.categoryId === activeReminderCategoryId)?.id || reminderSections[0]?.id || 'default';
+            activeReminderSectionId = ensureReminderSectionForCategory(activeReminderCategoryId)[0]?.id || reminderSections[0]?.id || 'default';
             saveReminders();
           });
         });

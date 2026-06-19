@@ -1425,8 +1425,7 @@
       position: relative;
       min-height: 5.25rem;
       flex: 0 0 auto;
-      padding: .8rem;
-      padding-right: 2.35rem;
+      padding: .8rem .6rem .8rem .8rem;
       background: #fff;
       gap: 0 !important;
       border-bottom-left-radius: .85rem;
@@ -1529,35 +1528,46 @@
     }
 
     .project-task-toggle {
-      margin-top: .15rem;
-      margin-right: 0;
-      width: 0 !important;
-      min-width: 0;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateX(-.18rem) scale(.86);
-      transition:
-        width .34s cubic-bezier(.16, .84, .28, 1),
-        min-width .34s cubic-bezier(.16, .84, .28, 1),
-        margin-right .34s cubic-bezier(.16, .84, .28, 1),
-        opacity .32s ease,
-        transform .36s cubic-bezier(.16, .84, .28, 1);
-    }
-
-    .project-task-card:hover .project-task-toggle,
-    .project-task-card:focus-within .project-task-toggle,
-    .project-task-card.is-done .project-task-toggle {
+      position: absolute;
+      top: .9rem;
+      left: .8rem;
+      z-index: 2;
       width: 1.25rem !important;
       min-width: 1.25rem;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-.35rem) scale(.82);
+      transition:
+        opacity .4s ease,
+        transform .46s cubic-bezier(.16, .84, .28, 1);
+    }
+
+    .project-task-card:not(.is-card-type):hover .project-task-toggle,
+    .project-task-card:not(.is-card-type):focus-within .project-task-toggle,
+    .project-task-card:not(.is-card-type).is-done .project-task-toggle {
       opacity: 1;
       pointer-events: auto;
-      transform: scale(1);
-      margin-right: .625rem;
+      transform: translateX(0) scale(1);
+    }
+
+    .project-task-main-meta {
+      transition: padding-left .46s cubic-bezier(.16, .84, .28, 1);
+    }
+
+    .project-task-card.is-card-type .project-task-main-meta {
+      transition: none;
+    }
+
+    .project-task-card:not(.is-card-type):hover .project-task-main-meta,
+    .project-task-card:not(.is-card-type):focus-within .project-task-main-meta,
+    .project-task-card:not(.is-card-type).is-done .project-task-main-meta {
+      padding-left: 1.875rem;
     }
 
     .project-task-title {
       display: -webkit-box;
       max-height: 2.6em;
+      padding-right: 1.55rem;
       overflow: hidden;
       overflow-wrap: anywhere;
       -webkit-box-orient: vertical;
@@ -4903,24 +4913,26 @@
         limit: 2,
         wrapperClass: 'flex -space-x-2',
         bubbleClass: 'w-6 h-6 rounded-full border-2 border-white bg-slate-200 text-slate-600 text-[8px] font-bold flex items-center justify-center overflow-hidden',
-        emptyHtml: '<span class="text-[11px] font-semibold text-slate-400">Sin responsable</span>',
+        emptyHtml: '<span class="whitespace-nowrap text-[10px] font-semibold text-slate-400">Sin responsable</span>',
       });
       return `<div class="project-task-card ${done ? 'is-done' : ''} ${coverUrl ? 'has-cover' : ''} ${isPending ? 'is-pending' : ''} ${isEntering ? 'is-entering' : ''} ${!isProgressTask ? 'is-card-type' : ''}" draggable="${isPending ? 'false' : 'true'}" data-board-task-id="${escapeHtml(task.id || '')}" onclick="${isPending ? '' : `openProjectTask('${safeProjectId}', '${safeTaskId}')`}">
         ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="project-task-cover" alt="">` : ''}
         ${isPending ? '' : projectBoardTaskMenu(project, task, taskType)}
-        <div class="project-task-card-body flex items-start gap-2.5">
+        <div class="project-task-card-body">
           ${isProgressTask ? `<button type="button" onclick="event.stopPropagation(); toggleTask('${safeTaskId}', '${safeProjectId}')" class="project-task-toggle h-5 w-5 shrink-0 rounded-full border-2 ${done ? 'border-lime-300 bg-lime-200 text-slate-950' : 'border-slate-300 bg-white'} flex items-center justify-center" title="Completar tarea" aria-label="Completar tarea">
             ${done ? '<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
           </button>` : ''}
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0">
+            <div class="project-task-main-meta">
             <div class="project-task-title text-[13px] font-bold leading-snug ${done ? 'line-through text-slate-400' : 'text-slate-900'}">${escapeHtml(task.texto || 'Tarjeta sin titulo')}</div>
             <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
               ${getTaskPriorityBadge(priority)}
               ${due ? `<span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-500">${escapeHtml(formatBoardDate(due))}</span>` : ''}
             </div>
-            <div class="project-task-footer mt-2 flex items-center justify-between gap-3">
-              ${ownersHtml}
-              <span class="ml-auto inline-flex shrink-0 items-center justify-end gap-1.5 whitespace-nowrap text-[11px] font-bold text-slate-500">
+            </div>
+            <div class="project-task-footer mt-2 flex items-center gap-2">
+              <div class="min-w-0 shrink-0">${ownersHtml}</div>
+              <span class="-mr-0.5 ml-auto inline-flex shrink-0 items-center justify-end gap-1 whitespace-nowrap text-[10px] font-bold text-slate-500">
                 ${files.length ? `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.586-6.586a4 4 0 10-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20 13.486"/></svg>${files.length}` : ''}
                 <span>${(task.subtasks || []).length} Tareas</span>
                 <span class="text-slate-300">·</span>
