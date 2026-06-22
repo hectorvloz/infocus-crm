@@ -1090,6 +1090,10 @@
       overflow: hidden;
     }
 
+    body.header-timer-picker-open {
+      overflow: hidden;
+    }
+
     body.timer-fullscreen-open header {
       z-index: 1 !important;
     }
@@ -1941,7 +1945,13 @@
           <button id="remindersCloseBtn" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 leading-none">✕</button>
         </div>
         <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/70 flex items-center gap-2">
+          <button id="reminderCategoriesPrevBtn" type="button" class="hidden shrink-0 h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-100 disabled:cursor-default disabled:opacity-30" title="Ver categorías anteriores" aria-label="Ver categorías anteriores">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></svg>
+          </button>
           <div id="reminderCategories" class="min-w-0 flex-1 flex gap-2 overflow-x-auto custom-scroll"></div>
+          <button id="reminderCategoriesNextBtn" type="button" class="hidden shrink-0 h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-100 disabled:cursor-default disabled:opacity-30" title="Ver más categorías" aria-label="Ver más categorías">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6"/></svg>
+          </button>
           <button id="reminderAddCategoryBtn" type="button" class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#f2fda2] text-slate-900 text-lg font-extrabold leading-none hover:bg-[#e5f27c]" title="Añadir categoría" aria-label="Añadir categoría">+</button>
         </div>
         <div class="px-5 pt-3 pb-2 border-b border-slate-100">
@@ -2358,6 +2368,8 @@
       const remindersBackdrop = document.getElementById('remindersBackdrop');
       const remindersCloseBtn = document.getElementById('remindersCloseBtn');
       const reminderCategories = document.getElementById('reminderCategories');
+      const reminderCategoriesPrevBtn = document.getElementById('reminderCategoriesPrevBtn');
+      const reminderCategoriesNextBtn = document.getElementById('reminderCategoriesNextBtn');
       const reminderAddCategoryBtn = document.getElementById('reminderAddCategoryBtn');
       const reminderActiveCategoryTitle = document.getElementById('reminderActiveCategoryTitle');
       const remindersList = document.getElementById('remindersList');
@@ -2403,6 +2415,8 @@
       let reminderPendingLink = null;
       let activeReminderCategoryId = 'default-cat';
       let activeReminderSectionId = 'default';
+      let reminderAllViewMode = 'clients';
+      let reminderPriorityCollapsed = {};
       let reminderPopoverBusyUntil = 0;
       let reminderDatePickerOpen = false;
       const ALL_REMINDERS_CATEGORY_ID = '__all__';
@@ -2458,10 +2472,16 @@
           reminderCategoriesData = Array.isArray(parsed.categories) ? parsed.categories : [];
           reminderSections = Array.isArray(parsed.sections) ? parsed.sections : [];
           reminders = Array.isArray(parsed.items) ? parsed.items : [];
+          reminderAllViewMode = parsed.allViewMode === 'priority' ? 'priority' : 'clients';
+          reminderPriorityCollapsed = parsed.priorityCollapsed && typeof parsed.priorityCollapsed === 'object'
+            ? parsed.priorityCollapsed
+            : {};
         } catch (_) {
           reminderCategoriesData = [];
           reminderSections = [];
           reminders = [];
+          reminderAllViewMode = 'clients';
+          reminderPriorityCollapsed = {};
         }
         if (!reminderCategoriesData.length) {
           reminderCategoriesData = [{ id: 'default-cat', title: 'Recordatorios' }];
@@ -2483,7 +2503,13 @@
       }
 
       function persistRemindersOnly() {
-        localStorage.setItem(REMINDERS_KEY, JSON.stringify({ categories: reminderCategoriesData, sections: reminderSections, items: reminders }));
+        localStorage.setItem(REMINDERS_KEY, JSON.stringify({
+          categories: reminderCategoriesData,
+          sections: reminderSections,
+          items: reminders,
+          allViewMode: reminderAllViewMode,
+          priorityCollapsed: reminderPriorityCollapsed,
+        }));
         renderRemindersCounter();
       }
 
@@ -2510,6 +2536,21 @@
         if (normalized === 'Atención') return 'border-amber-200 bg-amber-50 text-amber-700';
         if (normalized === 'Con calma') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
         return 'border-slate-200 bg-slate-50 text-slate-500';
+      }
+
+      function groupRemindersByPriority(items) {
+        const groups = [
+          { key: 'Urgente', label: 'Urgente', items: [] },
+          { key: 'Atención', label: 'Atención', items: [] },
+          { key: 'Con calma', label: 'Con calma', items: [] },
+          { key: '', label: 'Sin prioridad', items: [] },
+        ];
+        const groupsByKey = new Map(groups.map((group) => [group.key, group]));
+        items.filter(hasReminderText).forEach((item) => {
+          const priority = normalizeReminderPriority(item?.priority);
+          groupsByKey.get(priority)?.items.push(item);
+        });
+        return groups;
       }
 
       function reminderPriorityButtonHtml(priority, attrs = '') {
@@ -2828,6 +2869,20 @@
         return String(categoryId || '') === ALL_REMINDERS_CATEGORY_ID;
       }
 
+      function moveReminderCategoryToFront(categoryId) {
+        const id = String(categoryId || '');
+        const index = reminderCategoriesData.findIndex((category) => String(category.id) === id);
+        if (index <= 0) return false;
+        const [category] = reminderCategoriesData.splice(index, 1);
+        reminderCategoriesData.unshift(category);
+        return true;
+      }
+
+      function touchReminderCategoryBySection(sectionId) {
+        const section = reminderSections.find((item) => String(item.id) === String(sectionId || ''));
+        return section ? moveReminderCategoryToFront(section.categoryId) : false;
+      }
+
       function ensureReminderSectionForCategory(categoryId) {
         let sections = reminderSections.filter((section) => String(section.categoryId) === String(categoryId));
         if (!sections.length) {
@@ -2843,9 +2898,46 @@
         const allMode = isAllRemindersCategoryId(activeReminderCategoryId);
         const activeCategory = reminderCategoriesData.find((category) => String(category.id) === String(activeReminderCategoryId));
         if (allMode || !activeCategory) {
+          const viewLabel = reminderAllViewMode === 'priority' ? 'Prioridad' : 'Clientes';
           reminderActiveCategoryTitle.innerHTML = `
-            <div class="text-xl font-extrabold leading-tight text-slate-900">Todos</div>
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-xl font-extrabold leading-tight text-slate-900">Todos</div>
+              <div class="relative">
+                <button type="button" id="reminderAllViewBtn" aria-haspopup="menu" aria-expanded="false" class="inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50">
+                  <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M7 12h10M10 17h4"/></svg>
+                  <span>${viewLabel}</span>
+                  <svg class="h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div id="reminderAllViewDropdown" role="menu" class="hidden absolute right-0 top-[calc(100%+0.4rem)] z-[90] w-52 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl">
+                  <div class="px-2.5 pb-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Organizar por</div>
+                  <button type="button" role="menuitemradio" aria-checked="${reminderAllViewMode === 'clients'}" data-reminder-all-view="clients" class="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-extrabold ${reminderAllViewMode === 'clients' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}">
+                    <span>Clientes</span>
+                    <span class="${reminderAllViewMode === 'clients' ? '' : 'hidden'}">✓</span>
+                  </button>
+                  <button type="button" role="menuitemradio" aria-checked="${reminderAllViewMode === 'priority'}" data-reminder-all-view="priority" class="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-extrabold ${reminderAllViewMode === 'priority' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}">
+                    <span>Prioridad</span>
+                    <span class="${reminderAllViewMode === 'priority' ? '' : 'hidden'}">✓</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           `;
+          const viewBtn = reminderActiveCategoryTitle.querySelector('#reminderAllViewBtn');
+          const viewDropdown = reminderActiveCategoryTitle.querySelector('#reminderAllViewDropdown');
+          viewBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const shouldOpen = viewDropdown?.classList.contains('hidden');
+            viewDropdown?.classList.toggle('hidden', !shouldOpen);
+            viewBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+          });
+          viewDropdown?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const option = event.target?.closest?.('[data-reminder-all-view]');
+            if (!option) return;
+            reminderAllViewMode = option.getAttribute('data-reminder-all-view') === 'priority' ? 'priority' : 'clients';
+            persistRemindersOnly();
+            renderReminders();
+          });
           return;
         }
         reminderActiveCategoryTitle.innerHTML = `
@@ -2888,6 +2980,7 @@
           </div>`;
         }).join('');
         reminderCategories.innerHTML = allChip + categoryChips;
+        requestAnimationFrame(updateReminderCategoryScrollControls);
         reminderCategories.querySelectorAll('[data-reminder-category]').forEach((btn) => {
           btn.addEventListener('click', () => {
             activeReminderCategoryId = btn.getAttribute('data-reminder-category') || 'default-cat';
@@ -2919,6 +3012,24 @@
         });
       }
 
+      function updateReminderCategoryScrollControls() {
+        if (!reminderCategories || !reminderCategoriesPrevBtn || !reminderCategoriesNextBtn) return;
+        const maxScrollLeft = Math.max(0, reminderCategories.scrollWidth - reminderCategories.clientWidth);
+        const hasOverflow = maxScrollLeft > 2;
+        reminderCategoriesPrevBtn.classList.toggle('hidden', !hasOverflow);
+        reminderCategoriesPrevBtn.classList.toggle('inline-flex', hasOverflow);
+        reminderCategoriesNextBtn.classList.toggle('hidden', !hasOverflow);
+        reminderCategoriesNextBtn.classList.toggle('inline-flex', hasOverflow);
+        reminderCategoriesPrevBtn.disabled = !hasOverflow || reminderCategories.scrollLeft <= 2;
+        reminderCategoriesNextBtn.disabled = !hasOverflow || reminderCategories.scrollLeft >= maxScrollLeft - 2;
+      }
+
+      function scrollReminderCategories(direction) {
+        if (!reminderCategories) return;
+        const amount = Math.max(160, Math.round(reminderCategories.clientWidth * 0.7));
+        reminderCategories.scrollBy({ left: direction * amount, behavior: 'smooth' });
+      }
+
       function renderReminders() {
         if (!remindersList) return;
         if (!isAllRemindersCategoryId(activeReminderCategoryId) && !reminderCategoriesData.some((category) => category.id === activeReminderCategoryId)) {
@@ -2935,10 +3046,17 @@
         renderReminderCategories();
         renderActiveReminderCategoryTitle();
 
-        const reminderItemHtml = (item, sectionId) => {
+        const reminderItemHtml = (item, sectionId, options = {}) => {
           const priority = priorityText(item.priority);
           const date = formatReminderDate(item.dueDate);
-          const metaHtml = (priority || date || item.link) ? `<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold group-focus-within:hidden">
+          const categoryLabel = options.showCategory
+            ? reminderCategoriesData.find((category) => reminderSections.some((section) => (
+                String(section.id) === String(item.sectionId || '')
+                && String(section.categoryId) === String(category.id)
+              )))?.title
+            : '';
+          const metaHtml = (categoryLabel || priority || date || item.link) ? `<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold group-focus-within:hidden">
+                ${categoryLabel ? `<span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2 text-[10px] font-extrabold text-slate-500">${escapeHtml(categoryLabel)}</span>` : ''}
                 ${priority ? `<span class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${priorityClass(item.priority)}">${reminderPriorityIcon(item.priority)}${priority}</span>` : ''}
                 ${date ? `<span class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500">${date}</span>` : ''}
                 ${item.link ? reminderLinkMarkup(item.link) : ''}
@@ -2982,14 +3100,13 @@
             </div>
             <div class="${collapsed && !isImplicitSection ? 'hidden' : ''} ${isImplicitSection ? 'mt-0' : 'mt-2'} space-y-0.5" data-reminder-section-items="${escapeHtml(section.id)}">${itemHtml}</div>
             <button type="button" data-reminder-section-add="${escapeHtml(section.id)}" class="${collapsed && !isImplicitSection ? 'hidden' : ''} group mt-1 flex h-8 w-full items-center gap-2.5 py-1 text-left" title="Añadir recordatorio" aria-label="Añadir recordatorio">
-              <span class="ml-0.5 inline-flex h-6 w-6 shrink-0 rounded-full border-2 border-dotted border-slate-300 bg-white/10 transition-colors group-hover:border-slate-400"></span>
+              <span class="inline-flex h-6 w-6 shrink-0 rounded-full border-2 border-dotted border-slate-300 bg-white/10 transition-colors group-hover:border-slate-400"></span>
               <span class="pointer-events-none text-sm font-medium text-slate-300 opacity-0 group-hover:opacity-100">Nuevo recordatorio</span>
             </button>
           </section>`;
         };
 
-        const sectionsHtml = allMode
-          ? reminderCategoriesData.map((category) => {
+        const clientSectionsHtml = () => reminderCategoriesData.map((category) => {
               const sections = ensureReminderSectionForCategory(category.id);
               const sectionIds = sections.map((section) => String(section.id));
               const categoryPending = reminders.filter((item) => sectionIds.includes(String(item.sectionId || '')) && hasReminderText(item) && !item.done).length;
@@ -3008,7 +3125,34 @@
                   ${sections.map((section) => sectionHtml(section, sections, true)).join('')}
                 </div>
               </section>`;
-            }).join('')
+            }).join('');
+
+        const prioritySectionsHtml = () => groupRemindersByPriority(reminders).map((group) => {
+          const groupId = group.key || 'none';
+          const collapsed = !!reminderPriorityCollapsed[groupId];
+          const pendingCount = group.items.filter((item) => !item.done).length;
+          const groupClass = group.key ? priorityClass(group.key) : 'border-slate-200 bg-slate-50 text-slate-600';
+          return `<section class="rounded-2xl border border-slate-100 bg-white/70 px-3 py-2.5 shadow-sm" data-reminder-priority-group="${escapeHtml(groupId)}">
+            <div class="flex items-center gap-2">
+              <button type="button" data-reminder-priority-collapse="${escapeHtml(groupId)}" aria-expanded="${!collapsed}" class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#111729] text-white/90 hover:bg-slate-800" title="${collapsed ? 'Abrir prioridad' : 'Compactar prioridad'}" aria-label="${collapsed ? 'Abrir prioridad' : 'Compactar prioridad'}">
+                <svg class="h-3 w-3 transition-transform ${collapsed ? '-rotate-90' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <span class="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-extrabold ${groupClass}">
+                ${group.key ? reminderPriorityIcon(group.key) : '<span class="h-2 w-2 rounded-full bg-slate-300"></span>'}
+                ${escapeHtml(group.label)}
+              </span>
+              <span class="ml-auto rounded-full bg-[#f2fda2] px-2 py-0.5 text-[11px] font-black text-slate-900">${pendingCount}</span>
+            </div>
+            <div class="${collapsed ? 'hidden' : ''} mt-3 space-y-0.5 pl-6">
+              ${group.items.length
+                ? group.items.map((item) => reminderItemHtml(item, item.sectionId || 'default', { showCategory: true })).join('')
+                : '<div class="py-3 text-center text-xs font-semibold text-slate-400">No hay recordatorios</div>'}
+            </div>
+          </section>`;
+        }).join('');
+
+        const sectionsHtml = allMode
+          ? (reminderAllViewMode === 'priority' ? prioritySectionsHtml() : clientSectionsHtml())
           : categorySections.map((section) => sectionHtml(section, categorySections)).join('');
 
         remindersList.innerHTML = sectionsHtml;
@@ -3041,6 +3185,7 @@
         } else {
           reminders.push(reminder);
         }
+        touchReminderCategoryBySection(targetSectionId);
         if (reminderNewText) reminderNewText.value = '';
         updateReminderPriorityPicker('');
         if (reminderNewDate) {
@@ -3275,6 +3420,14 @@
             saveReminders();
           });
         });
+        remindersList?.querySelectorAll('[data-reminder-priority-collapse]').forEach((btn) => {
+          btn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const id = btn.getAttribute('data-reminder-priority-collapse') || 'none';
+            reminderPriorityCollapsed[id] = !reminderPriorityCollapsed[id];
+            saveReminders();
+          });
+        });
         remindersList?.querySelectorAll('[data-reminder-section-collapse]').forEach((btn) => {
           btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-reminder-section-collapse') || '';
@@ -3368,7 +3521,12 @@
           });
         });
         remindersList?.querySelectorAll('[data-reminder-toggle]').forEach((btn) => {
-          btn.addEventListener('click', () => {
+          btn.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          });
+          btn.addEventListener('click', (event) => {
+            event.stopPropagation();
             const id = btn.getAttribute('data-reminder-toggle');
             const current = reminders.find((item) => item.id === id);
             if (!current) return;
@@ -3386,6 +3544,7 @@
               without.splice(targetIndex, 0, updated);
             }
             reminders = without;
+            touchReminderCategoryBySection(updated.sectionId);
             if (updated.done) {
               btn.classList.remove('border-slate-300', 'bg-white', 'text-transparent');
               btn.classList.add('border-[#f2fda2]', 'bg-[#f2fda2]', 'text-slate-900');
@@ -3416,10 +3575,14 @@
           };
           input.addEventListener('input', () => {
             const id = input.getAttribute('data-reminder-text');
+            const row = input.closest('[data-reminder-id]');
+            const sectionId = row?.getAttribute('data-reminder-section-id') || '';
             autoSizeReminderText(input);
             reminders = reminders.map((item) => item.id === id ? { ...item, text: input.value, updatedAt: Date.now() } : item);
+            const categoryMoved = touchReminderCategoryBySection(sectionId);
             maybeShowReminderLinkDropdown(input, id);
             persistRemindersOnly();
+            if (categoryMoved) renderReminderCategories();
           });
           input.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter') return;
@@ -3447,7 +3610,9 @@
         remindersList?.querySelectorAll('[data-reminder-priority]').forEach((select) => {
           select.addEventListener('change', () => {
             const id = select.getAttribute('data-reminder-priority');
+            const current = reminders.find((item) => item.id === id);
             reminders = reminders.map((item) => item.id === id ? { ...item, priority: normalizeReminderPriority(select.value), updatedAt: Date.now() } : item);
+            touchReminderCategoryBySection(current?.sectionId);
             saveReminders();
           });
         });
@@ -3493,7 +3658,9 @@
             markReminderPopoverBusy();
             const id = btn.getAttribute('data-reminder-priority-set') || '';
             const value = normalizeReminderPriority(btn.getAttribute('data-reminder-priority-value') || '');
+            const current = reminders.find((item) => item.id === id);
             reminders = reminders.map((item) => item.id === id ? { ...item, priority: value, updatedAt: Date.now() } : item);
+            touchReminderCategoryBySection(current?.sectionId);
             hideReminderRowPriorityDropdowns();
             saveReminders();
           });
@@ -3502,13 +3669,18 @@
           const picker = initReminderDatePicker(input, (dateStr) => {
             markReminderPopoverBusy();
             const id = input.getAttribute('data-reminder-date');
+            const current = reminders.find((item) => item.id === id);
             reminders = reminders.map((item) => item.id === id ? { ...item, dueDate: dateStr, updatedAt: Date.now() } : item);
+            const categoryMoved = touchReminderCategoryBySection(current?.sectionId);
             persistRemindersOnly();
+            if (categoryMoved) renderReminderCategories();
           });
           if (picker) return;
           input.addEventListener('change', () => {
             const id = input.getAttribute('data-reminder-date');
+            const current = reminders.find((item) => item.id === id);
             reminders = reminders.map((item) => item.id === id ? { ...item, dueDate: input.value, updatedAt: Date.now() } : item);
+            touchReminderCategoryBySection(current?.sectionId);
             saveReminders();
           });
         });
@@ -3571,6 +3743,13 @@
 
       function hideReminderPriorityDropdown() {
         reminderPriorityDropdown?.classList.add('hidden');
+      }
+
+      function hideReminderAllViewDropdown() {
+        const dropdown = reminderActiveCategoryTitle?.querySelector('#reminderAllViewDropdown');
+        const button = reminderActiveCategoryTitle?.querySelector('#reminderAllViewBtn');
+        dropdown?.classList.add('hidden');
+        button?.setAttribute('aria-expanded', 'false');
       }
 
       function hideReminderRowPriorityDropdowns(exceptId = '') {
@@ -3869,6 +4048,7 @@
         remindersBackdrop?.classList.add('hidden');
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
+        hideReminderAllViewDropdown();
         hideReminderRowPriorityDropdowns();
         closeReminderDatePickers();
         clearReminderPendingLink();
@@ -3901,6 +4081,16 @@
       });
       remindersCloseBtn?.addEventListener('click', closeRemindersPanel);
       remindersBackdrop?.addEventListener('click', closeRemindersPanel);
+      reminderCategoriesPrevBtn?.addEventListener('click', () => scrollReminderCategories(-1));
+      reminderCategoriesNextBtn?.addEventListener('click', () => scrollReminderCategories(1));
+      reminderCategories?.addEventListener('scroll', updateReminderCategoryScrollControls, { passive: true });
+      reminderCategories?.addEventListener('wheel', (event) => {
+        if (reminderCategories.scrollWidth <= reminderCategories.clientWidth + 2) return;
+        if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+        event.preventDefault();
+        reminderCategories.scrollLeft += event.deltaY;
+      }, { passive: false });
+      window.addEventListener('resize', updateReminderCategoryScrollControls);
       reminderShowComposerBtn?.addEventListener('click', openReminderComposer);
       reminderComposer?.addEventListener('focusout', () => {
         setTimeout(() => {
@@ -3913,7 +4103,7 @@
         const title = 'Nueva categoría';
         const category = { id: uid('cat'), title, collapsed: false };
         const section = { id: uid('section'), categoryId: category.id, title: '', collapsed: false };
-        reminderCategoriesData.push(category);
+        reminderCategoriesData.unshift(category);
         reminderSections.push(section);
         activeReminderCategoryId = category.id;
         activeReminderSectionId = section.id;
@@ -4034,6 +4224,7 @@
       remindersPanel?.addEventListener('click', (event) => {
         const target = event.target;
         const insidePriority = target?.closest?.('#reminderPriorityBtn, #reminderPriorityDropdown, [data-reminder-priority-edit], [data-reminder-priority-menu]');
+        const insideAllView = target?.closest?.('#reminderAllViewBtn, #reminderAllViewDropdown');
         const insideLink = target?.closest?.('#reminderLinkDropdown, [data-reminder-text], #reminderNewText');
         const insideDate = target?.closest?.('[data-reminder-date], #reminderNewDate, .flatpickr-input, .reminder-date-trigger, .flatpickr-calendar');
         const insideComposer = reminderComposer?.contains(target);
@@ -4043,6 +4234,9 @@
         if (!insidePriority) {
           hideReminderPriorityDropdown();
           hideReminderRowPriorityDropdowns();
+        }
+        if (!insideAllView) {
+          hideReminderAllViewDropdown();
         }
         if (!insideLink) {
           hideReminderLinkDropdown();
@@ -4077,6 +4271,7 @@
         document.body.classList.remove('header-profile-menu-open');
         hideReminderLinkDropdown();
         hideReminderPriorityDropdown();
+        hideReminderAllViewDropdown();
         hideReminderRowPriorityDropdowns();
         closeReminderDatePickers();
         if (document.activeElement instanceof HTMLElement && reminderComposer?.contains(document.activeElement)) {
@@ -4299,13 +4494,14 @@
       function ensureHeaderTimerPickerModal() {
         if (document.getElementById('headerTimerPickerModal')) return;
         const wrapper = document.createElement('div');
-        wrapper.innerHTML = `<div id="headerTimerPickerModal" class="fixed inset-0 z-[1400] hidden">
-          <div class="absolute inset-0 bg-slate-950/55" data-header-timer-close></div>
-          <div class="absolute inset-0 flex items-center justify-center p-4">
-            <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        wrapper.innerHTML = `<div id="headerTimerPickerModal" class="fixed inset-0 hidden" style="z-index:2147483550" role="dialog" aria-modal="true" aria-labelledby="headerTimerPickerTitle">
+          <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" data-header-timer-close></div>
+          <div class="absolute inset-0 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+              <div role="document" class="my-4 w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
               <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
                 <div class="min-w-0">
-                  <h3 class="text-lg font-extrabold text-slate-900">¿En qué proyecto iniciarás el temporizador?</h3>
+                  <h3 id="headerTimerPickerTitle" class="text-lg font-extrabold text-slate-900">¿En qué proyecto iniciarás el temporizador?</h3>
                   <p class="text-xs text-slate-500 mt-1">Primero elige proyecto y luego la tarea para comenzar a contar tiempo.</p>
                   <div class="mt-3">
                     <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wide text-slate-400">
@@ -4344,6 +4540,7 @@
                 </div>
               </div>
             </div>
+            </div>
           </div>
         </div>`;
         document.body.appendChild(wrapper.firstElementChild);
@@ -4352,6 +4549,7 @@
           node.addEventListener('click', () => {
             const modal = document.getElementById('headerTimerPickerModal');
             if (modal) modal.classList.add('hidden');
+            document.body.classList.remove('header-timer-picker-open');
           });
         });
 
@@ -4395,6 +4593,7 @@
           const search = document.getElementById('headerTimerProjectSearch');
           if (search) search.value = '';
           renderHeaderTimerProjectList('');
+          document.body.classList.add('header-timer-picker-open');
           modal.classList.remove('hidden');
         } catch (_) {
           if (window.showNotification) window.showNotification('No se pudo cargar proyectos para el temporizador.', 'error');
@@ -4423,6 +4622,7 @@
 
           const modal = document.getElementById('headerTimerPickerModal');
           if (modal) modal.classList.add('hidden');
+          document.body.classList.remove('header-timer-picker-open');
           await syncGlobalTimerFromServer();
           if (window.showNotification) window.showNotification('Temporizador iniciado', 'success');
         } catch (_) {
