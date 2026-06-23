@@ -51,7 +51,7 @@
 
     .compact-rich-editor-shell {
       position: relative;
-      border-radius: .9rem;
+      border-radius: 1.1rem;
       border: 1px solid #e2e8f0;
       background: rgba(248, 250, 252, .6);
       box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
@@ -199,6 +199,7 @@
       resize: vertical;
       overflow-y: auto;
       overflow-x: hidden;
+      border-radius: 0 0 1.05rem 1.05rem;
       scrollbar-width: thin;
       scrollbar-color: #cbd5e1 transparent;
       text-transform: none;
@@ -266,6 +267,21 @@
       border-radius: .25rem;
       background: #fef08a;
       padding: 0 .12rem;
+    }
+
+    .compact-rich-editor a,
+    .project-note-autolink {
+      color: #2563eb;
+      font-weight: 800;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
+      word-break: break-word;
+    }
+
+    .compact-rich-editor a:hover,
+    .project-note-autolink:hover {
+      color: #1d4ed8;
     }
 
     .compact-rich-editor .note-checkline {
@@ -381,6 +397,7 @@
     .compact-rich-editor-shell.is-ai-writing {
       position: relative;
       isolation: isolate;
+      border-radius: 1.25rem;
       border-color: rgba(217, 70, 239, .46);
       box-shadow:
         0 0 0 2px rgba(217, 70, 239, .13),
@@ -393,7 +410,7 @@
       inset: -.55rem;
       z-index: -1;
       pointer-events: none;
-      border-radius: 1.25rem;
+      border-radius: 1.65rem;
       background: linear-gradient(120deg, rgba(129,140,248,.38), rgba(217,70,239,.40), rgba(240,254,151,.52), rgba(56,189,248,.34), rgba(129,140,248,.38));
       background-size: 260% 260%;
       filter: blur(18px);
@@ -421,6 +438,7 @@
 
     .compact-rich-editor-shell.is-ai-writing .compact-rich-editor {
       background: linear-gradient(180deg, rgba(253, 244, 255, .76), rgba(255, 255, 255, .9));
+      border-radius: 0 0 1.2rem 1.2rem;
     }
 
     #taskModalDescription .task-desc-ai-enter,
@@ -903,6 +921,8 @@
     }
 
     .project-board-cover {
+      position: relative;
+      overflow: hidden;
       height: 58px;
       border-radius: 1rem 1rem 0 0;
       background:
@@ -914,8 +934,20 @@
 
     .project-board-cover.has-image {
       height: 66px;
-      background-size: cover;
-      background-position: center;
+    }
+
+    .project-board-cover__img {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    .project-board-cover.is-cover-fallback .project-board-cover__img {
+      display: none;
     }
 
     .project-cover-preview {
@@ -3534,13 +3566,79 @@
       return sanitizeDescriptionHtml(template.innerHTML);
     }
 
+    function normalizeAutolinkHref(raw = '') {
+      const value = String(raw || '').trim();
+      if (!value) return '';
+      const href = /^www\./i.test(value) ? `https://${value}` : value;
+      return /^(https?:\/\/|mailto:|tel:)/i.test(href) ? href : '';
+    }
+
+    function splitAutolinkPunctuation(value = '') {
+      let text = String(value || '');
+      let suffix = '';
+      while (/[),.;:!?]$/.test(text)) {
+        const char = text.slice(-1);
+        if (char === ')' && (text.match(/\(/g) || []).length >= (text.match(/\)/g) || []).length) break;
+        suffix = char + suffix;
+        text = text.slice(0, -1);
+      }
+      return { text, suffix };
+    }
+
+    function linkifyDescriptionTextNodes(root) {
+      if (!root) return;
+      const urlPattern = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent || parent.closest('a,script,style,textarea,button')) return NodeFilter.FILTER_REJECT;
+          urlPattern.lastIndex = 0;
+          return urlPattern.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        },
+      });
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      textNodes.forEach((node) => {
+        const fragment = document.createDocumentFragment();
+        const source = node.nodeValue || '';
+        let lastIndex = 0;
+        source.replace(urlPattern, (match, _url, offset) => {
+          const { text, suffix } = splitAutolinkPunctuation(match);
+          const href = normalizeAutolinkHref(text);
+          if (!href) return match;
+          if (offset > lastIndex) fragment.appendChild(document.createTextNode(source.slice(lastIndex, offset)));
+          const link = document.createElement('a');
+          link.href = href;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = text;
+          fragment.appendChild(link);
+          if (suffix) fragment.appendChild(document.createTextNode(suffix));
+          lastIndex = offset + match.length;
+          return match;
+        });
+        if (lastIndex < source.length) fragment.appendChild(document.createTextNode(source.slice(lastIndex)));
+        node.replaceWith(fragment);
+      });
+    }
+
+    function linkifyPlainText(value = '', className = 'project-note-autolink') {
+      const template = document.createElement('template');
+      template.innerHTML = `<span>${escapeHtml(value)}</span>`;
+      linkifyDescriptionTextNodes(template.content);
+      template.content.querySelectorAll('a').forEach((link) => {
+        if (className) link.className = className;
+      });
+      return template.innerHTML;
+    }
+
     function sanitizeDescriptionHtml(value = '') {
       const raw = String(value || '').trim();
       if (!raw) return '';
       const source = looksLikeHtml(raw) ? raw : plainTextToDescriptionHtml(raw);
       const template = document.createElement('template');
       template.innerHTML = source;
-      const allowedTags = new Set(['B', 'STRONG', 'I', 'EM', 'S', 'STRIKE', 'U', 'MARK', 'P', 'DIV', 'BR', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'HR', 'SPAN', 'INPUT']);
+      const allowedTags = new Set(['A', 'B', 'STRONG', 'I', 'EM', 'S', 'STRIKE', 'U', 'MARK', 'P', 'DIV', 'BR', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'HR', 'SPAN', 'INPUT']);
       const walk = (node) => {
         Array.from(node.childNodes).forEach((child) => {
           if (child.nodeType === Node.ELEMENT_NODE) {
@@ -3553,15 +3651,27 @@
               const value = attr.value || '';
               const isSafeStyle = name === 'style' && /background(?:-color)?\s*:\s*(?:rgb\(254,\s*240,\s*138\)|#?fef08a|yellow)/i.test(value);
               const isSafeCheckboxAttr = child.tagName === 'INPUT' && ['type', 'checked', 'contenteditable'].includes(name);
-              if (name !== 'class' && !isSafeStyle && !isSafeCheckboxAttr) child.removeAttribute(attr.name);
+              const isSafeLinkAttr = child.tagName === 'A' && ['href', 'target', 'rel'].includes(name);
+              if (name !== 'class' && !isSafeStyle && !isSafeCheckboxAttr && !isSafeLinkAttr) child.removeAttribute(attr.name);
               if (child.tagName === 'INPUT' && child.getAttribute('type') !== 'checkbox') child.remove();
               if (name === 'class' && !/^note-|^compact-/.test(value)) child.removeAttribute(attr.name);
             });
+            if (child.tagName === 'A') {
+              const href = normalizeAutolinkHref(child.getAttribute('href') || child.textContent || '');
+              if (!href) {
+                child.replaceWith(document.createTextNode(child.textContent || ''));
+                return;
+              }
+              child.setAttribute('href', href);
+              child.setAttribute('target', '_blank');
+              child.setAttribute('rel', 'noopener noreferrer');
+            }
           }
           walk(child);
         });
       };
       walk(template.content);
+      linkifyDescriptionTextNodes(template.content);
       return template.innerHTML.trim();
     }
 
@@ -3585,6 +3695,16 @@
       if (!editor) return;
       editor.innerHTML = sanitizeDescriptionHtml(value);
       syncCompactDescEditorState(editorId);
+    }
+
+    function normalizeCompactDescEditorLinks(editorId) {
+      const editor = document.getElementById(editorId);
+      if (!editor) return;
+      const nextHtml = sanitizeDescriptionHtml(editor.innerHTML || '');
+      if (nextHtml !== (editor.innerHTML || '').trim()) {
+        editor.innerHTML = nextHtml;
+        syncCompactDescEditorState(editorId);
+      }
     }
 
     function activateCompactDescEditor(editorId) {
@@ -3992,11 +4112,37 @@
     window.runCompactDescCommand = runCompactDescCommand;
     window.toggleCompactDescFormatMenu = toggleCompactDescFormatMenu;
     window.applyCompactDescFormat = applyCompactDescFormat;
+    let compactDescLinkOpenedAt = 0;
 
     document.addEventListener('input', (event) => {
       const editor = event.target?.closest?.('.compact-rich-editor');
       if (!editor?.id) return;
       syncCompactDescEditorState(editor.id);
+    });
+
+    document.addEventListener('blur', (event) => {
+      const editor = event.target?.closest?.('.compact-rich-editor');
+      if (!editor?.id) return;
+      normalizeCompactDescEditorLinks(editor.id);
+      queueCompactDescAutosave(editor.id);
+    }, true);
+
+    document.addEventListener('pointerdown', (event) => {
+      const link = event.target?.closest?.('.compact-rich-editor a[href]');
+      if (!link) return;
+      event.preventDefault();
+      event.stopPropagation();
+      compactDescLinkOpenedAt = Date.now();
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+    }, true);
+
+    document.addEventListener('click', (event) => {
+      const link = event.target?.closest?.('.compact-rich-editor a[href]');
+      if (!link) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (Date.now() - compactDescLinkOpenedAt < 750) return;
+      window.open(link.href, '_blank', 'noopener,noreferrer');
     });
 
     document.addEventListener('keyup', (event) => {
@@ -4668,16 +4814,16 @@
 
       grid.innerHTML = rows.map((project, index) => {
         const [from, to] = boardCoverTone(project, index);
-        const coverImage = String(project.cover_image || '').trim();
+        const coverImage = normalizeProjectCoverUrl(project.cover_image);
         const coverClass = coverImage ? 'project-board-cover has-image' : 'project-board-cover';
-        const coverStyle = coverImage ? `background-image:url(&quot;${escapeHtml(coverImage)}&quot;);` : '';
+        const coverMarkup = projectCoverImageMarkup(coverImage, project.titulo || 'Portada del proyecto');
         const safeId = String(project.id || '').replace(/'/g, "\\'");
         const stats = getProjectTaskStats(project);
         const taskCount = Array.isArray(project.tareas) ? project.tareas.length : 0;
         const client = escapeHtml(project.cliente || 'Sin cliente');
         const due = formatBoardDate(project.vencimiento);
         return `<button type="button" onclick="openProjectBoard('${safeId}')" class="project-board-card text-left" style="--board-from:${from};--board-to:${to};">
-          <div class="${coverClass}" style="${coverStyle}"></div>
+          <div class="${coverClass}">${coverMarkup}</div>
           <div class="project-board-footer">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
@@ -6822,9 +6968,7 @@
       if (preview) {
         preview.style.setProperty('--cover-from', from);
         preview.style.setProperty('--cover-to', to);
-        preview.style.backgroundImage = newProjectCoverImage
-          ? `url("${newProjectCoverImage}")`
-          : '';
+        preview.style.backgroundImage = projectCoverCssUrl(newProjectCoverImage);
       }
 
       if (gallery) {
@@ -6837,7 +6981,7 @@
     }
 
     function renderProjectCoverPopover({ activeImage = '', activeColor = '', target = 'new' } = {}) {
-      const active = String(activeImage || '').trim();
+      const active = normalizeProjectCoverUrl(activeImage);
       const photosKey = `${target}Photos`;
       const colorsKey = `${target}Colors`;
       const photosExpanded = !!projectCoverPickerExpanded[photosKey];
@@ -6846,12 +6990,13 @@
       const colors = colorsExpanded ? PROJECT_COVER_PALETTES : PROJECT_COVER_PALETTES.slice(0, 4);
       const inputId = `${target}ProjectCoverUploadInput`;
       const photoOptions = photos.map((preset, index) => {
-        const isActive = active === preset.url;
+        const presetUrl = normalizeProjectCoverUrl(preset.url);
+        const isActive = active === presetUrl;
         const originalIndex = PROJECT_COVER_PRESETS.indexOf(preset);
         const action = target === 'modal'
           ? `selectModalCoverPreset(${originalIndex})`
           : `selectNewProjectCoverPreset(${originalIndex})`;
-        return `<button type="button" class="project-cover-option ${isActive ? 'is-active' : ''}" style="background-image:url('${escapeHtml(preset.url)}')" onclick="${action}" aria-label="Usar portada ${escapeHtml(preset.name)}">
+        return `<button type="button" class="project-cover-option ${isActive ? 'is-active' : ''}" style="background-image:url('${escapeHtml(presetUrl)}')" onclick="${action}" aria-label="Usar portada ${escapeHtml(preset.name)}">
           <span>${escapeHtml(preset.name)}</span>
         </button>`;
       }).join('');
@@ -7012,13 +7157,13 @@
       const preview = document.getElementById('modalCoverPreview');
       const gallery = document.getElementById('modalCoverGallery');
       const clearBtn = document.getElementById('modalCoverClearBtn');
-      const coverImage = String(p.cover_image || '').trim();
+      const coverImage = normalizeProjectCoverUrl(p.cover_image);
       const [from, to] = parseProjectCoverColor(p.cover_color) || boardCoverTone(p, 0);
 
       if (preview) {
         preview.style.setProperty('--cover-from', from);
         preview.style.setProperty('--cover-to', to);
-        preview.style.backgroundImage = coverImage ? `url("${coverImage}")` : '';
+        preview.style.backgroundImage = projectCoverCssUrl(coverImage);
       }
       if (gallery) {
         gallery.innerHTML = renderProjectCoverPopover({
@@ -7032,7 +7177,7 @@
 
     async function saveModalCoverImage(value) {
       if (projectModalReadOnly || !currentProjectId) return;
-      const coverImage = String(value || '').trim();
+      const coverImage = persistableProjectCoverUrl(value);
       const project = projects.find(x => String(x.id) === String(currentProjectId));
       if (project) project.cover_image = coverImage;
       renderModalCoverPicker(project);
@@ -7164,7 +7309,7 @@
                 inicio,
                 vencimiento,
                 cover_color: newProjectCoverColor,
-                cover_image: newProjectCoverFile ? '' : newProjectCoverImage,
+                cover_image: newProjectCoverFile ? '' : persistableProjectCoverUrl(newProjectCoverImage),
                 planned_seconds: plannedSeconds
             })
         });
@@ -7407,6 +7552,58 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    function isLoopbackHost(hostname) {
+      const host = String(hostname || '').toLowerCase();
+      return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+    }
+
+    function normalizeProjectCoverUrl(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (/^data:image\//i.test(raw) || /^blob:/i.test(raw)) return raw;
+
+      try {
+        const parsed = new URL(raw, window.location.origin);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+
+        const currentHost = window.location.hostname;
+        if (isLoopbackHost(parsed.hostname) && !isLoopbackHost(currentHost)) {
+          return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+
+        return parsed.href;
+      } catch (error) {
+        return raw.startsWith('/') ? raw : '';
+      }
+    }
+
+    function persistableProjectCoverUrl(value) {
+      const normalized = normalizeProjectCoverUrl(value);
+      if (!normalized || /^blob:/i.test(normalized)) return '';
+      if (/^data:image\//i.test(normalized)) return normalized;
+
+      try {
+        const parsed = new URL(normalized, window.location.origin);
+        if (parsed.origin === window.location.origin) {
+          return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+        return parsed.href;
+      } catch (error) {
+        return normalized;
+      }
+    }
+
+    function projectCoverCssUrl(value) {
+      const normalized = normalizeProjectCoverUrl(value);
+      return normalized ? `url(${JSON.stringify(normalized)})` : '';
+    }
+
+    function projectCoverImageMarkup(value, alt = '') {
+      const src = normalizeProjectCoverUrl(value);
+      if (!src) return '';
+      return `<img class="project-board-cover__img" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="var p=this.closest('.project-board-cover');if(p)p.classList.add('is-cover-fallback');this.remove();">`;
     }
 
     function normalizeProfilePhotoPath(value) {
@@ -8504,13 +8701,13 @@
       list.innerHTML = visibleNotes.map((note) => {
         const author = escapeHtml(String(note.author_name || note.user || 'Usuario'));
         const created = escapeHtml(formatTaskNoteDate(note.created_at));
-        const text = escapeHtml(String(note.texto || ''));
+        const textHtml = linkifyPlainText(String(note.texto || ''));
         return `<div class="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5">
           <div class="flex items-center justify-between gap-2">
             <div class="text-[11px] font-bold text-slate-100">${author}</div>
             <div class="text-[10px] text-slate-300">${created}</div>
           </div>
-          <div class="mt-1 text-xs leading-5 text-slate-100 whitespace-pre-wrap">${text}</div>
+          <div class="mt-1 text-xs leading-5 text-slate-100 whitespace-pre-wrap">${textHtml}</div>
         </div>`;
       }).join('');
 
@@ -11548,13 +11745,13 @@
         const author = escapeHtml(String(note.author_name || note.user || 'Usuario'));
         const created = escapeHtml(formatTaskNoteDate(note.created_at));
         const updated = note.updated_at ? `<span class="text-[11px] text-slate-400">Editada ${escapeHtml(formatTaskNoteDate(note.updated_at))}</span>` : '';
-        const text = escapeHtml(String(note.texto || ''));
+        const textHtml = linkifyPlainText(String(note.texto || ''));
         return `<div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
           <div class="flex items-start justify-between gap-2">
             <div class="text-xs font-bold text-slate-700">${author}</div>
             <div class="text-[11px] text-slate-500 text-right">${created}<br>${updated}</div>
           </div>
-          <div class="mt-2 text-sm text-slate-700 leading-6 whitespace-pre-wrap">${text}</div>
+          <div class="mt-2 text-sm text-slate-700 leading-6 whitespace-pre-wrap">${textHtml}</div>
         </div>`;
       }).join('');
     }
@@ -11633,7 +11830,8 @@
         const author = escapeHtml(String(note.author_name || 'Usuario'));
         const created = escapeHtml(formatTaskNoteDate(note.created_at));
         const updated = note.updated_at ? `<span class="text-xs text-slate-400">Editada ${escapeHtml(formatTaskNoteDate(note.updated_at))}</span>` : '';
-        const text = escapeHtml(String(note.texto || ''));
+        const textValue = escapeHtml(String(note.texto || ''));
+        const textHtml = linkifyPlainText(String(note.texto || ''));
         const taskName = escapeHtml(String(note.task_name || 'Tarea sin nombre'));
         return `<div class="relative pl-8">
           <div class="absolute left-3 top-0 bottom-0 w-px bg-slate-200 ${index === items.length - 1 ? 'hidden' : ''}"></div>
@@ -11655,13 +11853,13 @@
             </div>
             ${isEditing
               ? `<div class="space-y-3">
-                  <textarea id="taskNoteEditInput-${noteId}" rows="4" class="w-full rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500">${text}</textarea>
+                  <textarea id="taskNoteEditInput-${noteId}" rows="4" class="w-full rounded-2xl border-slate-200 bg-white text-slate-900 shadow-sm focus:border-lime-500 focus:ring-lime-500">${textValue}</textarea>
                   <div class="flex items-center justify-end gap-2">
                     <button type="button" onclick="cancelProjectNoteEdit()" class="px-3 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-white">Cancelar</button>
                     <button type="button" onclick="saveProjectNoteEdit('${note.task_id}','${noteId}')" class="px-3 py-2 rounded-xl bg-slate-900 text-sm font-bold text-white hover:bg-slate-800">Guardar</button>
                   </div>
                 </div>`
-              : `<div class="text-sm leading-6 text-slate-700 whitespace-pre-wrap">${text}</div>`}
+              : `<div class="text-sm leading-6 text-slate-700 whitespace-pre-wrap">${textHtml}</div>`}
           </div>
         </div>`;
       }).join('');
@@ -12763,7 +12961,7 @@
           const mime = String(item?.mime || '');
           return mime.startsWith('image/');
         });
-        const coverUrl = imageFile?.preview_url || imageFile?.url || '';
+        const coverUrl = persistableProjectCoverUrl(imageFile?.preview_url || imageFile?.url || '');
         if (!coverUrl) throw new Error('cover_url_missing');
         const updated = await updateProjectField('cover_image', coverUrl, projectId);
 

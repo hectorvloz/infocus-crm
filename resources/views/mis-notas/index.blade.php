@@ -11,6 +11,30 @@
   .notes-search-clear{position:absolute;right:.65rem;top:50%;width:2rem;height:2rem;transform:translateY(-50%);border-radius:999px;border:1px solid #dbe5f1;color:#64748b;background:#f8fafc;display:inline-grid;place-content:center}
   .notes-search-clear.hidden{display:none}
   .notes-search-count{flex:0 0 auto;border-radius:999px;border:1px solid #dbe5f1;background:#f8fafc;padding:.55rem .8rem;color:#64748b;font-size:.78rem;font-weight:900}
+  .note-ai-support-btn{display:inline-flex;align-items:center;gap:.45rem;height:2.25rem;border-radius:999px;border:2px solid #f0abfc;background:#fff;padding:0 .85rem;color:#1f2937;font-size:.78rem;font-weight:900;box-shadow:0 10px 22px rgba(217,70,239,.12);transition:background-color .15s ease,box-shadow .15s ease,transform .15s ease}
+  .note-ai-support-btn:hover{background:#fdf4ff;box-shadow:0 14px 28px rgba(217,70,239,.18);transform:translateY(-1px)}
+  .note-ai-support-spark{color:#d946ef;font-size:.95rem;line-height:1}
+  .note-ai-support-panel{position:fixed;width:min(21rem,calc(100vw - 1.5rem));overflow:hidden;border-radius:1.25rem;border:1px solid #f5d0fe;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.22),0 0 0 1px #fae8ff;z-index:2147482500}
+  .note-ai-support-panel.hidden{display:none!important}
+  .note-ai-support-head{display:flex;align-items:center;gap:.75rem;border-bottom:1px solid #fae8ff;background:linear-gradient(180deg,#fff,#fdf4ff);padding:.9rem 1rem}
+  .note-ai-support-avatar{display:inline-flex;width:2.3rem;height:2.3rem;align-items:center;justify-content:center;border-radius:999px;background:#fdf4ff;color:#d946ef;font-weight:900}
+  .note-ai-support-title{font-size:.98rem;font-weight:950;color:#111827;line-height:1.1}
+  .note-ai-support-subtitle{margin-top:.15rem;font-size:.72rem;font-weight:800;color:#94a3b8}
+  .note-ai-support-close{margin-left:auto;display:inline-flex;width:1.85rem;height:1.85rem;align-items:center;justify-content:center;border-radius:.75rem;color:#94a3b8;font-size:1.4rem;font-weight:500;line-height:1}
+  .note-ai-support-close:hover{background:#f1f5f9;color:#334155}
+  .note-ai-support-messages{max-height:10.5rem;overflow-y:auto;background:#f8fafc;padding:.65rem;display:flex;flex-direction:column;gap:.45rem}
+  .note-ai-support-message{border-radius:.85rem;padding:.58rem .7rem;font-size:.76rem;font-weight:750;line-height:1.35;box-shadow:0 8px 18px rgba(15,23,42,.06)}
+  .note-ai-support-message.assistant{margin-right:2rem;background:#fff;color:#64748b}
+  .note-ai-support-message.user{margin-left:2rem;background:#111827;color:#fff}
+  .note-ai-support-actions{display:flex;gap:.4rem;overflow-x:auto;padding:.65rem .75rem .2rem;background:#fff;scrollbar-width:none}
+  .note-ai-support-actions::-webkit-scrollbar{display:none}
+  .note-ai-support-actions button{flex:0 0 auto;border-radius:999px;border:1px solid #f5d0fe;background:#fdf4ff;padding:.35rem .58rem;color:#86198f;font-size:.68rem;font-weight:900}
+  .note-ai-support-actions button:hover{background:#f5d0fe;color:#701a75}
+  .note-ai-support-custom{display:flex;gap:.45rem;padding:.65rem .75rem .8rem;background:#fff}
+  .note-ai-support-custom input{min-width:0;flex:1;border-radius:.85rem;border:1px solid #e2e8f0;padding:.6rem .7rem;font-size:.76rem;font-weight:750;color:#1e293b;outline:none}
+  .note-ai-support-custom input:focus{border-color:#f0abfc;box-shadow:0 0 0 3px rgba(240,171,252,.35)}
+  .note-ai-support-custom button{border-radius:.85rem;background:#f5d0fe;padding:.6rem .8rem;color:#111827;font-size:.76rem;font-weight:950}
+  .note-ai-support-custom button:disabled{opacity:.6;cursor:not-allowed}
 </style>
 <div id="notes-list-view">
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -81,6 +105,37 @@
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51 15.42 17.49"/><path d="M15.41 6.51 8.59 10.49"/></svg>
         <span>Compartir</span>
       </button>
+      <div class="relative">
+        <button id="action-ai-support" type="button" class="note-ai-support-btn" aria-haspopup="dialog" aria-expanded="false">
+          <span class="note-ai-support-spark">✦</span>
+          <span>Apoyo de IA</span>
+        </button>
+        <div id="note-ai-support-panel" class="note-ai-support-panel hidden">
+          <div class="note-ai-support-head">
+            <span class="note-ai-support-avatar">✦</span>
+            <div>
+              <div class="note-ai-support-title">Apoyo de IA</div>
+              <div class="note-ai-support-subtitle">Edita esta nota con formato enriquecido</div>
+            </div>
+            <button id="note-ai-support-close" type="button" class="note-ai-support-close" aria-label="Cerrar apoyo de IA">×</button>
+          </div>
+          <div id="note-ai-support-messages" class="note-ai-support-messages">
+            <div class="note-ai-support-message assistant">Dime qué quieres hacer con esta nota o elige un tono rápido.</div>
+          </div>
+          <div class="note-ai-support-actions" aria-label="Acciones rápidas de IA">
+            <button type="button" data-note-ai-prompt="rewrite">Reescribir mejor</button>
+            <button type="button" data-note-ai-prompt="formal">Más formal</button>
+            <button type="button" data-note-ai-prompt="friendly">Más familiar</button>
+            <button type="button" data-note-ai-prompt="summary">Resumir</button>
+            <button type="button" data-note-ai-prompt="checklist">Convertir a checklist</button>
+            <button type="button" data-note-ai-prompt="structure">Ordenar con títulos</button>
+          </div>
+          <div class="note-ai-support-custom">
+            <input id="note-ai-support-input" type="text" placeholder="Ej. mejora la nota y subraya lo importante...">
+            <button id="note-ai-support-send" type="button">Enviar</button>
+          </div>
+        </div>
+      </div>
     </div>
     <button id="action-delete" type="button" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-rose-200 bg-white text-rose-700 hover:bg-rose-50">
       <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 16h10l1-16"/></svg>
@@ -210,6 +265,11 @@ document.addEventListener('DOMContentLoaded', function () {
   const actionPdf = document.getElementById('action-pdf');
   const actionDuplicate = document.getElementById('action-duplicate');
   const actionShare = document.getElementById('action-share');
+  const actionAiSupport = document.getElementById('action-ai-support');
+  const noteAiSupportPanel = document.getElementById('note-ai-support-panel');
+  const noteAiSupportClose = document.getElementById('note-ai-support-close');
+  const noteAiSupportInput = document.getElementById('note-ai-support-input');
+  const noteAiSupportSend = document.getElementById('note-ai-support-send');
   const actionDelete = document.getElementById('action-delete');
   const addNoteBtn = document.getElementById('add-note-btn');
   const noteClientTrigger = document.getElementById('note-client-trigger');
@@ -227,6 +287,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const shareModeSelect = document.getElementById('share-mode-select');
   const shareAddBtn = document.getElementById('share-add-btn');
   const shareCollaboratorsList = document.getElementById('share-collaborators-list');
+  const NOTE_AI_CHAT_URL = @json(route('api.ai.chat'));
+  const NOTE_AI_EXECUTE_URL = @json(route('api.ai.actions.execute'));
 
   let allNotes = [];
   let clients = [];
@@ -332,6 +394,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const holder = document.createElement('div');
     holder.innerHTML = String(html || '').replace(/<div><br><\/div>/g, '<div></div>');
     scrubNoteHtml(holder);
+    linkifyNoteTextNodes(holder);
+    scrubNoteHtml(holder);
     return holder.innerHTML.trim();
   }
 
@@ -370,6 +434,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!isSafeNoteHref(href)) {
           el.removeAttribute('href');
         } else {
+          el.setAttribute('target', '_blank');
           el.setAttribute('rel', 'noopener noreferrer');
         }
       }
@@ -398,6 +463,62 @@ document.addEventListener('DOMContentLoaded', function () {
   function isSafeNoteHref(href) {
     if (!href) return false;
     return /^(https?:|mailto:|tel:|#|\/)/i.test(href);
+  }
+
+  function normalizeNoteAutolinkHref(raw = '') {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    const href = /^www\./i.test(value) ? `https://${value}` : value;
+    return /^(https?:\/\/|mailto:|tel:)/i.test(href) ? href : '';
+  }
+
+  function splitNoteAutolinkPunctuation(value = '') {
+    let text = String(value || '');
+    let suffix = '';
+    while (/[),.;:!?]$/.test(text)) {
+      const char = text.slice(-1);
+      if (char === ')' && (text.match(/\(/g) || []).length >= (text.match(/\)/g) || []).length) break;
+      suffix = char + suffix;
+      text = text.slice(0, -1);
+    }
+    return { text, suffix };
+  }
+
+  function linkifyNoteTextNodes(root) {
+    if (!root) return;
+    const urlPattern = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || parent.closest('a,script,style,textarea,button')) return NodeFilter.FILTER_REJECT;
+        urlPattern.lastIndex = 0;
+        return urlPattern.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    textNodes.forEach((node) => {
+      const fragment = document.createDocumentFragment();
+      const source = node.nodeValue || '';
+      let lastIndex = 0;
+      source.replace(urlPattern, (match, _url, offset) => {
+        const { text, suffix } = splitNoteAutolinkPunctuation(match);
+        const href = normalizeNoteAutolinkHref(text);
+        if (!href) return match;
+        if (offset > lastIndex) fragment.appendChild(document.createTextNode(source.slice(lastIndex, offset)));
+        const link = document.createElement('a');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = text;
+        fragment.appendChild(link);
+        if (suffix) fragment.appendChild(document.createTextNode(suffix));
+        lastIndex = offset + match.length;
+        return match;
+      });
+      if (lastIndex < source.length) fragment.appendChild(document.createTextNode(source.slice(lastIndex)));
+      node.replaceWith(fragment);
+    });
   }
 
   function cleanPastedNode(node) {
@@ -509,6 +630,8 @@ document.addEventListener('DOMContentLoaded', function () {
     source.innerHTML = String(html || '');
     const holder = document.createElement('div');
     Array.from(source.childNodes).forEach((node) => holder.appendChild(cleanPastedNode(node)));
+    scrubNoteHtml(holder);
+    linkifyNoteTextNodes(holder);
     scrubNoteHtml(holder);
     return holder.innerHTML;
   }
@@ -642,6 +765,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.__infocusAiCurrentNote = {
       id: note.id || '',
       title: note.title || extractNoteTitleFromPlain(note.plainText || ''),
+      html,
       plainText: htmlToPlainText(html || note.plainText || '').slice(0, 2600),
       client_name: resolveNoteClientName(note) || activeNoteLinkedClient || '',
       permission: note.permission || 'owner',
@@ -708,6 +832,164 @@ document.addEventListener('DOMContentLoaded', function () {
     if (noteId && String(allNotes[editingNoteIndex].id || '') !== String(noteId)) return;
     setAiNoteWorking(!!event.detail?.working);
   });
+
+  function positionNoteAiSupportPanel() {
+    if (!noteAiSupportPanel || !actionAiSupport || noteAiSupportPanel.classList.contains('hidden')) return;
+    const rect = actionAiSupport.getBoundingClientRect();
+    const gap = 10;
+    const panelWidth = Math.min(336, window.innerWidth - 24);
+    noteAiSupportPanel.style.width = `${panelWidth}px`;
+    const left = Math.max(12, Math.min(window.innerWidth - panelWidth - 12, rect.right - panelWidth));
+    const panelHeight = noteAiSupportPanel.offsetHeight || 320;
+    const topAbove = rect.top - panelHeight - gap;
+    const top = topAbove >= 12 ? topAbove : Math.min(window.innerHeight - panelHeight - 12, rect.bottom + gap);
+    noteAiSupportPanel.style.left = `${left}px`;
+    noteAiSupportPanel.style.top = `${Math.max(12, top)}px`;
+  }
+
+  function toggleNoteAiSupport(forceState = null) {
+    if (!noteAiSupportPanel || !actionAiSupport) return;
+    const shouldShow = forceState === null ? noteAiSupportPanel.classList.contains('hidden') : !!forceState;
+    noteAiSupportPanel.classList.toggle('hidden', !shouldShow);
+    actionAiSupport.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
+    if (shouldShow) {
+      updateInfocusAiCurrentNoteContext();
+      requestAnimationFrame(positionNoteAiSupportPanel);
+      setTimeout(() => noteAiSupportInput?.focus(), 0);
+    }
+  }
+
+  function appendNoteAiSupportMessage(role, text) {
+    const box = document.getElementById('note-ai-support-messages');
+    if (!box) return;
+    const node = document.createElement('div');
+    node.className = `note-ai-support-message ${role === 'user' ? 'user' : 'assistant'}`;
+    node.textContent = text;
+    box.appendChild(node);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function noteAiQuickPrompt(kind) {
+    const map = {
+      rewrite: 'Reescribe esta nota para que quede más clara, mejor redactada y profesional, manteniendo la idea original.',
+      formal: 'Reescribe esta nota con un tono más formal y ordenado.',
+      friendly: 'Reescribe esta nota con un tono más familiar, cercano y natural.',
+      summary: 'Resume esta nota y deja solo lo importante, con títulos claros.',
+      checklist: 'Convierte esta nota en un checklist accionable con casillas [ ] y pasos claros.',
+      structure: 'Organiza esta nota con título principal, subtítulos, listas, negritas, subrayados y resaltados donde ayude.',
+    };
+    return map[kind] || '';
+  }
+
+  function buildNoteAiInstruction(userInstruction) {
+    updateInfocusAiCurrentNoteContext();
+    const note = window.__infocusAiCurrentNote || {};
+    const title = note.title || 'Nota sin titulo';
+    const noteId = note.id || '';
+    const instruction = String(userInstruction || '').trim();
+    return [
+      'Trabaja únicamente sobre la nota personal abierta en Mis Notas.',
+      `Nota ID: ${noteId}`,
+      `Título actual: ${title}`,
+      `Instrucción del usuario: ${instruction}`,
+      '',
+      'Devuelve una propuesta lista para aplicar con este formato exacto:',
+      'Actualizar nota personal:',
+      `Nota ID: ${noteId}`,
+      'Título: [nuevo título]',
+      'Contenido:',
+      '[contenido final completo]',
+      '',
+      'Usa formato enriquecido compatible cuando aporte claridad:',
+      '- # para título principal y ## para subtítulos',
+      '- **negrita**, _cursiva_, ++subrayado++, ~~tachado~~, ==resaltado==',
+      '- [ ] y [x] para checklist',
+      '- listas numeradas y viñetas',
+      '- enlaces en formato [texto](https://url.com)',
+      '',
+      'No respondas con explicación larga: entrega la propuesta final aplicable.',
+    ].join('\n');
+  }
+
+  function noteAiContext(extraMessage = '') {
+    updateInfocusAiCurrentNoteContext();
+    return {
+      page: document.title || 'Mis Notas',
+      url: window.location.href,
+      current_note: window.__infocusAiCurrentNote || null,
+      forced_intent: 'note_update',
+      last_user_message: String(extraMessage || ''),
+    };
+  }
+
+  async function sendNoteAiSupport(message) {
+    if (!canEditCurrentNote()) {
+      appendNoteAiSupportMessage('assistant', 'Esta nota es de solo lectura para tu usuario.');
+      return;
+    }
+    const userMessage = String(message || noteAiSupportInput?.value || '').trim();
+    if (!userMessage) return;
+
+    saveCurrentNoteFromEditor();
+    updateInfocusAiCurrentNoteContext();
+    if (!window.__infocusAiCurrentNote?.id) {
+      appendNoteAiSupportMessage('assistant', 'Abre una nota antes de usar Apoyo de IA.');
+      return;
+    }
+
+    appendNoteAiSupportMessage('user', userMessage);
+    if (noteAiSupportInput) noteAiSupportInput.value = '';
+    if (noteAiSupportSend) {
+      noteAiSupportSend.disabled = true;
+      noteAiSupportSend.textContent = 'Pensando...';
+    }
+    appendNoteAiSupportMessage('assistant', 'Estoy preparando una versión enriquecida de la nota...');
+    setAiNoteWorking(true);
+
+    try {
+      const instruction = buildNoteAiInstruction(userMessage);
+      const chatResponse = await fetch(NOTE_AI_CHAT_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify({
+          chat_id: null,
+          message: instruction,
+          context: noteAiContext(userMessage),
+        }),
+      });
+      const chatData = await chatResponse.json().catch(() => ({}));
+      if (!chatResponse.ok) throw new Error(chatData.message || 'chat_failed');
+      const proposal = String(chatData.message?.content || '').trim();
+      if (!proposal) throw new Error('empty_proposal');
+
+      const executeResponse = await fetch(NOTE_AI_EXECUTE_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify({
+          chat_id: chatData.chat_id || null,
+          proposal,
+          context: noteAiContext(userMessage),
+        }),
+      });
+      const executeData = await executeResponse.json().catch(() => ({}));
+      if (!executeResponse.ok || !executeData.ok || !executeData.note_update) {
+        throw new Error(executeData.message?.content || 'execute_failed');
+      }
+
+      await window.__infocusAiApplyNoteUpdate(executeData.note_update);
+      appendNoteAiSupportMessage('assistant', 'Listo, actualicé la nota con formato enriquecido.');
+    } catch (error) {
+      console.error(error);
+      appendNoteAiSupportMessage('assistant', 'No pude aplicar el cambio con IA. Intenta con una instrucción más concreta.');
+      setAiNoteWorking(false);
+    } finally {
+      if (noteAiSupportSend) {
+        noteAiSupportSend.disabled = false;
+        noteAiSupportSend.textContent = 'Enviar';
+      }
+      noteAiSupportInput?.focus();
+    }
+  }
 
   window.addEventListener('infocus-ai-undo-applied', async (event) => {
     if (event.detail?.store !== 'mis_notas') return;
@@ -1138,6 +1420,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (noteColorToggle) noteColorToggle.disabled = !canEdit;
     if (noteFormatTrigger) noteFormatTrigger.disabled = !canEdit;
     if (noteClientTrigger) noteClientTrigger.disabled = !canEdit;
+    if (actionAiSupport) actionAiSupport.classList.toggle('hidden', !canEdit);
+    if (!canEdit) toggleNoteAiSupport(false);
     if (actionDelete) actionDelete.classList.toggle('hidden', !isOwner);
     if (actionShare) actionShare.classList.toggle('hidden', !isOwner);
   }
@@ -1168,6 +1452,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function backToList() {
     saveCurrentNoteFromEditor();
+    toggleNoteAiSupport(false);
     closeShareModal();
     noteEditView.classList.add('hidden');
     notesListView.classList.remove('hidden');
@@ -1589,6 +1874,13 @@ document.addEventListener('DOMContentLoaded', function () {
         + linkedClientPillHtml
         + '</div>';
       card.addEventListener('click', () => openNoteEditor(actualIndex));
+      card.querySelectorAll('.note-card-preview a[href]').forEach((link) => {
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(link.href, '_blank', 'noopener,noreferrer');
+        });
+      });
       card.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
@@ -1773,11 +2065,26 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   noteEditor.addEventListener('click', (event) => {
+    const link = event.target?.closest?.('a[href]');
+    if (link && noteEditor.contains(link)) {
+      event.preventDefault();
+      window.open(link.href, '_blank', 'noopener,noreferrer');
+      return;
+    }
     const target = event.target;
     if (target instanceof HTMLImageElement && target.classList.contains('note-inline-image')) {
       event.preventDefault();
       handleImageClick(target);
     }
+  });
+
+  noteEditor.addEventListener('blur', () => {
+    if (!canEditCurrentNote()) return;
+    const normalized = normalizeHtml(noteEditor.innerHTML || '');
+    if (normalized && normalized !== (noteEditor.innerHTML || '').trim()) {
+      noteEditor.innerHTML = normalized;
+    }
+    saveCurrentNoteFromEditor();
   });
 
   noteEditor.addEventListener('change', (event) => {
@@ -1815,6 +2122,30 @@ document.addEventListener('DOMContentLoaded', function () {
   actionDuplicate.addEventListener('click', duplicateCurrentNote);
   actionDelete.addEventListener('click', deleteCurrentNote);
   actionShare?.addEventListener('click', openShareModal);
+  actionAiSupport?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleNoteAiSupport();
+  });
+  noteAiSupportClose?.addEventListener('click', () => toggleNoteAiSupport(false));
+  noteAiSupportSend?.addEventListener('click', () => sendNoteAiSupport());
+  noteAiSupportInput?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    sendNoteAiSupport();
+  });
+  document.querySelectorAll('[data-note-ai-prompt]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const prompt = noteAiQuickPrompt(button.getAttribute('data-note-ai-prompt') || '');
+      if (prompt) sendNoteAiSupport(prompt);
+    });
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!noteAiSupportPanel || noteAiSupportPanel.classList.contains('hidden')) return;
+    if (event.target?.closest?.('#note-ai-support-panel, #action-ai-support')) return;
+    toggleNoteAiSupport(false);
+  });
+  window.addEventListener('resize', positionNoteAiSupportPanel);
+  window.addEventListener('scroll', positionNoteAiSupportPanel, true);
   addNoteBtn?.addEventListener('click', createNewNote);
 
   shareAddBtn?.addEventListener('click', () => {
@@ -2373,6 +2704,19 @@ document.addEventListener('DOMContentLoaded', function () {
   font-size: .96em;
   font-weight: 400;
   line-height: 1.55;
+}
+#note-editor a,
+.note-card-preview a {
+  color: #2563eb;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  word-break: break-word;
+}
+#note-editor a:hover,
+.note-card-preview a:hover {
+  color: #1d4ed8;
 }
 #note-canvas.note-ai-working {
   isolation: isolate;

@@ -1,4 +1,5 @@
-<aside id="sidebar" class="hidden md:flex flex-col w-72 h-full z-50 p-4 sidebar-shell">
+<div id="mobileSidebarBackdrop" class="fixed inset-0 hidden bg-slate-950/45 backdrop-blur-sm md:hidden" style="z-index:2147482400"></div>
+<aside id="sidebar" class="fixed md:relative inset-y-0 left-0 flex flex-col w-[19rem] md:w-72 h-full z-[2147482500] md:z-50 p-3 md:p-4 sidebar-shell -translate-x-full md:translate-x-0 transition-transform duration-300 ease-out">
   @php
     $s = (new \App\Repositories\FileStore('settings.json'))->find('settings') ?: [];
     $logoLarge = $s['logo_large'] ?? $s['logo'] ?? null;
@@ -208,68 +209,35 @@
 
 <!-- Mobile Bottom Nav -->
 <div class="mobile-bottom-nav fixed bottom-3 left-3 right-3 md:hidden z-50">
-  <div class="bg-slate-900 text-white rounded-2xl shadow-xl px-3 py-3 flex items-center justify-around">
-    @if($can('panel.read'))
-      <a href="{{ route('dashboard') }}" class="p-2 {{ request()->routeIs('dashboard') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
-      </a>
-    @endif
+  <div class="bg-slate-900 text-white rounded-[1.35rem] shadow-xl px-2 py-2.5 grid grid-cols-5 gap-1 border border-white/10">
     @if($can('mis-notas.read'))
-      <a href="{{ route('mis-notas.index') }}" class="p-2 {{ request()->routeIs('mis-notas.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c-2.5 0-3.5 1.5-3.5 3.5 0 1 .25 1.75.75 2.25M12 3c2.5 0 3.5 1.5 3.5 3.5 0 1-.25 1.75-.75 2.25M12 3v5.75M8.5 6.5c-1 .5-1.5 1.5-1.5 2.5 0 2 1 3.5 3 4v3c0 1.5 1 2.5 2.5 2.5s2.5-1 2.5-2.5v-3c2-0.5 3-2 3-4 0-1-.5-2-1.5-2.5M6.5 11c-.5 0-1 .5-1 1v4c0 1.5 1 2.5 2.5 2.5M17.5 11c.5 0 1 .5 1 1v4c0 1.5-1 2.5-2.5 2.5"/></svg>
+      <a href="{{ route('mis-notas.index') }}" class="mobile-bottom-link {{ request()->routeIs('mis-notas.*') ? 'is-active text-lime-300' : 'text-white/70' }}" aria-label="Notas">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5A3.375 3.375 0 0 0 10.125 2.25H6.75A2.25 2.25 0 0 0 4.5 4.5v15A2.25 2.25 0 0 0 6.75 21.75h10.5A2.25 2.25 0 0 0 19.5 19.5v-5.25Z"/><path stroke-linecap="round" d="M8 13h7M8 17h4"/></svg>
+        <span>Notas</span>
       </a>
     @endif
-    @if($can('clientes.read'))
-      <a href="{{ route('clientes.index') }}" class="p-2 {{ request()->routeIs('clientes.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>
-      </a>
-    @endif
-    @if($can('reuniones.read'))
-      <a href="{{ route('reuniones.index') }}" class="p-2 {{ request()->routeIs('reuniones.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path stroke-linecap="round" d="M8 2v4M16 2v4M3 10h18"/></svg>
-      </a>
-    @endif
-    @if($can('documentos.read'))
-      <a href="{{ route('documentos.index') }}" class="p-2 {{ request()->routeIs('documentos.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4.2a2 2 0 0 1 1.4.58L13 7.5h5.5A2.5 2.5 0 0 1 21 10v7.5A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5v-10Z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18"/>
-        </svg>
-      </a>
-    @endif
-    @if($can('proyectos.read'))
-      <a href="{{ route('proyectos.index') }}" class="p-2 {{ request()->routeIs('proyectos.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    @if($can('panel.read'))
+      <a href="{{ route('dashboard') }}" class="mobile-bottom-link {{ request()->routeIs('dashboard') ? 'is-active text-lime-300' : 'text-white/70' }}" aria-label="Dashboard">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+        <span>Dashboard</span>
       </a>
     @endif
     @if($can('facturas.read'))
-      <a href="{{ route('facturas.index') }}" class="p-2 {{ request()->routeIs('facturas.*') ? 'text-lime-300' : 'text-white/70' }}">
+      <a href="{{ route('facturas.index') }}" class="mobile-bottom-link {{ request()->routeIs('facturas.*') ? 'is-active text-lime-300' : 'text-white/70' }}" aria-label="Facturas">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 3h10l4 4v14H7zM10 13h6M10 9h6M10 17h6"/></svg>
+        <span>Facturas</span>
       </a>
     @endif
-    @if($can('leads.read'))
-      <a href="{{ route('leads.index') }}" class="p-2 {{ request()->routeIs('leads.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 4h18"/><path d="M7 4v5l5 5v6l4-2v-4l5-5"/></svg>
+    @if($can('proyectos.read'))
+      <a href="{{ route('proyectos.index') }}" class="mobile-bottom-link {{ request()->routeIs('proyectos.*') ? 'is-active text-lime-300' : 'text-white/70' }}" aria-label="Proyectos">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span>Proyectos</span>
       </a>
     @endif
-    @if($can('cotizaciones.read'))
-      <a href="{{ route('cotizaciones.index') }}" class="p-2 {{ request()->routeIs('cotizaciones.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      </a>
-    @endif
-    @if($can('productos.read'))
-      <a href="{{ route('productos.index') }}" class="p-2 {{ request()->routeIs('productos.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-      </a>
-    @endif
-    @if($can('contratos.read'))
-      <a href="{{ route('contratos.index') }}" class="p-2 {{ request()->routeIs('contratos.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-      </a>
-    @endif
-    @if($canAccessSettings)
-      <a href="{{ route('settings.edit') }}" class="p-2 {{ request()->routeIs('settings.*') ? 'text-lime-300' : 'text-white/70' }}">
-        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10.91 3H11a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 21 10.91V11a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    @if($can('gastos.read'))
+      <a href="{{ route('gastos.index') }}" class="mobile-bottom-link {{ request()->routeIs('gastos.*') ? 'is-active text-lime-300' : 'text-white/70' }}" aria-label="Gastos">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 9V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><rect x="7" y="9" width="14" height="10" rx="2"/><path d="M11 14h.01M17 14h.01"/></svg>
+        <span>Gastos</span>
       </a>
     @endif
   </div>

@@ -1445,7 +1445,7 @@
 
     // Anti-flicker: Apply collapsed state immediately if saved
     try {
-      if (localStorage.getItem('sidebarCollapsed') === '1') {
+      if (window.matchMedia('(min-width: 768px)').matches && localStorage.getItem('sidebarCollapsed') === '1') {
         document.documentElement.classList.add('sidebar-is-collapsed');
       }
     } catch(e) {}
@@ -1607,6 +1607,64 @@
     .sidebar-scroll-pending #sidebar .custom-scroll {
       visibility: hidden;
       pointer-events: none;
+    }
+
+    @media (max-width: 767px) {
+      body.mobile-sidebar-open {
+        overflow: hidden;
+      }
+
+      body.mobile-sidebar-open #sidebar {
+        transform: translateX(0) !important;
+      }
+
+      body.mobile-sidebar-open #mobileSidebarBackdrop {
+        display: block !important;
+      }
+
+      #sidebar {
+        max-width: calc(100vw - 1rem);
+      }
+
+      #sidebar .flex-1.flex.flex-col {
+        border-radius: 1.6rem;
+      }
+
+      #sidebar #sidebarToggle .sidebar-icon-open {
+        display: none !important;
+      }
+
+      #sidebar #sidebarToggle .sidebar-icon-close {
+        display: block !important;
+      }
+
+      .mobile-bottom-nav {
+        bottom: calc(.75rem + env(safe-area-inset-bottom));
+      }
+
+      .mobile-bottom-link {
+        min-width: 0;
+        min-height: 3.15rem;
+        border-radius: .95rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: .16rem;
+        font-size: .59rem;
+        font-weight: 800;
+        letter-spacing: -.01em;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .mobile-bottom-link svg {
+        width: 1.28rem;
+        height: 1.28rem;
+      }
+
+      .mobile-bottom-link.is-active {
+        background: rgba(236, 254, 136, .12);
+      }
     }
 
     #remindersPanel {
@@ -1841,8 +1899,19 @@
   <div class="flex h-full">
     @include('partials.sidebar')
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-      <header class="flex-shrink-0 flex items-center justify-between px-4 md:px-8 py-5 bg-neutral-50/90 backdrop-blur z-[120] sticky top-0">
+      <header class="flex-shrink-0 flex items-center justify-between gap-2 px-3 md:px-8 py-3 md:py-5 bg-neutral-50/90 backdrop-blur z-[120] sticky top-0">
         <div class="flex items-center gap-3">
+          <button
+            id="mobileSidebarOpenBtn"
+            type="button"
+            class="md:hidden inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-sm border border-slate-200"
+            title="Abrir menú"
+            aria-label="Abrir menú"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+              <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/>
+            </svg>
+          </button>
           @if($showGlobalBackButton)
             <button
               id="global-header-back-btn"
@@ -1860,34 +1929,34 @@
           @endif
           <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center"></h1>
         </div>
-        <div class="hidden md:flex items-center gap-3 min-w-0">
+        <div class="flex items-center gap-2 md:gap-3 min-w-0">
           <div id="headerTaskTimerHost" class="hidden min-w-[250px] max-w-[430px] flex-1"></div>
           <div id="headerLeadTimerHost" class="hidden"></div>
-          <button id="headerStartTimerBtn" type="button" onclick="handleHeaderTimerButtonClick()" class="inline-flex items-center justify-center h-11 w-11 rounded-full bg-white shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-600 hover:text-slate-900" title="Iniciar temporizador" aria-label="Iniciar temporizador">
+          <button id="headerStartTimerBtn" type="button" onclick="handleHeaderTimerButtonClick()" class="inline-flex items-center justify-center h-10 w-10 md:h-11 md:w-11 rounded-full bg-white shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-600 hover:text-slate-900" title="Iniciar temporizador" aria-label="Iniciar temporizador">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <circle cx="12" cy="12" r="8"/>
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3"/>
             </svg>
           </button>
-          <button id="headerNotificationsBtn" type="button" class="relative inline-flex items-center justify-center h-11 w-11 rounded-full bg-white shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-600 hover:text-slate-900" title="Notificaciones" aria-label="Notificaciones">
+          <button id="headerNotificationsBtn" type="button" class="relative inline-flex items-center justify-center h-10 w-10 md:h-11 md:w-11 rounded-full bg-white shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-600 hover:text-slate-900" title="Notificaciones" aria-label="Notificaciones">
             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/>
               <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 17a2.5 2.5 0 0 0 5 0"/>
             </svg>
             <span id="headerNotificationsCount" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] leading-[18px] text-center font-bold">0</span>
           </button>
-          <button id="headerRemindersBtn" type="button" class="relative inline-flex items-center justify-center h-11 w-11 rounded-full bg-[#111729] shadow-sm hover:shadow-md transition-all border border-[#111729] text-[#f2fda2] hover:text-[#f2fda2]" title="Recordatorios" aria-label="Recordatorios">
+          <button id="headerRemindersBtn" type="button" class="relative inline-flex items-center justify-center h-10 w-10 md:h-11 md:w-11 rounded-full bg-[#111729] shadow-sm hover:shadow-md transition-all border border-[#111729] text-[#f2fda2] hover:text-[#f2fda2]" title="Recordatorios" aria-label="Recordatorios">
             <i class="fa-solid fa-list-check text-[18px] leading-none" aria-hidden="true"></i>
             <span id="headerRemindersCount" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] leading-[18px] text-center font-bold">0</span>
           </button>
           <div class="relative">
-            <button id="headerProfileBtn" type="button" class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 font-bold shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-700 hover:text-slate-900" title="Mi perfil" aria-label="Mi perfil">
+            <button id="headerProfileBtn" type="button" class="inline-flex h-10 md:h-auto items-center gap-2 rounded-full bg-white px-3 md:px-4 py-2 md:py-2.5 font-bold shadow-sm hover:shadow-md transition-all border border-slate-200 text-slate-700 hover:text-slate-900" title="Mi perfil" aria-label="Mi perfil">
               <span id="headerPresenceDot" class="inline-flex w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
               <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <circle cx="12" cy="8" r="4"/>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 20a8 8 0 0 1 16 0"/>
               </svg>
-              <span>Mi perfil</span>
+              <span class="hidden sm:inline">Mi perfil</span>
             </button>
             <div id="headerProfileMenu" class="hidden absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl p-2" style="z-index:2147483400">
               <div class="px-3 py-2 border-b border-slate-100">
@@ -2083,6 +2152,8 @@
     window.csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const el = document.getElementById('sidebar');
     const btn = document.getElementById('sidebarToggle');
+    const mobileSidebarOpenBtn = document.getElementById('mobileSidebarOpenBtn');
+    const mobileSidebarBackdrop = document.getElementById('mobileSidebarBackdrop');
     const sidebarScrollHost = el ? el.querySelector('.custom-scroll') : null;
     const SIDEBAR_SCROLL_KEY = 'sidebarScrollTop';
     const APPEARANCE_MODE_KEY = 'infocusAppearanceMode';
@@ -2137,8 +2208,31 @@
     } else {
       document.documentElement.classList.remove('sidebar-scroll-pending');
     }
+    const isMobileSidebar = () => window.matchMedia('(max-width: 767px)').matches;
+    const openMobileSidebar = () => {
+      document.body.classList.add('mobile-sidebar-open');
+      mobileSidebarOpenBtn?.setAttribute('aria-expanded', 'true');
+    };
+    const closeMobileSidebar = () => {
+      document.body.classList.remove('mobile-sidebar-open');
+      mobileSidebarOpenBtn?.setAttribute('aria-expanded', 'false');
+    };
+    mobileSidebarOpenBtn?.addEventListener('click', openMobileSidebar);
+    mobileSidebarBackdrop?.addEventListener('click', closeMobileSidebar);
+    el?.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        if (isMobileSidebar()) closeMobileSidebar();
+      });
+    });
     const isCollapsed = () => el.classList.contains('collapsed') || el.classList.contains('w-24');
     const setCollapsed = (collapsed) => {
+      if (!el || isMobileSidebar()) {
+        document.documentElement.classList.remove('sidebar-is-collapsed');
+        el?.classList.remove('w-24', 'collapsed');
+        el?.classList.add('w-[19rem]');
+        document.querySelectorAll('[data-label]').forEach(n => n.classList.remove('hidden'));
+        return;
+      }
       if (collapsed) {
         document.documentElement.classList.add('sidebar-is-collapsed');
         el.classList.remove('w-72');
@@ -2161,13 +2255,28 @@
     };
     if (btn) {
       btn.addEventListener('click', () => {
+        if (isMobileSidebar()) {
+          closeMobileSidebar();
+          return;
+        }
         setCollapsed(!isCollapsed());
       });
       try {
-        const collapsed = localStorage.getItem('sidebarCollapsed') === '1';
-        setCollapsed(collapsed);
+        if (!isMobileSidebar()) {
+          const collapsed = localStorage.getItem('sidebarCollapsed') === '1';
+          setCollapsed(collapsed);
+        }
       } catch(e){}
     }
+    window.addEventListener('resize', () => {
+      if (!isMobileSidebar()) {
+        closeMobileSidebar();
+        try { setCollapsed(localStorage.getItem('sidebarCollapsed') === '1'); } catch(e) {}
+      } else {
+        document.documentElement.classList.remove('sidebar-is-collapsed');
+        el?.classList.remove('w-24', 'collapsed');
+      }
+    });
     // Detectar qué submenu (si alguno) tiene un hijo activo en esta página
     const _activeSubmenuKeys = new Set();
     document.querySelectorAll('[id^="submenu-"]').forEach(p => {
@@ -6223,6 +6332,60 @@
       }
     }
 
+    @media (max-width: 767px) {
+      .infocus-ai-launcher {
+        right: .95rem;
+        bottom: calc(6.25rem + env(safe-area-inset-bottom));
+        width: 2.75rem;
+        height: 2.75rem;
+        z-index: 2147482450;
+      }
+
+      .infocus-ai-launcher::before {
+        width: 3.45rem;
+        height: 3.45rem;
+        filter: blur(4px) saturate(1.15);
+        opacity: .72;
+      }
+
+      .infocus-ai-launcher::after {
+        width: 3.9rem;
+        height: 3.9rem;
+        filter: blur(6px) saturate(1.1);
+        opacity: .54;
+      }
+
+      body.infocus-productivity-open .infocus-ai-launcher {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateY(-3.25rem) scale(.92);
+      }
+
+      .infocus-ai-open {
+        width: 2.75rem;
+        height: 2.75rem;
+        box-shadow:
+          0 14px 28px rgba(15, 23, 42, .22),
+          inset 0 0 0 1px rgba(255,255,255,.08),
+          inset 0 -8px 18px rgba(0,0,0,.18);
+      }
+
+      .infocus-ai-sparkle-icon {
+        width: 1.22rem;
+        height: 1.22rem;
+      }
+
+      .infocus-ai-shell {
+        right: .6rem;
+        left: .6rem;
+        bottom: calc(5.7rem + env(safe-area-inset-bottom));
+        width: auto;
+        height: min(34rem, calc(100vh - 7rem));
+        border-radius: 1.35rem;
+      }
+    }
+
     .infocus-ai-open {
       position: relative;
       width: 3.18rem;
@@ -7293,7 +7456,10 @@
       }
 
       function cleanAiDisplayText(content) {
-        const original = String(content || '').replace(/\r\n?/g, '\n');
+        const original = String(content || '')
+          .replace(/<!--\s*AI_ACTIONS_JSON[\s\S]*?-->/gi, '')
+          .replace(/```ai_actions[\s\S]*?```/gi, '')
+          .replace(/\r\n?/g, '\n');
         const lines = original.split(/\n/);
         while (lines.length && lines[0].trim() === '') lines.shift();
         while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
@@ -7329,6 +7495,7 @@
       async function revealAssistantMessage(node, content, options = {}) {
         if (!node) return;
         const text = String(content || '');
+        const structuredActions = normalizeAiActions(options.actions || []);
         const displayText = cleanAiDisplayText(text);
         const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         const shouldAnimate = options.animate !== false && !reducedMotion;
@@ -7355,11 +7522,85 @@
 
         node.classList.remove('is-revealing');
         appendAiEnhancements(node, text);
-        appendCreateActions(node, text);
+        appendCreateActions(node, text, structuredActions);
         scrollAiToBottom('smooth');
       }
 
-      function shouldShowCreateActions(content) {
+      function normalizeAiActions(actions = []) {
+        const allowedTypes = new Set([
+          'start_pomodoro',
+          'create_project',
+          'update_project',
+          'add_project_task',
+          'add_project_subtask',
+          'add_project_note',
+          'create_personal_note',
+          'update_personal_note',
+          'create_reminder',
+          'create_meeting',
+          'create_quote',
+          'create_contract',
+          'send_email',
+          'send_recurring_invoice_early',
+        ]);
+        const items = Array.isArray(actions) ? actions : [];
+        return items.map((action) => {
+          if (!action || !allowedTypes.has(action.type)) return null;
+          const minutes = Number(action.minutes);
+          const normalized = {
+            type: action.type,
+            label: String(action.label || ''),
+            fields: normalizeAiActionFields(action.fields || {}),
+            requires_confirmation: action.requires_confirmation !== false,
+          };
+          if (action.type === 'start_pomodoro') {
+            normalized.label = normalized.label || 'Activar pomodoro';
+            normalized.minutes = [25, 30, 60].includes(minutes) ? minutes : 25;
+            normalized.task = String(action.task || normalized.fields.task || 'Bloque de foco guiado por IA').trim().slice(0, 160) || 'Bloque de foco guiado por IA';
+            normalized.open_pip = Boolean(action.open_pip || action.openPip || normalized.fields.open_pip);
+          }
+          return normalized;
+        }).filter(Boolean);
+      }
+
+      function normalizeAiActionFields(fields, depth = 0) {
+        if (!fields || typeof fields !== 'object' || Array.isArray(fields) || depth > 3) return {};
+        return Object.entries(fields).reduce((acc, [key, value]) => {
+          const safeKey = String(key || '').replace(/[^\w-]/g, '').slice(0, 60);
+          if (!safeKey || ['type', 'requires_confirmation'].includes(safeKey)) return acc;
+          if (typeof value === 'string') {
+            acc[safeKey] = value.slice(0, 4000);
+          } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+            acc[safeKey] = value;
+          } else if (Array.isArray(value)) {
+            acc[safeKey] = value.slice(0, 40).map((item) => {
+              if (typeof item === 'string') return item.slice(0, 1000);
+              if (typeof item === 'number' || typeof item === 'boolean' || item === null) return item;
+              if (item && typeof item === 'object' && !Array.isArray(item)) return normalizeAiActionFields(item, depth + 1);
+              return '';
+            }).filter((item) => item !== '');
+          } else if (value && typeof value === 'object') {
+            acc[safeKey] = normalizeAiActionFields(value, depth + 1);
+          }
+          return acc;
+        }, {});
+      }
+
+      function primaryAiAction(actions = []) {
+        return normalizeAiActions(actions)[0] || null;
+      }
+
+      function parseStructuredAiAction(actionsNode) {
+        if (!actionsNode?.dataset?.aiAction) return null;
+        try {
+          return primaryAiAction([JSON.parse(actionsNode.dataset.aiAction)]);
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function shouldShowCreateActions(content, actions = []) {
+        if (primaryAiAction(actions)) return true;
         const text = normalizeAiText(content);
         if (/te refieres a .*nota.* o .*proyecto|quieres crear un proyecto basado en esa nota|actualizar la nota que tienes abierta/i.test(text)) {
           return false;
@@ -7408,6 +7649,29 @@
         return hasEntity && (hasCreateIntent || asksConfirmation);
       }
 
+      function aiActionLabels(action, content = '') {
+        if (action?.type === 'start_pomodoro') {
+          return { accept: 'Activar pomodoro', reject: 'No activar', busy: 'Activando...' };
+        }
+        const labels = {
+          create_project: ['Crear proyecto', 'No crear', 'Creando...'],
+          update_project: ['Aplicar cambios', 'No aplicar', 'Aplicando...'],
+          add_project_task: ['Agregar tarea', 'No agregar', 'Agregando...'],
+          add_project_subtask: ['Agregar subtarea', 'No agregar', 'Agregando...'],
+          add_project_note: ['Agregar nota', 'No agregar', 'Agregando...'],
+          create_personal_note: ['Crear nota', 'No crear', 'Creando nota...'],
+          update_personal_note: ['Actualizar nota', 'No actualizar', 'Actualizando...'],
+          create_reminder: ['Crear recordatorio', 'No crear', 'Creando recordatorio...'],
+          create_meeting: ['Programar ahora', 'No programar', 'Programando...'],
+          create_quote: ['Crear cotización', 'No crear', 'Creando cotización...'],
+          create_contract: ['Crear contrato', 'No crear', 'Creando contrato...'],
+          send_email: ['Enviar ahora', 'No enviar', 'Enviando...'],
+          send_recurring_invoice_early: ['Enviar ahora', 'No enviar', 'Enviando...'],
+        }[action?.type];
+        if (labels) return { accept: labels[0], reject: labels[1], busy: labels[2] };
+        return aiConfirmLabels(content);
+      }
+
       function aiConfirmLabels(content) {
         const text = normalizeAiText(content);
         if (isPomodoroProposal(content)) {
@@ -7451,29 +7715,34 @@
         return { accept: 'Crear ahora', reject: 'No crear', busy: 'Creando...' };
       }
 
-      function appendCreateActions(node, content) {
-        if (!node || !shouldShowCreateActions(content)) return;
-        const labels = aiConfirmLabels(content);
-        const actions = document.createElement('div');
-        actions.className = 'infocus-ai-confirm-actions';
-        actions.dataset.aiProposal = content || '';
-        actions.dataset.aiBusyLabel = labels.busy;
-        actions.innerHTML = `
+      function appendCreateActions(node, content, aiActions = []) {
+        const structuredActions = normalizeAiActions(aiActions);
+        if (!node || !shouldShowCreateActions(content, structuredActions)) return;
+        const structuredAction = structuredActions[0] || null;
+        const labels = structuredAction ? aiActionLabels(structuredAction, content) : aiConfirmLabels(content);
+        const actionsNode = document.createElement('div');
+        actionsNode.className = 'infocus-ai-confirm-actions';
+        actionsNode.dataset.aiProposal = content || '';
+        actionsNode.dataset.aiBusyLabel = labels.busy;
+        if (structuredAction) {
+          actionsNode.dataset.aiAction = JSON.stringify(structuredAction);
+        }
+        actionsNode.innerHTML = `
           <button type="button" class="infocus-ai-confirm-create" data-ai-confirm-create>${labels.accept}</button>
           <button type="button" class="infocus-ai-confirm-cancel" data-ai-confirm-cancel>${labels.reject}</button>
         `;
-        node.appendChild(actions);
+        node.appendChild(actionsNode);
         scrollAiToBottom('smooth');
       }
 
-      function appendMessage(role, content, extraClass = '') {
+      function appendMessage(role, content, extraClass = '', actions = []) {
         if (welcome) welcome.style.display = 'none';
         const node = document.createElement('div');
         node.className = `infocus-ai-message ${role} ${extraClass}`.trim();
         node.innerHTML = role === 'assistant' ? renderAiMarkdown(cleanAiDisplayText(content)) : escapeHtml(content);
         if (role === 'assistant') {
           appendAiEnhancements(node, content);
-          appendCreateActions(node, content);
+          appendCreateActions(node, content, actions);
         }
         body.appendChild(node);
         scrollAiToBottom('auto');
@@ -7712,6 +7981,202 @@
         );
       }
 
+      async function executeStructuredAiAction(actionsNode) {
+        const action = parseStructuredAiAction(actionsNode);
+        if (!action) return false;
+
+        if (action.type === 'start_pomodoro') {
+          if (!window.startTdahPomodoroFromAi) {
+            throw new Error('tdah_pomodoro_not_ready');
+          }
+
+          const options = {
+            minutes: action.minutes,
+            task: action.task,
+            openPip: action.open_pip,
+          };
+          const result = await window.startTdahPomodoroFromAi(options);
+          actionsNode.remove();
+          appendMessage('assistant', result?.ok
+            ? `✅ **Pomodoro TDAH activado**\n\n- **Bloque:** ${options.minutes} minutos\n- **Enfoque:** ${options.task}`
+            : 'No pude activar el Pomodoro TDAH. Revisa que haya una tarea o intenta de nuevo.'
+          );
+          return true;
+        }
+
+        return false;
+      }
+
+      function aiActionField(action, keys, fallback = '') {
+        const fields = action?.fields || {};
+        for (const key of keys) {
+          const value = fields[key];
+          if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+        }
+        return fallback;
+      }
+
+      function aiActionLine(label, value) {
+        if (value === undefined || value === null || String(value).trim() === '') return '';
+        return `${label}: ${String(value).trim()}`;
+      }
+
+      function aiActionList(label, value, formatter = null) {
+        const items = Array.isArray(value) ? value : (String(value || '').trim() ? [value] : []);
+        if (!items.length) return '';
+        const lines = items.map((item, index) => {
+          if (formatter) return formatter(item, index);
+          if (item && typeof item === 'object') {
+            return `${index + 1}. ${String(item.title || item.name || item.text || item.task || item.description || '').trim()}`;
+          }
+          return `${index + 1}. ${String(item).trim()}`;
+        }).filter((line) => String(line).trim() !== '');
+        return lines.length ? `${label}:\n${lines.join('\n')}` : '';
+      }
+
+      function proposalFromStructuredAiAction(action, fallbackProposal = '') {
+        const f = action?.fields || {};
+        const title = aiActionField(action, ['title', 'name', 'text', 'task', 'project']);
+        const parts = [];
+        switch (action?.type) {
+          case 'create_project':
+            parts.push('Nuevo proyecto:');
+            parts.push(aiActionLine('Nombre', aiActionField(action, ['title', 'name', 'project'])));
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'], 'Sin Cliente')));
+            parts.push(aiActionLine('Estado', aiActionField(action, ['stage', 'status'])));
+            parts.push(aiActionLine('Prioridad', aiActionField(action, ['priority'], 'Con calma')));
+            parts.push(aiActionLine('Fecha inicio', aiActionField(action, ['start_date'])));
+            parts.push(aiActionLine('Vencimiento', aiActionField(action, ['due_date', 'date'])));
+            parts.push(aiActionLine('Responsables', aiActionField(action, ['responsible', 'responsibles'])));
+            parts.push(aiActionLine('Descripción', aiActionField(action, ['description', 'content'])));
+            parts.push(aiActionList('Columnas', f.columns, (item) => `- ${String(item).trim()}`));
+            parts.push(aiActionList('Tareas sugeridas', f.tasks, (item, index) => {
+              if (item && typeof item === 'object') {
+                const taskTitle = String(item.title || item.name || item.text || item.task || '').trim();
+                const stage = String(item.column || item.stage || '').trim();
+                const subtasks = Array.isArray(item.subtasks) && item.subtasks.length
+                  ? `\n   - Subtareas a agregar:\n${item.subtasks.map((subtask) => `     - ${String(subtask).trim()}`).join('\n')}`
+                  : '';
+                const description = String(item.description || '').trim();
+                return `${index + 1}. ${stage ? `${stage}: ` : ''}${taskTitle}${description ? `\n   - Descripción: ${description}` : ''}${subtasks}`;
+              }
+              return `${index + 1}. ${String(item).trim()}`;
+            }));
+            break;
+          case 'update_project':
+            parts.push('Actualizar proyecto:');
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project', 'title', 'name'])));
+            parts.push(aiActionLine('Descripción', aiActionField(action, ['description', 'content'])));
+            parts.push(aiActionLine('Estado', aiActionField(action, ['stage', 'status'])));
+            parts.push(aiActionLine('Prioridad', aiActionField(action, ['priority'])));
+            parts.push(aiActionLine('Vencimiento', aiActionField(action, ['due_date', 'date'])));
+            parts.push(aiActionLine('Responsables', aiActionField(action, ['responsible', 'responsibles'])));
+            parts.push(aiActionList('Columnas', f.columns, (item) => `- ${String(item).trim()}`));
+            parts.push(aiActionList('Tareas a agregar', f.tasks, (item, index) => `${index + 1}. ${String(item?.title || item?.name || item?.text || item).trim()}`));
+            parts.push(aiActionList('Subtareas a agregar', f.subtasks, (item) => `- ${String(item).trim()}`));
+            break;
+          case 'add_project_task':
+            parts.push('Nueva tarea:');
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
+            parts.push(aiActionLine('Columna', aiActionField(action, ['column', 'stage'])));
+            parts.push(aiActionLine('Tarea a agregar', title));
+            parts.push(aiActionLine('Descripción', aiActionField(action, ['description', 'content'])));
+            parts.push(aiActionLine('Prioridad', aiActionField(action, ['priority'])));
+            parts.push(aiActionLine('Vencimiento', aiActionField(action, ['due_date', 'date'])));
+            parts.push(aiActionLine('Responsables', aiActionField(action, ['responsible', 'responsibles'])));
+            parts.push(aiActionList('Subtareas a agregar', f.subtasks, (item) => `- ${String(item).trim()}`));
+            break;
+          case 'add_project_subtask':
+            parts.push('Nueva subtarea:');
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
+            parts.push(aiActionLine('Tarea', aiActionField(action, ['task'])));
+            parts.push(aiActionList('Subtareas a agregar', f.subtasks || [title], (item) => `- ${String(item).trim()}`));
+            break;
+          case 'add_project_note':
+            parts.push('Nota de proyecto:');
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
+            parts.push(aiActionLine('Tarea', aiActionField(action, ['task'])));
+            parts.push(aiActionLine('Nota', aiActionField(action, ['note', 'content', 'text', 'description'])));
+            break;
+          case 'create_personal_note':
+            parts.push('Nota personal:');
+            parts.push(aiActionLine('Título', aiActionField(action, ['title', 'name'])));
+            parts.push(aiActionLine('Contenido', aiActionField(action, ['content', 'text', 'description'])));
+            parts.push(aiActionLine('Color', aiActionField(action, ['color'])));
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'])));
+            break;
+          case 'update_personal_note':
+            parts.push('Actualizar nota personal:');
+            parts.push(aiActionLine('Nota ID', aiActionField(action, ['note_id', 'id'])));
+            parts.push(aiActionLine('Título', aiActionField(action, ['title', 'name'])));
+            parts.push(aiActionLine('Contenido', aiActionField(action, ['content', 'text', 'description'])));
+            break;
+          case 'create_reminder':
+            parts.push('Recordatorio propuesto:');
+            parts.push(aiActionLine('Texto', aiActionField(action, ['text', 'title', 'description'])));
+            parts.push(aiActionLine('Prioridad', aiActionField(action, ['priority'])));
+            parts.push(aiActionLine('Fecha', aiActionField(action, ['date', 'due_date'])));
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
+            parts.push(aiActionLine('Tarea', aiActionField(action, ['task'])));
+            parts.push(aiActionLine('Lista', aiActionField(action, ['list', 'category'])));
+            break;
+          case 'create_meeting':
+            parts.push('Reunión propuesta:');
+            parts.push(aiActionLine('Título', title));
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'])));
+            parts.push(aiActionLine('Fecha', aiActionField(action, ['date'])));
+            parts.push(aiActionLine('Hora inicio', aiActionField(action, ['start_time', 'time'])));
+            parts.push(aiActionLine('Hora fin', aiActionField(action, ['end_time'])));
+            parts.push(aiActionLine('Ubicación', aiActionField(action, ['location'])));
+            parts.push(aiActionLine('Responsables', aiActionField(action, ['responsible', 'responsibles'])));
+            parts.push(aiActionLine('Invitados', aiActionField(action, ['recipients', 'invitees', 'emails'])));
+            parts.push(aiActionLine('Notas', aiActionField(action, ['notes', 'description', 'content'])));
+            break;
+          case 'create_quote':
+            parts.push('Cotización propuesta:');
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'])));
+            parts.push(aiActionLine('Moneda', aiActionField(action, ['currency'])));
+            parts.push(aiActionLine('Vencimiento', aiActionField(action, ['due_date', 'date'])));
+            parts.push(aiActionLine('Estado', aiActionField(action, ['status'])));
+            parts.push(aiActionList('Items', f.items, (item) => {
+              if (item && typeof item === 'object') {
+                return `- ${String(item.name || item.description || item.service || '').trim()} - ${item.quantity || 1} x ${item.price || item.amount || 0}`;
+              }
+              return `- ${String(item).trim()}`;
+            }));
+            break;
+          case 'create_contract':
+            parts.push('Contrato propuesto:');
+            parts.push(aiActionLine('Contrato', title));
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'])));
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
+            parts.push(aiActionLine('Monto', aiActionField(action, ['amount'])));
+            parts.push(aiActionLine('Moneda', aiActionField(action, ['currency'])));
+            parts.push(aiActionLine('Estado', aiActionField(action, ['status'])));
+            parts.push(aiActionLine('Contenido', aiActionField(action, ['content', 'message', 'description'])));
+            break;
+          case 'send_email':
+            parts.push('Correo propuesto:');
+            parts.push(aiActionLine('Para', aiActionField(action, ['to', 'recipient', 'recipients'])));
+            parts.push(aiActionLine('Asunto', aiActionField(action, ['subject'])));
+            parts.push(aiActionLine('Mensaje', aiActionField(action, ['message', 'body', 'content'])));
+            break;
+          case 'send_recurring_invoice_early':
+            parts.push('Factura recurrente adelantada:');
+            parts.push(aiActionLine('Factura', aiActionField(action, ['invoice', 'invoice_number'])));
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'])));
+            parts.push(aiActionLine('Fecha de emisión original', aiActionField(action, ['issue_date', 'original_issue_date'])));
+            parts.push(aiActionLine('Vencimiento original', aiActionField(action, ['due_date', 'original_due_date'])));
+            parts.push('Acción: Enviar hoy');
+            break;
+          default:
+            return fallbackProposal;
+        }
+
+        const proposal = parts.filter((line) => String(line || '').trim() !== '').join('\n');
+        return proposal || fallbackProposal;
+      }
+
       async function loadHistory() {
         try {
           const response = await fetch(endpoints.index, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -7778,7 +8243,12 @@
           currentChatId = item.id || id;
           body.innerHTML = '';
           (Array.isArray(item.messages) ? item.messages : []).forEach((message) => {
-            appendMessage(message.role === 'user' ? 'user' : 'assistant', message.content || '');
+            appendMessage(
+              message.role === 'user' ? 'user' : 'assistant',
+              message.content || '',
+              '',
+              message.role === 'assistant' ? (message.actions || []) : []
+            );
           });
           if (!restoreAiScrollPosition()) {
             scrollAiToBottom('auto');
@@ -7816,7 +8286,9 @@
           const json = await response.json();
           if (!response.ok) throw new Error(json.message || 'Error');
           currentChatId = json.chat_id || currentChatId;
-          await revealAssistantMessage(thinking, json.message?.content || 'No recibí respuesta.');
+          await revealAssistantMessage(thinking, json.message?.content || 'No recibí respuesta.', {
+            actions: json.message?.actions || [],
+          });
           loadHistory();
         } catch (error) {
           thinking.classList.remove('thinking');
@@ -7831,7 +8303,8 @@
 
       async function executeConfirmedAction(actionsNode) {
         if (!actionsNode || sending) return;
-        const proposal = actionsNode.dataset.aiProposal || '';
+        let proposal = actionsNode.dataset.aiProposal || '';
+        const structuredAction = parseStructuredAiAction(actionsNode);
         sending = true;
         sendBtn.disabled = true;
 
@@ -7839,6 +8312,26 @@
         buttons.forEach((button) => button.disabled = true);
         const createButton = actionsNode.querySelector('[data-ai-confirm-create]');
         if (createButton) createButton.textContent = actionsNode.dataset.aiBusyLabel || 'Procesando...';
+
+        if (structuredAction?.type === 'start_pomodoro') {
+          try {
+            const handled = await executeStructuredAiAction(actionsNode);
+            if (!handled) throw new Error('unsupported_ai_action');
+          } catch (_) {
+            appendMessage('assistant', 'No pude activar el Pomodoro TDAH. Intenta de nuevo.');
+            buttons.forEach((button) => button.disabled = false);
+            if (createButton) createButton.textContent = aiActionLabels(structuredAction, proposal).accept;
+          } finally {
+            sending = false;
+            sendBtn.disabled = false;
+            input.focus();
+          }
+          return;
+        }
+
+        if (structuredAction) {
+          proposal = proposalFromStructuredAiAction(structuredAction, proposal);
+        }
 
         if (isPomodoroProposal(proposal)) {
           try {
@@ -7889,7 +8382,9 @@
           });
           const json = await response.json().catch(() => ({}));
           currentChatId = json.chat_id || currentChatId;
-          await revealAssistantMessage(thinking, json.message?.content || 'No pude ejecutar esa acción.');
+          await revealAssistantMessage(thinking, json.message?.content || 'No pude ejecutar esa acción.', {
+            actions: json.message?.actions || [],
+          });
           let undoAction = json.undo_action || null;
           if (json.ok && json.note_update && window.__infocusAiApplyNoteUpdate) {
             await window.__infocusAiApplyNoteUpdate(json.note_update);
@@ -7981,7 +8476,10 @@
         const cancelButton = event.target.closest('[data-ai-confirm-cancel]');
         if (cancelButton) {
           const actions = cancelButton.closest('.infocus-ai-confirm-actions');
-          const labels = aiConfirmLabels(actions?.dataset.aiProposal || '');
+          const structuredAction = parseStructuredAiAction(actions);
+          const labels = structuredAction
+            ? aiActionLabels(structuredAction, actions?.dataset.aiProposal || '')
+            : aiConfirmLabels(actions?.dataset.aiProposal || '');
           actions?.remove();
           sendMessage(`${labels.reject} por ahora. Quiero ajustar los datos antes de continuar.`);
           return;

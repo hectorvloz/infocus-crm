@@ -42,9 +42,12 @@ class AiService
                 $content = 'No recibí una respuesta útil del proveedor. Revisa el modelo configurado o intenta otra vez.';
             }
 
+            $structured = $this->extractStructuredActions($content);
+
             return [
-                'content' => $this->filter->cleanText($content),
+                'content' => $this->filter->cleanText($structured['content']),
                 'provider' => $settings['provider'] ?? null,
+                'actions' => $structured['actions'],
             ];
         } catch (\Throwable $exception) {
             report($exception);
@@ -197,6 +200,202 @@ class AiService
         $messages[] = ['role' => 'user', 'content' => $this->buildUserMessage($message, $context, $settings)];
 
         return $messages;
+    }
+
+    /**
+     * Extracts a small, allowlisted action payload from the model response.
+     * The visible text remains safe for rendering and old text-based actions
+     * keep working as a fallback.
+     *
+     * @return array{content:string, actions:array<int, array<string, mixed>>}
+     */
+    private function extractStructuredActions(string $content): array
+    {
+        $actions = [];
+        $cleanContent = $content;
+
+        $patterns = [
+            '/<!--\s*AI_ACTIONS_JSON\s*([\s\S]*?)\s*-->/u',
+            '/```ai_actions\s*([\s\S]*?)\s*```/u',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (!preg_match($pattern, $cleanContent, $match)) {
+                continue;
+            }
+
+            $decoded = json_decode(trim((string) ($match[1] ?? '')), true);
+            $actions = $this->normalizeStructuredActions($decoded);
+            $cleanContent = preg_replace($pattern, '', $cleanContent) ?? $cleanContent;
+            break;
+        }
+
+        if (empty($actions)) {
+            $actions = $this->inferSafeStructuredActions($cleanContent);
+        }
+
+        return [
+            'content' => trim($cleanContent),
+            'actions' => $actions,
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeStructuredActions(mixed $payload): array
+    {
+        $rawActions = is_array($payload) && array_is_list($payload)
+            ? $payload
+            : (is_array($payload) && is_array($payload['actions'] ?? null) ? $payload['actions'] : []);
+
+        $normalized = [];
+        foreach ($rawActions as $action) {
+            if (!is_array($action)) {
+                continue;
+            }
+
+            $type = trim((string) ($action['type'] ?? ''));
+            if (!in_array($type, $this->allowedStructuredActionTypes(), true)) {
+                continue;
+            }
+
+            $normalizedAction = [
+                'type' => 'start_pomodoro',
+                'label' => $this->structuredActionLabel($type),
+                'requires_confirmation' => true,
+            ];
+            $normalizedAction['type'] = $type;
+            $normalizedAction['fields'] = $this->sanitizeStructuredActionFields((array) ($action['fields'] ?? []));
+
+            if ($type === 'start_pomodoro') {
+                $minutes = (int) ($action['minutes'] ?? data_get($normalizedAction, 'fields.minutes', 25));
+                if (!in_array($minutes, [25, 30, 60], true)) {
+                    $minutes = 25;
+                }
+
+                $task = Str::limit($this->filter->cleanText((string) ($action['task'] ?? data_get($normalizedAction, 'fields.task', 'Bloque de foco guiado por IA'))), 160, '');
+                $normalizedAction['minutes'] = $minutes;
+                $normalizedAction['task'] = $task !== '' ? $task : 'Bloque de foco guiado por IA';
+                $normalizedAction['open_pip'] = (bool) ($action['open_pip'] ?? data_get($normalizedAction, 'fields.open_pip', false));
+            }
+
+            $normalized[] = $normalizedAction;
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function allowedStructuredActionTypes(): array
+    {
+        return [
+            'start_pomodoro',
+            'create_project',
+            'update_project',
+            'add_project_task',
+            'add_project_subtask',
+            'add_project_note',
+            'create_personal_note',
+            'update_personal_note',
+            'create_reminder',
+            'create_meeting',
+            'create_quote',
+            'create_contract',
+            'send_email',
+            'send_recurring_invoice_early',
+        ];
+    }
+
+    private function structuredActionLabel(string $type): string
+    {
+        return match ($type) {
+            'start_pomodoro' => 'Activar pomodoro',
+            'create_project' => 'Crear proyecto',
+            'update_project' => 'Aplicar cambios',
+            'add_project_task' => 'Agregar tarea',
+            'add_project_subtask' => 'Agregar subtarea',
+            'add_project_note' => 'Agregar nota',
+            'create_personal_note' => 'Crear nota',
+            'update_personal_note' => 'Actualizar nota',
+            'create_reminder' => 'Crear recordatorio',
+            'create_meeting' => 'Programar reunión',
+            'create_quote' => 'Crear cotización',
+            'create_contract' => 'Crear contrato',
+            'send_email' => 'Enviar correo',
+            'send_recurring_invoice_early' => 'Enviar factura',
+            default => 'Ejecutar acción',
+        };
+    }
+
+    private function sanitizeStructuredActionFields(array $fields, int $depth = 0): array
+    {
+        if ($depth > 3) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($fields as $key => $value) {
+            $safeKey = Str::snake(Str::limit(preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $key) ?: '', 60, ''));
+            if ($safeKey === '' || in_array($safeKey, ['type', 'requires_confirmation'], true)) {
+                continue;
+            }
+
+            if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
+                $clean[$safeKey] = $value;
+                continue;
+            }
+
+            if (is_string($value)) {
+                $clean[$safeKey] = Str::limit($this->filter->cleanText($value), 4000, '');
+                continue;
+            }
+
+            if (is_array($value)) {
+                $clean[$safeKey] = array_is_list($value)
+                    ? array_slice(array_map(fn ($item) => is_array($item)
+                        ? $this->sanitizeStructuredActionFields($item, $depth + 1)
+                        : (is_scalar($item) ? Str::limit($this->filter->cleanText((string) $item), 1000, '') : null), $value), 0, 40)
+                    : $this->sanitizeStructuredActionFields($value, $depth + 1);
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function inferSafeStructuredActions(string $content): array
+    {
+        $normalized = Str::lower(Str::ascii($content));
+        if (
+            !preg_match('/pomodoro|bloque de foco|trabajo enfocado|tdah/', $normalized)
+            || !preg_match('/activar|iniciar|empezar|propuesto|listo para activar|activar pomodoro/', $normalized)
+        ) {
+            return [];
+        }
+
+        $minutes = 25;
+        if (preg_match('/\b(25|30|60)\s*(?:min|mins|minutos)?\b/', $normalized, $match)) {
+            $minutes = (int) $match[1];
+        }
+
+        $task = 'Bloque de foco guiado por IA';
+        if (preg_match('/(?:Tarea|Enfoque|Objetivo|Bloque)\s*:\s*([^\r\n]+)/iu', $content, $match)) {
+            $task = trim(str_replace('**', '', (string) $match[1]));
+        }
+
+        return [[
+            'type' => 'start_pomodoro',
+            'label' => 'Activar pomodoro',
+            'minutes' => $minutes,
+            'task' => Str::limit($this->filter->cleanText($task), 160, ''),
+            'open_pip' => str_contains($normalized, 'pip') || str_contains($normalized, 'mini'),
+            'requires_confirmation' => true,
+        ]];
     }
 
     private function buildUserMessage(string $message, array $context, array $settings): string
@@ -780,6 +979,12 @@ Para adelantar el envío de una factura recurrente ya programada, no cambies sus
 Para contratos, usa: Contrato, Cliente, Proyecto, Monto, Moneda, Estado y Mensaje/Contenido.
 Para correos, usa campos claros en líneas separadas: Para, Asunto y Mensaje. No prometas que el correo fue enviado antes de la confirmación humana.
 Para Pomodoro TDAH o bloqueo mental, propone un bloque enfocado con campos claros: Pomodoro propuesto, Tarea, Duración (25, 30 o 60 minutos) y Motivo. Termina invitando a tocar "Activar pomodoro"; no digas que está activado antes de la confirmación.
+Cuando propongas cualquier acción que requiera botón de confirmación, añade al final un bloque oculto de acción estructurada. No metas explicaciones dentro del bloque. Formato:
+<!-- AI_ACTIONS_JSON {"actions":[{"type":"tipo_permitido","fields":{"campo":"valor"}}]} -->
+Tipos permitidos: start_pomodoro, create_project, update_project, add_project_task, add_project_subtask, add_project_note, create_personal_note, update_personal_note, create_reminder, create_meeting, create_quote, create_contract, send_email, send_recurring_invoice_early.
+Para start_pomodoro usa también campos directos: {"type":"start_pomodoro","minutes":25,"task":"texto breve del enfoque","open_pip":false}.
+Para las demás acciones, en fields usa nombres simples en snake_case según aplique: title, name, client, project, task, column, description, content, text, priority, start_date, due_date, date, start_time, end_time, location, responsible, recipients, subject, message, currency, status, amount, columns, tasks, subtasks, items, invoice. La previsualización visible debe seguir usando los campos claros en español indicados arriba, porque el CRM también valida esa propuesta antes de ejecutar.
+Si no estás proponiendo una acción confirmable, no incluyas AI_ACTIONS_JSON.
 Cuando des recomendaciones, evita listas largas de opciones. No termines cada respuesta con "Siguiente paso". Usa una sugerencia final breve solo cuando sea útil para avanzar; si hace falta elegir, ofrece máximo 2 alternativas cortas.
 Cuando propongas acciones, incluye frases claras que el sistema pueda convertir en botones: "Crear proyecto", "Agregar tareas", "Asignar responsables", "Crear recordatorio", "Crear reunión" o "Enviar correo", pero solo si el usuario tiene permisos y la acción tiene sentido.
 En esas previsualizaciones, puedes indicar que puede tocar el botón adecuado ("Crear ahora", "Agregar ahora", "Aplicar cambios" o "Enviar ahora") o decir qué ajuste quiere, pero no lo repitas si la acción ya es evidente. No uses un botón o texto llamado solo "Crear".

@@ -383,6 +383,52 @@
         }
     }
 
+    @media (max-width: 767px) {
+        #tdah-toolkit,
+        #quick-notes-toolkit {
+            right: .95rem !important;
+            bottom: calc(9.65rem + env(safe-area-inset-bottom)) !important;
+            z-index: 2147482440 !important;
+        }
+
+        #productivity-launcher {
+            right: .95rem !important;
+            bottom: calc(9.65rem + env(safe-area-inset-bottom)) !important;
+            z-index: 2147482460 !important;
+        }
+
+        #tdah-toolkit #tdah-toggle,
+        #productivity-toggle,
+        .productivity-action-btn {
+            width: 2.75rem !important;
+            height: 2.75rem !important;
+            border-width: 2px !important;
+            box-shadow: 0 14px 28px -14px rgba(16, 23, 41, .72), 0 7px 16px -12px rgba(16, 23, 41, .55) !important;
+        }
+
+        #productivity-actions {
+            bottom: 3.05rem !important;
+            right: 0 !important;
+            gap: .35rem !important;
+        }
+
+        #tdah-panel,
+        #quick-notes-panel {
+            left: .75rem !important;
+            right: .75rem !important;
+            bottom: calc(13rem + env(safe-area-inset-bottom)) !important;
+            max-height: calc(100vh - 15rem) !important;
+            border-radius: 1.35rem !important;
+        }
+
+        #tdah-pomodoro-mini-pip {
+            right: .75rem !important;
+            bottom: calc(5.85rem + env(safe-area-inset-bottom)) !important;
+            width: min(17rem, calc(100vw - 1.5rem)) !important;
+            z-index: 2147482470 !important;
+        }
+    }
+
     .productivity-action-btn {
         width: 3.1rem;
         height: 3.1rem;
@@ -2477,7 +2523,7 @@
         function openPomodoroFullscreen() {
             if (!pomodoroFullscreen) return;
             const selectedTask = tdahSelectedTask || getStoredSelectedTask();
-            const hasValidTask = !!(pomodoroState.activeTaskId || selectedTask?.taskId);
+            const hasValidTask = !!(pomodoroState.activeTaskId || selectedTask?.taskId || pomodoroState.activeTaskName);
             if (!hasValidTask) {
                 notify('Selecciona o escribe una tarea en La unica cosa que haras.', 'error');
                 return;
@@ -3120,6 +3166,45 @@
             pomodoroState.workMinutes = safeMinutes;
             pomodoroState.remainingSeconds = safeMinutes * 60;
             renderPomodoro();
+        }
+
+        window.startTdahPomodoroFromAi = async function(options = {}) {
+            const safeMinutes = [25, 30, 60].includes(Number(options?.minutes)) ? Number(options.minutes) : 25;
+            const focusTask = String(options?.task || '').trim() || 'Bloque de foco guiado por IA';
+            const canStart = await ensurePomodoroCanStart();
+            if (!canStart) return { ok: false, reason: 'timer_conflict' };
+
+            if (pomodoroState.isRunning || pomodoroState.backendTimerActive || hasPomodoroSession(pomodoroState)) {
+                await resetPomodoro(true);
+            }
+
+            applySelectedTask(null, { syncInput: false, persist: true });
+            if (oneThingInput) {
+                oneThingInput.value = focusTask;
+                localStorage.setItem('tdah_one_thing', focusTask);
+            }
+            if (oneThingCheck) setOneThingCompletedState(false);
+
+            pomodoroState.workMinutes = safeMinutes;
+            pomodoroState.phase = 'work';
+            pomodoroState.remainingSeconds = safeMinutes * 60;
+            pomodoroState.activeProjectId = '';
+            pomodoroState.activeProjectTitle = 'Pomodoro TDAH';
+            pomodoroState.activeTaskId = '';
+            pomodoroState.activeTaskName = focusTask;
+            pomodoroState.backendTimerActive = false;
+            pomodoroState.loggedWorkLogs = 0;
+            pomodoroState.isRunning = true;
+            pomodoroState.endsAt = Date.now() + (safeMinutes * 60 * 1000);
+            pomodoroState.fullscreenVisible = false;
+
+            renderPomodoro();
+            syncPomodoroInterval();
+            if (options?.openPip) {
+                openPreferredPomodoroPip().catch(() => openCustomPomodoroPip());
+            }
+            notify(`Pomodoro TDAH activado: ${safeMinutes} minutos.`);
+            return { ok: true, state: { ...pomodoroState } };
         }
 
         if(oneThingInput) {

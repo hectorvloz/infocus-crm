@@ -107,6 +107,7 @@ class AiController extends Controller
             'content' => (string) ($result['content'] ?? ''),
             'created_at' => now()->toISOString(),
             'provider' => $result['provider'] ?? null,
+            'actions' => $this->normalizeResponseActions($result['actions'] ?? []),
         ];
 
         $chat['messages'] = array_values(array_slice([...$history, $userMessage, $assistantMessage], -60));
@@ -119,6 +120,117 @@ class AiController extends Controller
             'title' => $chat['title'],
             'message' => $assistantMessage,
         ]);
+    }
+
+    private function normalizeResponseActions(mixed $actions): array
+    {
+        if (!is_array($actions)) {
+            return [];
+        }
+
+        return collect($actions)
+            ->filter(fn ($action) => is_array($action) && in_array((string) ($action['type'] ?? ''), $this->allowedResponseActionTypes(), true))
+            ->map(function ($action) {
+                $type = (string) ($action['type'] ?? '');
+                $normalized = [
+                    'type' => $type,
+                    'label' => $this->responseActionLabel($type),
+                    'fields' => $this->sanitizeResponseActionFields((array) ($action['fields'] ?? [])),
+                    'requires_confirmation' => true,
+                ];
+
+                if ($type === 'start_pomodoro') {
+                    $minutes = (int) ($action['minutes'] ?? data_get($normalized, 'fields.minutes', 25));
+                    if (!in_array($minutes, [25, 30, 60], true)) {
+                        $minutes = 25;
+                    }
+
+                    $task = Str::limit($this->filter->cleanText((string) ($action['task'] ?? data_get($normalized, 'fields.task', 'Bloque de foco guiado por IA'))), 160, '');
+                    $normalized['minutes'] = $minutes;
+                    $normalized['task'] = $task !== '' ? $task : 'Bloque de foco guiado por IA';
+                    $normalized['open_pip'] = (bool) ($action['open_pip'] ?? data_get($normalized, 'fields.open_pip', false));
+                }
+
+                return $normalized;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function allowedResponseActionTypes(): array
+    {
+        return [
+            'start_pomodoro',
+            'create_project',
+            'update_project',
+            'add_project_task',
+            'add_project_subtask',
+            'add_project_note',
+            'create_personal_note',
+            'update_personal_note',
+            'create_reminder',
+            'create_meeting',
+            'create_quote',
+            'create_contract',
+            'send_email',
+            'send_recurring_invoice_early',
+        ];
+    }
+
+    private function responseActionLabel(string $type): string
+    {
+        return match ($type) {
+            'start_pomodoro' => 'Activar pomodoro',
+            'create_project' => 'Crear proyecto',
+            'update_project' => 'Aplicar cambios',
+            'add_project_task' => 'Agregar tarea',
+            'add_project_subtask' => 'Agregar subtarea',
+            'add_project_note' => 'Agregar nota',
+            'create_personal_note' => 'Crear nota',
+            'update_personal_note' => 'Actualizar nota',
+            'create_reminder' => 'Crear recordatorio',
+            'create_meeting' => 'Programar reunión',
+            'create_quote' => 'Crear cotización',
+            'create_contract' => 'Crear contrato',
+            'send_email' => 'Enviar correo',
+            'send_recurring_invoice_early' => 'Enviar factura',
+            default => 'Ejecutar acción',
+        };
+    }
+
+    private function sanitizeResponseActionFields(array $fields, int $depth = 0): array
+    {
+        if ($depth > 3) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($fields as $key => $value) {
+            $safeKey = Str::snake(Str::limit(preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $key) ?: '', 60, ''));
+            if ($safeKey === '' || in_array($safeKey, ['type', 'requires_confirmation'], true)) {
+                continue;
+            }
+
+            if (is_bool($value) || is_int($value) || is_float($value) || $value === null) {
+                $clean[$safeKey] = $value;
+                continue;
+            }
+
+            if (is_string($value)) {
+                $clean[$safeKey] = Str::limit($this->filter->cleanText($value), 4000, '');
+                continue;
+            }
+
+            if (is_array($value)) {
+                $clean[$safeKey] = array_is_list($value)
+                    ? array_slice(array_map(fn ($item) => is_array($item)
+                        ? $this->sanitizeResponseActionFields($item, $depth + 1)
+                        : (is_scalar($item) ? Str::limit($this->filter->cleanText((string) $item), 1000, '') : null), $value), 0, 40)
+                    : $this->sanitizeResponseActionFields($value, $depth + 1);
+            }
+        }
+
+        return $clean;
     }
 
     private function preflightAssistantReply(string $message, array $context): ?string
