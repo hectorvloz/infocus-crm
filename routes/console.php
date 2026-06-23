@@ -9,6 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('crm:run-scheduled')->everyMinute()->withoutOverlapping();
+Schedule::command('notifications:push')->everyMinute()->withoutOverlapping();
 Schedule::command('mail:weekly-hours-summary')->weeklyOn(1, '08:20');
 Schedule::command('mail:monthly-hours-summary')->monthlyOn(1, '08:30');
 Schedule::command('system:send-critical-alerts')->dailyAt('08:40');

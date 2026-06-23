@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
 use App\Support\Ai\AiActionExecutor;
+use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
 use App\Support\Ai\SensitiveDataFilter;
 use Illuminate\Http\JsonResponse;
@@ -14,8 +15,8 @@ use Illuminate\Support\Str;
 class AiController extends Controller
 {
     private FileStore $chats;
-    private FileStore $memories;
     private SensitiveDataFilter $filter;
+    private AiMemoryService $memoryService;
 
     public function __construct(
         private readonly AiService $ai,
@@ -23,8 +24,8 @@ class AiController extends Controller
     )
     {
         $this->chats = new FileStore('ai_chats.json');
-        $this->memories = new FileStore('ai_memories.json');
         $this->filter = new SensitiveDataFilter();
+        $this->memoryService = new AiMemoryService($this->filter);
     }
 
     public function index(): JsonResponse
@@ -95,7 +96,10 @@ class AiController extends Controller
             $result = ['content' => $preflight, 'provider' => 'crm'];
         } else {
             $result = $this->ai->reply((string) $data['message'], $history, $data['context'] ?? []);
-            $this->rememberRelevantPreference((string) $data['message']);
+            $this->memoryService->rememberAiCandidate(
+                $this->ai->extractMemoryCandidate((string) $data['message'], $data['context'] ?? []),
+                $data['context'] ?? []
+            );
         }
 
         $assistantMessage = [
@@ -298,115 +302,4 @@ class AiController extends Controller
         }
     }
 
-    private function rememberRelevantPreference(string $message): void
-    {
-        $clean = $this->filter->cleanText($message);
-        if ($clean === '' || mb_strlen($clean) < 12 || mb_strlen($clean) > 1200) {
-            return;
-        }
-
-        $normalized = Str::lower(Str::ascii($clean));
-        if ($this->looksSensitive($normalized) || ! $this->looksMemorable($normalized)) {
-            return;
-        }
-
-        $user = Auth::user();
-        $userId = (string) ($user?->id ?? Auth::id());
-        $fingerprint = md5(preg_replace('/\s+/', ' ', $normalized) ?? $normalized);
-        $all = $this->memories->all();
-
-        foreach ($all as &$memory) {
-            if ((string) ($memory['user_id'] ?? '') === $userId && (string) ($memory['fingerprint'] ?? '') === $fingerprint) {
-                $memory['updated_at'] = now()->toISOString();
-                $this->memories->save($all);
-                return;
-            }
-        }
-        unset($memory);
-
-        $all[] = [
-            'id' => (string) Str::ulid(),
-            'user_id' => $userId,
-            'user_name' => (string) ($user?->name ?? 'Usuario'),
-            'text' => Str::limit($clean, 500, ''),
-            'fingerprint' => $fingerprint,
-            'created_at' => now()->toISOString(),
-            'updated_at' => now()->toISOString(),
-        ];
-
-        $otherUsers = array_values(array_filter(
-            $all,
-            fn ($memory) => (string) ($memory['user_id'] ?? '') !== $userId
-        ));
-        $currentUser = collect($all)
-            ->filter(fn ($memory) => (string) ($memory['user_id'] ?? '') === $userId)
-            ->sortByDesc(fn ($memory) => (string) ($memory['updated_at'] ?? $memory['created_at'] ?? ''))
-            ->take(30)
-            ->values()
-            ->all();
-
-        $this->memories->save(array_values([...$otherUsers, ...$currentUser]));
-    }
-
-    private function looksMemorable(string $normalized): bool
-    {
-        $markers = [
-            'recuerda',
-            'acuerdate',
-            'ten en cuenta',
-            'prefiero',
-            'me gusta',
-            'no me gusta',
-            'cuando te pida',
-            'cuando diga',
-            'si te digo',
-            'para mi',
-            'mi forma',
-            'directriz',
-            'regla',
-            'siempre',
-            'nunca',
-            'evita',
-            'usa ',
-            'quiero que',
-            'mejor ',
-        ];
-
-        foreach ($markers as $marker) {
-            if (str_contains($normalized, $marker)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function looksSensitive(string $normalized): bool
-    {
-        $blocked = [
-            'api key',
-            'apikey',
-            'api_key',
-            'clave api',
-            'contrasena',
-            'contraseña',
-            'password',
-            'passwd',
-            'token',
-            'secret',
-            'client secret',
-            'smtp',
-            '.env',
-            'google_client_secret',
-            'stripe_secret',
-        ];
-
-        foreach ($blocked as $needle) {
-            if (str_contains($normalized, $needle)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

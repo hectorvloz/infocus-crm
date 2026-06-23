@@ -378,6 +378,55 @@
       animation: taskSubtaskAiEnter .48s cubic-bezier(.2, .9, .2, 1) both;
     }
 
+    .compact-rich-editor-shell.is-ai-writing {
+      position: relative;
+      isolation: isolate;
+      border-color: rgba(217, 70, 239, .46);
+      box-shadow:
+        0 0 0 2px rgba(217, 70, 239, .13),
+        0 18px 36px rgba(217, 70, 239, .13);
+    }
+
+    .compact-rich-editor-shell.is-ai-writing::before {
+      content: "";
+      position: absolute;
+      inset: -.55rem;
+      z-index: -1;
+      pointer-events: none;
+      border-radius: 1.25rem;
+      background: linear-gradient(120deg, rgba(129,140,248,.38), rgba(217,70,239,.40), rgba(240,254,151,.52), rgba(56,189,248,.34), rgba(129,140,248,.38));
+      background-size: 260% 260%;
+      filter: blur(18px);
+      opacity: .82;
+      animation: taskDescriptionAiGlow 2.2s ease-in-out infinite;
+    }
+
+    .compact-rich-editor-shell.is-ai-writing::after {
+      content: "IA escribiendo descripción";
+      position: absolute;
+      right: .55rem;
+      top: .5rem;
+      z-index: 4;
+      pointer-events: none;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid rgba(217, 70, 239, .28);
+      color: #86198f;
+      font-size: .65rem;
+      font-weight: 900;
+      letter-spacing: .02em;
+      padding: .22rem .5rem;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .10);
+    }
+
+    .compact-rich-editor-shell.is-ai-writing .compact-rich-editor {
+      background: linear-gradient(180deg, rgba(253, 244, 255, .76), rgba(255, 255, 255, .9));
+    }
+
+    #taskModalDescription .task-desc-ai-enter {
+      animation: taskDescriptionAiEnter .46s cubic-bezier(.2, .8, .2, 1) both;
+    }
+
     @keyframes taskChecklistAiGlow {
       0% { background-position: 0 0, 180% 0; opacity: .72; }
       50% { opacity: 1; }
@@ -394,6 +443,24 @@
         opacity: 1;
         transform: translateY(0) scale(1);
         background: transparent;
+      }
+    }
+
+    @keyframes taskDescriptionAiGlow {
+      0%, 100% { background-position: 0% 50%; opacity: .58; }
+      50% { background-position: 100% 50%; opacity: .92; }
+    }
+
+    @keyframes taskDescriptionAiEnter {
+      from {
+        opacity: 0;
+        transform: translateY(9px);
+        filter: blur(5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
       }
     }
 
@@ -1351,6 +1418,37 @@
       }
     }
 
+    .project-board-action-btn {
+      display: inline-flex;
+      height: 2.25rem;
+      align-items: center;
+      justify-content: center;
+      gap: .45rem;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(255, 255, 255, .86);
+      padding: 0 .9rem;
+      color: #1e293b;
+      font-size: .78rem;
+      font-weight: 850;
+      line-height: 1;
+      white-space: nowrap;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 8px 18px rgba(15, 23, 42, .04);
+      transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+    }
+
+    .project-board-action-btn:hover {
+      border-color: rgba(15, 23, 42, .16);
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(15, 23, 42, .08), 0 10px 20px rgba(15, 23, 42, .05);
+    }
+
+    .project-board-action-btn svg {
+      height: 1rem;
+      width: 1rem;
+      flex: 0 0 auto;
+    }
+
     .project-task-card {
       display: flex;
       flex: 0 0 auto;
@@ -1576,6 +1674,23 @@
 
     .project-task-footer {
       min-height: 1.5rem;
+    }
+
+    .project-task-time-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 1.25rem;
+      border-radius: 999px;
+      background: #d1f088;
+      color: #142033;
+      padding: .12rem .42rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: .62rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -.025em;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .04);
     }
 
     .project-task-card:active {
@@ -1951,11 +2066,11 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button type="button" onclick="openProject(currentBoardProjectId)" class="inline-flex h-9 items-center gap-2 rounded-full border border-slate-900/10 bg-white/80 px-3 text-xs font-extrabold text-slate-800 shadow-sm hover:bg-white sm:px-4 sm:text-sm">
+          <button type="button" onclick="openProject(currentBoardProjectId)" class="project-board-action-btn">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4Z"/></svg>
             Detalles
           </button>
-          <button type="button" onclick="openBoardTaskTrash()" class="relative inline-flex h-9 items-center gap-2 rounded-full border border-slate-900/10 bg-white/80 px-3 text-xs font-extrabold text-slate-800 shadow-sm hover:bg-white sm:px-3" title="Papelera de tareas">
+          <button type="button" onclick="openBoardTaskTrash()" class="project-board-action-btn relative" title="Papelera de tareas">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
             <span class="hidden sm:inline">Papelera</span>
             <span id="boardTaskTrashCount" class="hidden min-w-5 rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">0</span>
@@ -2032,9 +2147,14 @@
                     </div>
                 </div>
              </div>
-             <button onclick="closeProjectModal({ force: true })" class="text-slate-400 hover:text-slate-600 transition-colors p-2 rounded-full hover:bg-slate-200/50">
-               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-             </button>
+             <div class="ml-3 flex shrink-0 items-center gap-1.5">
+               <button id="modalArchiveProjectBtn" type="button" onclick="archiveProject()" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-600" title="Archivar proyecto" aria-label="Archivar proyecto">
+                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-8 0h10"/></svg>
+               </button>
+               <button onclick="closeProjectModal({ force: true })" class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/50 hover:text-slate-600" title="Cerrar" aria-label="Cerrar">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+               </button>
+             </div>
            </div>
 
            <div class="bg-white px-6 py-3 border-b border-slate-100 flex-none">
@@ -2343,14 +2463,6 @@
                            </div>
                        </div>
                    </div>
-
-                   <!-- Actions -->
-                   <div class="pt-6 border-t border-slate-200 space-y-2">
-                       <button type="button" onclick="archiveProject()" class="w-full py-2 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 text-left flex items-center gap-2">
-                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0-12-4 4m4-4 4 4M4 14v3a3 3 0 003 3h10a3 3 0 003-3v-3"/></svg>
-                           Archivar Proyecto
-                       </button>
-                   </div>
                </div>
            </div>
         </div>
@@ -2541,13 +2653,19 @@
           </div>
 
           <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
-            <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scroll">
+            <div id="taskModalMainScroll" class="flex-1 overflow-y-auto p-6 space-y-8 custom-scroll">
               <div id="taskModalInfoTab" class="space-y-8">
                 <div>
-                  <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
-                    Descripción
-                  </label>
+                  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                      <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                      Descripción
+                    </label>
+                    <button id="taskAiSupportTrigger" type="button" onclick="toggleTaskAiSupport()" class="inline-flex h-9 items-center gap-2 rounded-xl border-2 border-fuchsia-300 bg-white px-3 text-xs font-extrabold text-slate-800 shadow-sm hover:bg-fuchsia-50">
+                      <svg class="h-3.5 w-3.5 text-fuchsia-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.5l1.8 5.1 5.1 1.8-5.1 1.8L12 16.3l-1.8-5.1-5.1-1.8 5.1-1.8L12 2.5Zm6.2 10.5.9 2.5 2.4.9-2.4.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5ZM5.2 14l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1Z"/></svg>
+                      Apoyo de IA
+                    </button>
+                  </div>
                   <div class="compact-rich-editor-shell" data-desc-editor-shell>
                     <div class="compact-desc-toolbar" aria-label="Herramientas de descripcion">
                       <div class="compact-desc-format-wrap">
@@ -2577,16 +2695,11 @@
                 </div>
 
                 <div>
-                  <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div class="mb-2 flex items-center gap-2">
                     <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
                       <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                       Checklist
                     </label>
-                    <button id="taskAiSupportTrigger" type="button" onclick="toggleTaskAiSupport()" class="inline-flex h-9 items-center gap-2 rounded-xl border-2 border-fuchsia-300 bg-white px-3 text-xs font-extrabold text-slate-800 shadow-sm hover:bg-fuchsia-50">
-                      <svg class="h-3.5 w-3.5 text-fuchsia-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.5l1.8 5.1 5.1 1.8-5.1 1.8L12 16.3l-1.8-5.1-5.1-1.8 5.1-1.8L12 2.5Zm6.2 10.5.9 2.5 2.4.9-2.4.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5ZM5.2 14l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1Z"/></svg>
-                      Apoyo de IA
-                      <span class="hidden rounded-md bg-fuchsia-200 px-1.5 py-0.5 text-[10px] font-black text-fuchsia-900 sm:inline">NOVEDAD</span>
-                    </button>
                   </div>
                   <div id="taskAiSupportPanel" class="fixed hidden w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-fuchsia-200 bg-white shadow-2xl ring-1 ring-fuchsia-100" style="z-index:2147482500;">
                     <div class="flex items-center justify-between gap-2 border-b border-fuchsia-100 bg-white px-3 py-2">
@@ -2596,7 +2709,7 @@
                         </span>
                         <div class="min-w-0">
                           <div class="truncate text-sm font-black text-slate-900">Apoyo de IA</div>
-                          <div class="truncate text-[10px] font-semibold text-slate-400">Checklist de la tarea</div>
+                          <div class="truncate text-[10px] font-semibold text-slate-400">Descripción, checklist y subtareas</div>
                         </div>
                       </div>
                       <button type="button" onclick="toggleTaskAiSupport(false)" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar apoyo de IA">
@@ -2604,7 +2717,7 @@
                       </button>
                     </div>
                     <div id="taskAiSupportMessages" class="max-h-40 space-y-2 overflow-y-auto bg-slate-50 px-2.5 py-2.5 text-sm">
-                      <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Dime cómo ajustar el checklist: agregar, reescribir o crear tareas.</div>
+                      <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Dime si quieres mejorar la descripción o crear tareas/subtareas.</div>
                     </div>
                     <div class="flex gap-2 border-t border-slate-100 bg-white p-2">
                       <input id="taskAiSupportInput" class="min-w-0 flex-1 rounded-lg border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 focus:border-fuchsia-300 focus:ring-fuchsia-200" placeholder="Ej. divide esto en pasos..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); sendTaskAiSupport(); }">
@@ -2659,7 +2772,7 @@
               </div>
             </div>
 
-            <div class="w-full md:w-80 bg-slate-50 border-l border-slate-100 p-6 space-y-6 overflow-y-auto">
+            <div id="taskModalSidebarScroll" class="w-full md:w-80 bg-slate-50 border-l border-slate-100 p-6 space-y-6 overflow-y-auto">
               <div class="group relative bg-[#111729] rounded-xl shadow-sm border border-[#1f2a47] p-4 text-center">
                 <div class="absolute top-3 right-3 flex items-center gap-1.5 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0">
                   <button type="button" onclick="openTimerFullscreen()" class="w-8 h-8 rounded-full border border-slate-600 text-slate-300 hover:text-white hover:bg-[#1f2a47] flex items-center justify-center transition-colors" title="Pantalla completa" aria-label="Pantalla completa">
@@ -3852,6 +3965,43 @@
       updateCompactDescFormatState(editor.id);
     });
 
+    function findCompactDescOuterScroll(editor) {
+      if (editor?.id === 'taskModalDescription') {
+        return document.getElementById('taskModalMainScroll');
+      }
+      return editor?.closest?.('.custom-scroll, .overflow-y-auto') || null;
+    }
+
+    function closestCompactRichEditor(target) {
+      const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
+      return node?.closest?.('.compact-rich-editor') || null;
+    }
+
+    function applyScrollDelta(element, deltaY) {
+      if (!element || !deltaY) return deltaY;
+      const maxScroll = Math.max(0, element.scrollHeight - element.clientHeight);
+      if (maxScroll <= 0) return deltaY;
+
+      const current = element.scrollTop;
+      const next = Math.max(0, Math.min(maxScroll, current + deltaY));
+      element.scrollTop = next;
+      return deltaY - (next - current);
+    }
+
+    document.addEventListener('wheel', (event) => {
+      const editor = closestCompactRichEditor(event.target);
+      if (!editor || event.defaultPrevented || !event.deltaY) return;
+
+      let remainingDelta = applyScrollDelta(editor, event.deltaY);
+      const outerScroll = findCompactDescOuterScroll(editor);
+      if (outerScroll && outerScroll !== editor && Math.abs(remainingDelta) > 0.5) {
+        remainingDelta = applyScrollDelta(outerScroll, remainingDelta);
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false, capture: true });
+
     document.addEventListener('change', (event) => {
       const checkbox = event.target?.closest?.('.compact-rich-editor .note-checkbox');
       if (!checkbox) return;
@@ -3885,6 +4035,14 @@
     let pipVideoTrack = null;
     let pipLastDisplayValue = '00:00:00';
     let suppressPipPlaybackSync = false;
+    let pipStream = null;
+    let pipWatchdogInterval = null;
+    let pipLastFrameAt = 0;
+    let pipRecovering = false;
+    let pipAudioContext = null;
+    let pipAudioSource = null;
+    let pipAudioTrack = null;
+    let pipAudioPrimed = false;
     let responsibleSearchDebounce = null;
     let responsibleSearchAbort = null;
     let taskOwnerSearchDebounce = null;
@@ -4631,6 +4789,21 @@
       showProjectBoardLoading();
     }
 
+    function getProjectBoardMetaHtml(project) {
+      const stats = getProjectTaskStats(project);
+      const totalCards = Number(stats.totalCards ?? stats.total ?? 0);
+      const invested = formatInvestedDh(getProjectGrossSeconds(project));
+      const client = escapeHtml(project?.cliente || 'Sin cliente');
+      const cards = `${totalCards} tarjeta${totalCards === 1 ? '' : 's'}`;
+      return `${client} · ${cards} · ${escapeHtml(invested)} invertido · <strong class="font-extrabold text-slate-900">${stats.pct}% completado</strong>`;
+    }
+
+    function updateProjectBoardMeta(project) {
+      const meta = document.getElementById('projectBoardMeta');
+      if (!meta || !project) return;
+      meta.innerHTML = getProjectBoardMetaHtml(project);
+    }
+
     function renderProjectBoard(projectId, options = {}) {
       const project = projects.find((item) => String(item.id) === String(projectId));
       if (!project) {
@@ -4641,18 +4814,15 @@
       window.__infocusAiCurrentProject = {
         id: String(project.id || projectId || ''),
         title: String(project.titulo || 'Tablero'),
+        client_id: String(project.cliente_id || ''),
+        client_name: String(project.cliente || ''),
       };
       transitionBoardViews(true);
       bindProjectBoardHeaderBack();
 
       const title = document.getElementById('projectBoardTitle');
-      const meta = document.getElementById('projectBoardMeta');
       if (title) title.textContent = project.titulo || 'Tablero';
-      if (meta) {
-        const stats = getProjectTaskStats(project);
-        const totalCards = Number(stats.totalCards ?? stats.total ?? 0);
-        meta.textContent = `${project.cliente || 'Sin cliente'} · ${totalCards} tarjeta${totalCards === 1 ? '' : 's'} · ${stats.pct}% completado`;
-      }
+      updateProjectBoardMeta(project);
       updateBoardTaskTrashCount(project);
 
       const container = document.getElementById('projectBoardColumns');
@@ -4908,7 +5078,8 @@
       const files = Array.isArray(task.files) ? task.files : [];
       const cover = getTaskCoverFile(task);
       const coverUrl = cover?.preview_url || cover?.url || '';
-      const taskTime = formatTimer(getTaskCardAccumulatedSeconds(project, task));
+      const taskAccumulatedSeconds = getTaskCardAccumulatedSeconds(project, task);
+      const taskTime = formatTimer(taskAccumulatedSeconds);
       const ownersHtml = renderResponsibleBadges(owners.names, owners.ids, {
         limit: 2,
         wrapperClass: 'flex -space-x-2',
@@ -4935,8 +5106,7 @@
               <span class="-mr-0.5 ml-auto inline-flex shrink-0 items-center justify-end gap-1 whitespace-nowrap text-[10px] font-bold text-slate-500">
                 ${files.length ? `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.586-6.586a4 4 0 10-5.657-5.657L5.757 10.757a6 6 0 108.486 8.486L20 13.486"/></svg>${files.length}` : ''}
                 <span>${(task.subtasks || []).length} Tareas</span>
-                <span class="text-slate-300">·</span>
-                <span class="font-mono text-[10px] font-black tracking-tight text-slate-700" title="Tiempo invertido">${taskTime}</span>
+                ${taskAccumulatedSeconds > 0 ? `<span class="project-task-time-pill" title="Tiempo acumulado">${taskTime}</span>` : ''}
               </span>
             </div>
           </div>
@@ -6973,6 +7143,7 @@
       const noteComposer = document.getElementById('projectNoteComposer');
       const notesTabBtn = document.querySelector('[data-project-tab="notes"]');
       const sidebar = document.getElementById('projectModalSidebar');
+      const archiveBtn = document.getElementById('modalArchiveProjectBtn');
       const prioritySelector = document.getElementById('modalPrioritySelector');
       const responsablesInput = document.getElementById('newResponsibleInput');
       const dueDateInput = document.getElementById('modalDueDate');
@@ -6991,6 +7162,7 @@
       if (noteComposer && projectModalReadOnly) noteComposer.classList.add('hidden');
       if (notesTabBtn) notesTabBtn.classList.toggle('hidden', projectModalReadOnly);
       if (sidebar) sidebar.classList.toggle('hidden', projectModalReadOnly);
+      if (archiveBtn) archiveBtn.classList.toggle('hidden', projectModalReadOnly);
       if (prioritySelector) prioritySelector.classList.toggle('pointer-events-none', projectModalReadOnly);
       if (prioritySelector) prioritySelector.classList.toggle('opacity-70', projectModalReadOnly);
       if (responsablesInput) responsablesInput.disabled = projectModalReadOnly;
@@ -7021,6 +7193,8 @@
       window.__infocusAiCurrentProject = {
         id: String(p.id || id || ''),
         title: String(p.titulo || 'Proyecto'),
+        client_id: String(p.cliente_id || ''),
+        client_name: String(p.cliente || ''),
       };
 
       setProjectModalReadOnly(!!options?.readOnly);
@@ -7103,7 +7277,7 @@
       window.__infocusAiCurrentProject = null;
       if (typeof hideProjectDropOverlay === 'function') hideProjectDropOverlay();
       closeTaskModal();
-        if (pipRenderInterval) clearInterval(pipRenderInterval);
+      stopPipRenderLoop();
       setPipSourceVisible(false);
       closeTimerFullscreen();
         setProjectModalReadOnly(false);
@@ -7736,6 +7910,7 @@
       const modalPlanned = document.getElementById('modalTimerPlannedDisplay');
       const modalCompare = document.getElementById('modalTimerCompareDisplay');
       if (modalInvested) modalInvested.innerText = value;
+      if (String(currentBoardProjectId || '') === String(p?.id || '')) updateProjectBoardMeta(p);
       if (modalPlanned) modalPlanned.innerText = plannedValue;
       if (modalCompare) {
         modalCompare.innerText = `Comparación: ${diffValue}`;
@@ -8586,23 +8761,123 @@
     }
 
     async function ensureNativePipSource() {
-      if (pipStreamReady) return true;
       const canvas = document.getElementById('timerPipCanvas');
       const video = document.getElementById('timerPipVideo');
       if (!canvas || !video || !canvas.captureStream) return false;
-      const stream = canvas.captureStream(30);
-      pipVideoTrack = stream.getVideoTracks ? (stream.getVideoTracks()[0] || null) : null;
-      video.srcObject = stream;
+      if (pipTrackHealthy()) return true;
+      resetTimerPipSource();
+      drawTimerPipCanvas(getPipLiveDisplayValue());
+      pipStream = canvas.captureStream(2);
+      pipVideoTrack = pipStream.getVideoTracks ? (pipStream.getVideoTracks()[0] || null) : null;
+      const audioTrack = ensureTimerPipSilentAudioTrack();
+      if (audioTrack && pipStream.addTrack) {
+        try { pipStream.addTrack(audioTrack); } catch (_) {}
+      }
+      if (pipVideoTrack) {
+        pipVideoTrack.addEventListener('ended', () => {
+          if (isTimerNativePipOpen()) recoverTimerPipSource();
+        });
+        pipVideoTrack.addEventListener('mute', () => {
+          setTimeout(() => {
+            if (isTimerNativePipOpen()) recoverTimerPipSource();
+          }, 350);
+        });
+      }
+      video.srcObject = pipStream;
       video.muted = true;
       video.playsInline = true;
       video.setAttribute('webkit-playsinline', 'true');
       video.autoplay = true;
-      drawTimerPipCanvas(getPipLiveDisplayValue());
       try {
         await video.play();
       } catch (e) {}
       pipStreamReady = true;
       return true;
+    }
+
+    function resetTimerPipSource() {
+      if (pipStream?.getTracks) {
+        pipStream.getTracks().forEach((track) => {
+          try { track.stop(); } catch (_) {}
+        });
+      }
+      pipStream = null;
+      pipVideoTrack = null;
+      pipStreamReady = false;
+      const video = document.getElementById('timerPipVideo');
+      if (video) {
+        try { video.srcObject = null; } catch (_) {}
+      }
+      stopTimerPipSilentAudio();
+    }
+
+    function stopTimerPipSilentAudio() {
+      try { pipAudioSource?.stop(); } catch (_) {}
+      try { pipAudioTrack?.stop(); } catch (_) {}
+      try { pipAudioContext?.close(); } catch (_) {}
+      pipAudioContext = null;
+      pipAudioSource = null;
+      pipAudioTrack = null;
+    }
+
+    function ensureTimerPipSilentAudioTrack() {
+      if (!pipAudioPrimed) return null;
+      if (pipAudioTrack && pipAudioTrack.readyState !== 'ended') {
+        if (pipAudioContext?.state === 'suspended') pipAudioContext.resume().catch(() => {});
+        return pipAudioTrack;
+      }
+
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtor) return null;
+      try {
+        pipAudioContext = new AudioCtor();
+        const destination = pipAudioContext.createMediaStreamDestination();
+        const oscillator = pipAudioContext.createOscillator();
+        const gain = pipAudioContext.createGain();
+        oscillator.frequency.value = 1;
+        gain.gain.value = 0.00001;
+        oscillator.connect(gain);
+        gain.connect(destination);
+        oscillator.start();
+        pipAudioSource = oscillator;
+        pipAudioTrack = destination.stream.getAudioTracks()[0] || null;
+        pipAudioContext.resume().catch(() => {});
+        return pipAudioTrack;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function pipTrackHealthy() {
+      const video = document.getElementById('timerPipVideo');
+      const audioHealthy = !pipAudioPrimed || (pipAudioTrack && pipAudioTrack.readyState !== 'ended');
+      return !!pipStream
+        && !!pipVideoTrack
+        && !!audioHealthy
+        && pipVideoTrack.readyState !== 'ended'
+        && video?.srcObject === pipStream;
+    }
+
+    function isTimerNativePipOpen() {
+      const video = document.getElementById('timerPipVideo');
+      return document.pictureInPictureElement === video || video?.webkitPresentationMode === 'picture-in-picture';
+    }
+
+    async function recoverTimerPipSource() {
+      if (pipRecovering) return;
+      const video = document.getElementById('timerPipVideo');
+      if (!video) return;
+      pipRecovering = true;
+      try {
+        resetTimerPipSource();
+        await ensureNativePipSource();
+        drawTimerPipCanvas(getPipLiveDisplayValue());
+        suppressPipPlaybackSync = true;
+        await video.play().catch(() => {});
+        setTimeout(() => { suppressPipPlaybackSync = false; }, 0);
+      } finally {
+        pipRecovering = false;
+      }
     }
 
     function getPipLiveDisplayValue() {
@@ -8618,11 +8893,68 @@
     }
 
     function startPipRenderLoop() {
-      if (pipRenderInterval) clearInterval(pipRenderInterval);
-      pipRenderInterval = setInterval(() => {
+      if (pipRenderInterval) clearTimeout(pipRenderInterval);
+      if (pipWatchdogInterval) clearInterval(pipWatchdogInterval);
+
+      const pump = () => {
+        if (!isTimerNativePipOpen()) {
+          pipRenderInterval = null;
+          return;
+        }
         const val = getPipLiveDisplayValue();
         drawTimerPipCanvas(val);
-      }, 250);
+        const video = document.getElementById('timerPipVideo');
+        if (isTimerNativePipOpen() && video?.paused) {
+          suppressPipPlaybackSync = true;
+          video.play().catch(() => {}).finally(() => {
+            setTimeout(() => { suppressPipPlaybackSync = false; }, 0);
+          });
+        }
+        pipRenderInterval = setTimeout(pump, 500);
+      };
+      pump();
+
+      pipWatchdogInterval = setInterval(() => {
+        const video = document.getElementById('timerPipVideo');
+        if (!isTimerNativePipOpen()) return;
+        drawTimerPipCanvas(getPipLiveDisplayValue());
+        const staleFrame = pipLastFrameAt && Date.now() - pipLastFrameAt > 2600;
+        if (!pipTrackHealthy() || video?.paused || video?.readyState < 2 || staleFrame) {
+          suppressPipPlaybackSync = true;
+          video.play().catch(() => {}).finally(() => {
+            setTimeout(() => { suppressPipPlaybackSync = false; }, 0);
+          });
+          if (!pipTrackHealthy() || video?.readyState < 2 || staleFrame) {
+            recoverTimerPipSource();
+          }
+        }
+      }, 1000);
+    }
+
+    function stopPipRenderLoop() {
+      if (pipRenderInterval) {
+        clearTimeout(pipRenderInterval);
+        pipRenderInterval = null;
+      }
+      if (pipWatchdogInterval) {
+        clearInterval(pipWatchdogInterval);
+        pipWatchdogInterval = null;
+      }
+      if (!isTimerNativePipOpen()) stopTimerPipSilentAudio();
+    }
+
+    function refreshTimerPipAfterResume() {
+      if (!isTimerNativePipOpen()) return;
+      drawTimerPipCanvas(getPipLiveDisplayValue());
+      ensureNativePipSource().then(() => {
+        const video = document.getElementById('timerPipVideo');
+        if (!video) return;
+        suppressPipPlaybackSync = true;
+        video.play().catch(() => {}).finally(() => {
+          setTimeout(() => { suppressPipPlaybackSync = false; }, 0);
+        });
+        if (!pipRenderInterval) startPipRenderLoop();
+      });
     }
 
     function setPipSourceVisible(show) {
@@ -8677,6 +9009,8 @@
 
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = (Math.floor(Date.now() / 250) % 2) ? '#10182b' : '#0f172a';
+      ctx.fillRect(canvas.width - 3, canvas.height - 3, 2, 2);
       ctx.fillStyle = '#e2e8f0';
       ctx.font = 'bold 24px system-ui';
       ctx.fillText(fitText(title, maxTextWidth, 'bold 24px system-ui'), left, 142);
@@ -8689,6 +9023,7 @@
       if (pipVideoTrack && typeof pipVideoTrack.requestFrame === 'function') {
         pipVideoTrack.requestFrame();
       }
+      pipLastFrameAt = Date.now();
     }
 
     function setPipButtonState(active) {
@@ -8775,6 +9110,7 @@
         return;
       }
 
+      pipAudioPrimed = true;
       const ready = await ensureNativePipSource();
       if (ready && video && video.requestPictureInPicture) {
         try {
@@ -10131,6 +10467,7 @@
       const task = (p.tareas || []).find(t => t.id === taskId);
       if (!task) return;
       renderTaskDetail(task);
+      resetTaskModalScrollPositions();
       const taskModal = document.getElementById('taskDetailModal');
       if (taskModal) {
         if (taskModal.parentElement !== document.body) document.body.appendChild(taskModal);
@@ -10138,6 +10475,22 @@
         taskModal.classList.remove('hidden');
       }
       setTaskModalTab('info');
+      requestAnimationFrame(resetTaskModalScrollPositions);
+    }
+
+    function resetTaskModalScrollPositions() {
+      [
+        'taskModalMainScroll',
+        'taskModalSidebarScroll',
+        'taskModalDescription',
+        'taskAiSupportMessages',
+        'taskTimeHistoryList',
+      ].forEach((id) => {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.scrollTop = 0;
+        element.scrollLeft = 0;
+      });
     }
 
     function closeTaskModal() {
@@ -10517,7 +10870,7 @@
       if (panel) panel.classList.add('hidden');
       if (input) input.value = '';
       if (messages) {
-        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Dime cómo ajustar el checklist: agregar, reescribir o crear tareas.</div>';
+        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Dime si quieres mejorar la descripción o crear tareas/subtareas.</div>';
       }
     }
 
@@ -10542,12 +10895,58 @@
       list?.classList.toggle('is-ai-working', taskAiChecklistWorking);
     }
 
+    function setTaskAiDescriptionWorking(working = false) {
+      const editor = document.getElementById('taskModalDescription');
+      const shell = editor?.closest?.('[data-desc-editor-shell]');
+      shell?.classList.toggle('is-ai-writing', !!working);
+    }
+
+    function sleepTaskAi(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function animateTaskDescriptionAiReplacement(html) {
+      const editor = document.getElementById('taskModalDescription');
+      if (!editor) return;
+
+      const template = document.createElement('template');
+      template.innerHTML = sanitizeDescriptionHtml(html) || '<p><br></p>';
+      const nodes = Array.from(template.content.childNodes).filter((node) => {
+        return node.nodeType === Node.ELEMENT_NODE || String(node.textContent || '').trim() !== '';
+      });
+
+      editor.innerHTML = '';
+      setTaskAiDescriptionWorking(true);
+      for (const node of nodes) {
+        const clone = node.cloneNode(true);
+        if (clone.nodeType === Node.ELEMENT_NODE) {
+          clone.classList.add('task-desc-ai-enter');
+          clone.style.animationDelay = `${Math.min(editor.children.length, 8) * 45}ms`;
+        }
+        editor.appendChild(clone);
+        await sleepTaskAi(55);
+      }
+      syncCompactDescEditorState('taskModalDescription');
+    }
+
+    function inferTaskAiSupportTarget(message = '') {
+      const text = String(message || '').toLowerCase();
+      if (/(descripci[oó]n|descripcion|info|informaci[oó]n|resumen|mejora|mejorar|redacta|redactar|edita|editar|organiza|organizar|estructura|titulo|t[ií]tulo|negrita|resalta|resaltar)/i.test(text)) {
+        return 'description';
+      }
+      if (/(checklist|subtarea|sub tarea|subtareas|tarea|tareas|pasos|pendientes|lista)/i.test(text)) {
+        return 'checklist';
+      }
+      return 'mixed';
+    }
+
     async function sendTaskAiSupport() {
       if (!currentProjectId || !currentTaskId) return;
       const input = document.getElementById('taskAiSupportInput');
       const button = document.getElementById('taskAiSupportSendBtn');
       const message = String(input?.value || '').trim();
       if (!message) return;
+      const inferredTarget = inferTaskAiSupportTarget(message);
       const previousTask = getCurrentTask();
       const previousSubtaskIds = new Set((previousTask?.subtasks || []).map(getSubtaskAnimationId).filter(Boolean));
 
@@ -10557,19 +10956,26 @@
         button.disabled = true;
         button.textContent = 'Pensando...';
       }
-      appendTaskAiSupportMessage('assistant', 'Estoy preparando cambios para el checklist...');
-      setTaskAiChecklistWorking(true);
+      appendTaskAiSupportMessage('assistant', inferredTarget === 'description' ? 'Estoy trabajando la descripción...' : 'Estoy preparando los cambios...');
+      if (inferredTarget !== 'description') setTaskAiChecklistWorking(true);
+      if (inferredTarget !== 'checklist') setTaskAiDescriptionWorking(true);
 
       try {
         const response = await fetch('/api/proyectos/tareas/ia-apoyo', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
-          body: JSON.stringify({ id: currentProjectId, tarea_id: currentTaskId, message }),
+          body: JSON.stringify({
+            id: currentProjectId,
+            tarea_id: currentTaskId,
+            message,
+            current_description: getCompactDescValue('taskModalDescription'),
+          }),
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) {
           appendTaskAiSupportMessage('assistant', data.message || 'No pude aplicar cambios con IA.');
           setTaskAiChecklistWorking(false);
+          setTaskAiDescriptionWorking(false);
           return;
         }
 
@@ -10584,19 +10990,30 @@
           p.tareas = updatedTasks;
           p.archived_tasks = data.item.archived_tasks || p.archived_tasks || [];
         }
-        syncCurrentProjectTasks(updatedTasks, { rerenderTaskDetail: true });
+
+        const changedTarget = String(data.changed_target || inferredTarget || 'checklist');
+        if (changedTarget === 'description' || changedTarget === 'mixed') {
+          const descriptionHtml = sanitizeDescriptionHtml(updatedTask?.descripcion || data.description_html || '');
+          if (updatedTask && descriptionHtml) updatedTask.descripcion = descriptionHtml;
+          await animateTaskDescriptionAiReplacement(descriptionHtml);
+          setTaskDescriptionAutosaveStatus('saved');
+        }
+
+        syncCurrentProjectTasks(updatedTasks, { rerenderTaskDetail: changedTarget !== 'description' });
         if (String(currentBoardProjectId || '') === String(currentProjectId || '')) {
           renderProjectBoard(currentBoardProjectId);
         }
         appendTaskAiSupportMessage('assistant', data.message || 'Listo, apliqué los cambios.');
         setTimeout(() => {
           setTaskAiChecklistWorking(false);
+          setTaskAiDescriptionWorking(false);
           taskAiAnimatedSubtaskIds.clear();
         }, 950);
       } catch (error) {
         console.error(error);
         appendTaskAiSupportMessage('assistant', 'No pude conectar con el apoyo de IA.');
         setTaskAiChecklistWorking(false);
+        setTaskAiDescriptionWorking(false);
       } finally {
         if (button) {
           button.disabled = false;
@@ -12578,15 +12995,15 @@
     setPipButtonState(false);
     pipVideoEl?.addEventListener('leavepictureinpicture', () => {
       setPipButtonState(false);
-      if (pipRenderInterval) clearInterval(pipRenderInterval);
+      stopPipRenderLoop();
       setPipSourceVisible(false);
     });
     pipVideoEl?.addEventListener('webkitpresentationmodechanged', () => {
       setPipButtonState(pipVideoEl.webkitPresentationMode === 'picture-in-picture');
-      if (pipVideoEl.webkitPresentationMode !== 'picture-in-picture' && pipRenderInterval) {
-        clearInterval(pipRenderInterval);
-      }
+      if (pipVideoEl.webkitPresentationMode !== 'picture-in-picture') stopPipRenderLoop();
+      if (pipVideoEl.webkitPresentationMode === 'picture-in-picture' && !pipRenderInterval) startPipRenderLoop();
       setPipSourceVisible(pipVideoEl.webkitPresentationMode === 'picture-in-picture');
+      refreshTimerPipAfterResume();
     });
     pipVideoEl?.addEventListener('pause', () => {
       if (suppressPipPlaybackSync) return;
@@ -12600,6 +13017,12 @@
       if (!isNativePip) return;
       setCurrentProjectTimerRunning(true).catch(() => {});
     });
+    pipVideoEl?.addEventListener('emptied', refreshTimerPipAfterResume);
+    pipVideoEl?.addEventListener('stalled', refreshTimerPipAfterResume);
+    pipVideoEl?.addEventListener('waiting', refreshTimerPipAfterResume);
+    document.addEventListener('visibilitychange', refreshTimerPipAfterResume);
+    window.addEventListener('pageshow', refreshTimerPipAfterResume);
+    window.addEventListener('focus', refreshTimerPipAfterResume);
 
     function projectDragHasFiles(event) {
       return !!event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files');

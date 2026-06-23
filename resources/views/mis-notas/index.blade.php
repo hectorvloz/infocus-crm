@@ -643,6 +643,7 @@ document.addEventListener('DOMContentLoaded', function () {
       id: note.id || '',
       title: note.title || extractNoteTitleFromPlain(note.plainText || ''),
       plainText: htmlToPlainText(html || note.plainText || '').slice(0, 2600),
+      client_name: resolveNoteClientName(note) || activeNoteLinkedClient || '',
       permission: note.permission || 'owner',
     };
   }

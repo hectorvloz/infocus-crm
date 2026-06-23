@@ -2757,7 +2757,7 @@
             resetNativePipSource();
             
             renderNativePipFrame();
-            nativePipStream = nativePipCanvas.captureStream(30);
+            nativePipStream = nativePipCanvas.captureStream(2);
             nativePipVideoTrack = nativePipStream.getVideoTracks ? (nativePipStream.getVideoTracks()[0] || null) : null;
             const audioTrack = ensureNativePipSilentAudioTrack();
             if (audioTrack && nativePipStream.addTrack) {
@@ -2811,7 +2811,7 @@
                 if (isNativePomodoroPipOpen() && nativePipVideo?.paused) {
                     playNativePipVideoSilently();
                 }
-                nativePipRenderInterval = setTimeout(pump, 250);
+                nativePipRenderInterval = setTimeout(pump, 500);
             };
             pump();
 

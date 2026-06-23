@@ -63,6 +63,59 @@ class AiService
         return Str::limit($title !== '' ? $title : 'Nuevo chat', 46, '...');
     }
 
+    public function extractMemoryCandidate(string $message, array $context = []): ?string
+    {
+        $settings = $this->settings();
+        if (empty($settings['enabled']) || empty($settings['api_key'])) {
+            return null;
+        }
+
+        $safeMessage = $this->filter->cleanText($message);
+        if ($safeMessage === '' || mb_strlen($safeMessage) < 12) {
+            return null;
+        }
+
+        $safeContext = $this->filter->cleanArray($context);
+        $clientName = trim((string) data_get($safeContext, 'current_client.name', ''));
+        if ($clientName === '') {
+            $clientName = trim((string) data_get($safeContext, 'current_project.client_name', ''));
+        }
+        if ($clientName === '') {
+            $clientName = trim((string) data_get($safeContext, 'current_note.client_name', ''));
+        }
+
+        $prompt = "Decide si este mensaje contiene una memoria durable útil para un asistente CRM.\n"
+            . "Guarda memoria solo si es una preferencia estable, regla de trabajo, dato operativo recurrente de un cliente, del usuario o de la empresa.\n"
+            . "No guardes instrucciones temporales, tareas puntuales, datos sensibles, secretos, tokens, contraseñas, precios únicos sin recurrencia ni contenido accidental.\n"
+            . "Responde SOLO JSON válido con este formato: {\"remember\":true|false,\"memory\":\"frase breve en español\"}.\n"
+            . "Si remember=false, memory debe ser cadena vacía.\n"
+            . ($clientName !== '' ? "Cliente contextual: {$clientName}\n" : '')
+            . "Mensaje:\n{$safeMessage}";
+
+        try {
+            $content = $this->provider((string) ($settings['provider'] ?? 'openai'))->chat([
+                ['role' => 'system', 'content' => 'Eres un clasificador estricto de memoria para un CRM. Respondes solo JSON.'],
+                ['role' => 'user', 'content' => $prompt],
+            ], array_merge($settings, ['temperature' => 0.1]));
+        } catch (\Throwable $exception) {
+            report($exception);
+            return null;
+        }
+
+        $text = trim((string) $content);
+        $text = preg_replace('/^```(?:json)?\s*|\s*```$/u', '', $text) ?? $text;
+        if (!str_starts_with(trim($text), '{') && preg_match('/\{.*\}/su', $text, $match)) {
+            $text = $match[0];
+        }
+        $decoded = json_decode($text, true);
+        if (!is_array($decoded) || empty($decoded['remember'])) {
+            return null;
+        }
+
+        $memory = $this->filter->cleanText((string) ($decoded['memory'] ?? ''));
+        return mb_strlen($memory) >= 8 ? Str::limit($memory, 700, '') : null;
+    }
+
     private function settings(): array
     {
         $settings = (new FileStore('settings.json'))->find('settings') ?: [];
@@ -154,7 +207,7 @@ class AiService
             $parts[] = $userContext;
         }
 
-        $memoryContext = $this->userMemoryContext();
+        $memoryContext = (new AiMemoryService($this->filter))->relevantContext($message, $context);
         if ($memoryContext !== '') {
             $parts[] = $memoryContext;
         }
@@ -163,9 +216,13 @@ class AiService
         $safeContextLines = [];
         $url = parse_url((string) ($cleanContext['url'] ?? ''), PHP_URL_PATH) ?: '';
         $currentProject = is_array($cleanContext['current_project'] ?? null) ? $cleanContext['current_project'] : [];
+        $currentClient = is_array($cleanContext['current_client'] ?? null) ? $cleanContext['current_client'] : [];
 
         if ($url !== '') {
             $safeContextLines[] = '- Ruta actual: ' . $url;
+        }
+        if (!empty($currentClient['id']) || !empty($currentClient['name'])) {
+            $safeContextLines[] = '- Cliente actual: ' . trim((string) ($currentClient['name'] ?? '')) . ' (' . trim((string) ($currentClient['id'] ?? 'sin id')) . ')';
         }
         if (!empty($currentProject['id']) || !empty($currentProject['title'])) {
             $safeContextLines[] = '- Proyecto actual: ' . trim((string) ($currentProject['title'] ?? '')) . ' (' . trim((string) ($currentProject['id'] ?? 'sin id')) . ')';
@@ -228,29 +285,6 @@ class AiService
         }
 
         return "Usuario actual del chat:\n" . implode("\n", $lines) . "\nUsa su nombre de forma natural cuando aporte cercanía, sin repetirlo en cada respuesta.";
-    }
-
-    private function userMemoryContext(): string
-    {
-        $userId = (string) Auth::id();
-        if ($userId === '') {
-            return '';
-        }
-
-        $memories = collect((new FileStore('ai_memories.json'))->all())
-            ->filter(fn ($memory) => (string) ($memory['user_id'] ?? '') === $userId)
-            ->sortByDesc(fn ($memory) => (string) ($memory['updated_at'] ?? $memory['created_at'] ?? ''))
-            ->take(12)
-            ->map(fn ($memory) => '- ' . $this->filter->cleanText((string) ($memory['text'] ?? '')))
-            ->filter()
-            ->values()
-            ->all();
-
-        if (empty($memories)) {
-            return '';
-        }
-
-        return "Memoria útil del usuario:\n" . implode("\n", $memories) . "\nUsa estas memorias solo si son relevantes para el pedido actual. Si contradicen el mensaje actual, obedece el mensaje actual.";
     }
 
     private function permissionContext(): string

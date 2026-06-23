@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use App\Mail\GenericMail;
+use App\Support\Ai\AiMemoryService;
 
 class SettingsController extends Controller
 {
@@ -1199,8 +1200,9 @@ class SettingsController extends Controller
             'deepseek' => $this->maskedSecret((string) ($apiKeys['deepseek'] ?? ($provider === 'deepseek' ? $legacyKey : ''))),
         ];
         $settings['ai_api_key_preview'] = $settings['ai_api_key_previews'][$provider] ?? 'Sin configurar';
+        $aiMemories = (new AiMemoryService())->groupedForUser();
 
-        return view('settings.ai', compact('settings'));
+        return view('settings.ai', compact('settings', 'aiMemories'));
     }
 
     public function updateAi(Request $request)
@@ -1239,6 +1241,27 @@ class SettingsController extends Controller
         $this->saveSettings($payload);
 
         return redirect()->route('settings.ai')->with('success', 'Configuración de IA actualizada.');
+    }
+
+    public function updateAiMemory(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'text' => 'required|string|max:700',
+        ]);
+
+        $updated = (new AiMemoryService())->update($id, (string) $data['text']);
+        if (! $updated) {
+            return redirect()->route('settings.ai', ['tab' => 'memoria'])->with('error', 'No pude actualizar esa memoria.');
+        }
+
+        return redirect()->route('settings.ai', ['tab' => 'memoria'])->with('success', 'Memoria actualizada.');
+    }
+
+    public function deleteAiMemory(string $id)
+    {
+        (new AiMemoryService())->delete($id);
+
+        return redirect()->route('settings.ai', ['tab' => 'memoria'])->with('success', 'Memoria eliminada.');
     }
 
     private function maskedSecret(string $value): string

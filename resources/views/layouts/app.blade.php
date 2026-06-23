@@ -1922,7 +1922,10 @@
               <button type="button" data-notif-tab="unread" class="notif-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-800 bg-[#f3fea4] shadow-sm">No leídas</button>
               <button type="button" data-notif-tab="all" class="notif-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500">Todas</button>
             </div>
-            <button id="notificationsMarkAllBtn" type="button" class="text-xs font-bold text-slate-600 hover:text-slate-900">Marcar todas</button>
+            <div class="flex items-center gap-2">
+              <button id="browserNotificationsBtn" type="button" class="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-extrabold text-slate-600 shadow-sm hover:bg-slate-50">Activar alertas</button>
+              <button id="notificationsMarkAllBtn" type="button" class="text-xs font-bold text-slate-600 hover:text-slate-900">Marcar todas</button>
+            </div>
           </div>
           <div class="inline-flex flex-wrap rounded-xl border border-slate-200 p-1 bg-white gap-1">
             <button type="button" data-notif-module="all" class="notif-module-btn px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-slate-800 bg-[#f3fea4]">Todas <span data-notif-count="all" class="ml-1 text-slate-400">0</span></button>
@@ -2358,6 +2361,7 @@
       const notificationsCloseBtn = document.getElementById('notificationsCloseBtn');
       const notificationsList = document.getElementById('notificationsList');
       const markAllBtn = document.getElementById('notificationsMarkAllBtn');
+      const browserNotificationsBtn = document.getElementById('browserNotificationsBtn');
       const tabButtons = document.querySelectorAll('.notif-tab-btn');
       const moduleButtons = document.querySelectorAll('.notif-module-btn');
       const moduleCountEls = document.querySelectorAll('[data-notif-count]');
@@ -2406,6 +2410,9 @@
       let notifications = [];
       let currentTab = 'unread';
       let currentModule = 'all';
+      const BROWSER_NOTIFICATIONS_KEY = 'infocus_browser_notifications_seen_v1_' + @json((string) (auth()->id() ?? session('user.id') ?? session('user.email') ?? 'anon'));
+      let browserNotificationsInitialLoad = true;
+      let browserNotificationsSeen = new Set();
       const REMINDERS_KEY = 'infocus_header_reminders_v1_' + @json((string) (auth()->id() ?? session('user.id') ?? session('user.email') ?? 'anon'));
       let reminderCategoriesData = [];
       let reminderSections = [];
@@ -2419,6 +2426,8 @@
       let reminderPriorityCollapsed = {};
       let reminderPopoverBusyUntil = 0;
       let reminderDatePickerOpen = false;
+      let reminderRemoteLoaded = false;
+      let reminderRemoteSaveTimer = null;
       const ALL_REMINDERS_CATEGORY_ID = '__all__';
 
       function escapeHtml(value) {
@@ -2466,23 +2475,30 @@
         });
       }
 
-      function loadReminders() {
-        try {
-          const parsed = JSON.parse(localStorage.getItem(REMINDERS_KEY) || '{}');
-          reminderCategoriesData = Array.isArray(parsed.categories) ? parsed.categories : [];
-          reminderSections = Array.isArray(parsed.sections) ? parsed.sections : [];
-          reminders = Array.isArray(parsed.items) ? parsed.items : [];
-          reminderAllViewMode = parsed.allViewMode === 'priority' ? 'priority' : 'clients';
-          reminderPriorityCollapsed = parsed.priorityCollapsed && typeof parsed.priorityCollapsed === 'object'
-            ? parsed.priorityCollapsed
-            : {};
-        } catch (_) {
-          reminderCategoriesData = [];
-          reminderSections = [];
-          reminders = [];
-          reminderAllViewMode = 'clients';
-          reminderPriorityCollapsed = {};
-        }
+      function currentRemindersPayload() {
+        return {
+          categories: reminderCategoriesData,
+          sections: reminderSections,
+          items: reminders,
+          allViewMode: reminderAllViewMode,
+          priorityCollapsed: reminderPriorityCollapsed,
+        };
+      }
+
+      function hasUsefulRemindersPayload(payload) {
+        return Array.isArray(payload?.items) && payload.items.some(hasReminderText);
+      }
+
+      function applyRemindersPayload(payload) {
+        const parsed = payload && typeof payload === 'object' ? payload : {};
+        reminderCategoriesData = Array.isArray(parsed.categories) ? parsed.categories : [];
+        reminderSections = Array.isArray(parsed.sections) ? parsed.sections : [];
+        reminders = Array.isArray(parsed.items) ? parsed.items : [];
+        reminderAllViewMode = parsed.allViewMode === 'priority' ? 'priority' : 'clients';
+        reminderPriorityCollapsed = parsed.priorityCollapsed && typeof parsed.priorityCollapsed === 'object'
+          ? parsed.priorityCollapsed
+          : {};
+
         if (!reminderCategoriesData.length) {
           reminderCategoriesData = [{ id: 'default-cat', title: 'Recordatorios' }];
         }
@@ -2502,20 +2518,79 @@
         persistRemindersOnly();
       }
 
+      function readLocalRemindersPayload() {
+        try {
+          return JSON.parse(localStorage.getItem(REMINDERS_KEY) || '{}') || {};
+        } catch (_) {
+          return {};
+        }
+      }
+
+      function loadReminders() {
+        applyRemindersPayload(readLocalRemindersPayload());
+      }
+
       function persistRemindersOnly() {
-        localStorage.setItem(REMINDERS_KEY, JSON.stringify({
-          categories: reminderCategoriesData,
-          sections: reminderSections,
-          items: reminders,
-          allViewMode: reminderAllViewMode,
-          priorityCollapsed: reminderPriorityCollapsed,
-        }));
+        try {
+          localStorage.setItem(REMINDERS_KEY, JSON.stringify(currentRemindersPayload()));
+        } catch (_) {}
         renderRemindersCounter();
+      }
+
+      async function saveRemindersRemoteNow() {
+        if (!reminderRemoteLoaded) return;
+        try {
+          await fetch('/api/header/reminders', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': window.csrfToken,
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ payload: currentRemindersPayload() }),
+          });
+        } catch (error) {
+          console.warn('No se pudieron sincronizar los recordatorios.', error);
+        }
+      }
+
+      function queueSaveRemindersRemote() {
+        if (!reminderRemoteLoaded) return;
+        clearTimeout(reminderRemoteSaveTimer);
+        reminderRemoteSaveTimer = setTimeout(saveRemindersRemoteNow, 350);
       }
 
       function saveReminders() {
         persistRemindersOnly();
+        queueSaveRemindersRemote();
         renderReminders();
+      }
+
+      async function loadRemindersFromServer() {
+        const localPayload = readLocalRemindersPayload();
+        try {
+          const response = await fetch('/api/header/reminders', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          });
+          const data = await response.json().catch(() => ({}));
+          const serverPayload = data?.payload && typeof data.payload === 'object' ? data.payload : null;
+          reminderRemoteLoaded = true;
+
+          if (serverPayload) {
+            applyRemindersPayload(serverPayload);
+            renderReminders();
+            return;
+          }
+
+          if (!data?.exists && hasUsefulRemindersPayload(localPayload)) {
+            applyRemindersPayload(localPayload);
+            await saveRemindersRemoteNow();
+            renderReminders();
+          }
+        } catch (error) {
+          reminderRemoteLoaded = false;
+          console.warn('No se pudieron cargar recordatorios del servidor.', error);
+        }
       }
 
       function normalizeReminderPriority(priority) {
@@ -3868,6 +3943,209 @@
         return { icon: 'fa-regular fa-bell', wrap: 'bg-slate-50 text-slate-600 border-slate-200' };
       }
 
+      function parseNotificationDate(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const [year, month, day] = raw.split('-').map(Number);
+          return new Date(year, month - 1, day);
+        }
+        const normalized = raw.includes(' ') && !raw.includes('T') ? raw.replace(' ', 'T') : raw;
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      function formatNotificationDate(value) {
+        const date = parseNotificationDate(value);
+        if (!date) return '';
+        const raw = String(value || '');
+        const hasTime = /\d{1,2}:\d{2}/.test(raw);
+        const startOfDay = (input) => new Date(input.getFullYear(), input.getMonth(), input.getDate()).getTime();
+        const today = startOfDay(new Date());
+        const target = startOfDay(date);
+        const diffDays = Math.round((target - today) / 86400000);
+        const time = hasTime ? new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' }).format(date) : '';
+        let dayLabel = '';
+        if (diffDays === 0) dayLabel = 'Hoy';
+        else if (diffDays === 1) dayLabel = 'Mañana';
+        else if (diffDays === -1) dayLabel = 'Ayer';
+        else {
+          dayLabel = new Intl.DateTimeFormat('es-CO', {
+            day: '2-digit',
+            month: 'short',
+            year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric',
+          }).format(date);
+        }
+        return time ? `${dayLabel} · ${time}` : dayLabel;
+      }
+
+      function loadBrowserNotificationsSeen() {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(BROWSER_NOTIFICATIONS_KEY) || '[]');
+          browserNotificationsSeen = new Set(Array.isArray(parsed) ? parsed.map((id) => String(id || '')).filter(Boolean) : []);
+        } catch (e) {
+          browserNotificationsSeen = new Set();
+        }
+      }
+
+      function rememberBrowserNotifications(ids) {
+        ids.forEach((id) => {
+          const safeId = String(id || '').trim();
+          if (safeId) browserNotificationsSeen.add(safeId);
+        });
+        try {
+          localStorage.setItem(BROWSER_NOTIFICATIONS_KEY, JSON.stringify(Array.from(browserNotificationsSeen).slice(-250)));
+        } catch (e) {}
+      }
+
+      function browserNotificationsSupported() {
+        return 'Notification' in window;
+      }
+
+      function webPushSupported() {
+        return browserNotificationsSupported() && 'serviceWorker' in navigator && 'PushManager' in window && window.isSecureContext;
+      }
+
+      function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; i += 1) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      }
+
+      async function getInfocusServiceWorkerRegistration() {
+        if (!('serviceWorker' in navigator)) return null;
+        return navigator.serviceWorker.register('/infocus-sw.js');
+      }
+
+      async function subscribeWebPushNotifications() {
+        if (!webPushSupported()) return false;
+        const registration = await getInfocusServiceWorkerRegistration();
+        if (!registration) return false;
+
+        const keyResponse = await fetch('/api/header/notifications/push-key', {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const keyJson = await keyResponse.json().catch(() => ({}));
+        const publicKey = String(keyJson.public_key || '');
+        if (!keyResponse.ok || !publicKey) return false;
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+        }
+
+        const response = await fetch('/api/header/notifications/push-subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': window.csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({ subscription: subscription.toJSON() }),
+        });
+
+        return response.ok;
+      }
+
+      function updateBrowserNotificationsButton() {
+        if (!browserNotificationsBtn) return;
+        if (!browserNotificationsSupported()) {
+          browserNotificationsBtn.classList.remove('hidden');
+          browserNotificationsBtn.disabled = true;
+          browserNotificationsBtn.textContent = 'Alertas no compatibles';
+          browserNotificationsBtn.classList.add('opacity-60', 'cursor-not-allowed');
+          return;
+        }
+        browserNotificationsBtn.classList.remove('hidden', 'opacity-60', 'cursor-not-allowed');
+        browserNotificationsBtn.disabled = false;
+        if (Notification.permission === 'granted') {
+          browserNotificationsBtn.textContent = webPushSupported() ? 'Alertas activas' : 'Alertas activas aquí';
+          browserNotificationsBtn.classList.add('border-lime-200', 'bg-lime-50', 'text-lime-800');
+          browserNotificationsBtn.classList.remove('border-rose-200', 'bg-rose-50', 'text-rose-700');
+        } else if (Notification.permission === 'denied') {
+          browserNotificationsBtn.textContent = 'Alertas bloqueadas';
+          browserNotificationsBtn.classList.add('border-rose-200', 'bg-rose-50', 'text-rose-700');
+          browserNotificationsBtn.classList.remove('border-lime-200', 'bg-lime-50', 'text-lime-800');
+        } else {
+          browserNotificationsBtn.textContent = 'Activar alertas';
+          browserNotificationsBtn.classList.remove('border-lime-200', 'bg-lime-50', 'text-lime-800', 'border-rose-200', 'bg-rose-50', 'text-rose-700');
+        }
+      }
+
+      async function requestBrowserNotificationsPermission() {
+        if (!browserNotificationsSupported()) return;
+        try {
+          const permission = await Notification.requestPermission();
+          updateBrowserNotificationsButton();
+          if (permission === 'granted') {
+            const subscribed = await subscribeWebPushNotifications();
+            rememberBrowserNotifications(notifications.filter((item) => !item.read).map((item) => item.id));
+            if (window.showNotification) {
+              window.showNotification(
+                subscribed ? 'Alertas del navegador activadas, incluso con la app cerrada' : 'Alertas activadas solo mientras la app esté abierta',
+                subscribed ? 'success' : 'warning'
+              );
+            }
+          } else if (permission === 'denied' && window.showNotification) {
+            window.showNotification('El navegador bloqueó las alertas. Actívalas desde permisos del sitio.', 'warning');
+          }
+        } catch (e) {
+          updateBrowserNotificationsButton();
+        }
+      }
+
+      function pushBrowserNotification(item) {
+        if (!browserNotificationsSupported() || Notification.permission !== 'granted') return;
+        const title = String(item?.title || 'Nueva notificación');
+        const when = formatNotificationDate(item?.date);
+        const body = [String(item?.message || '').trim(), when].filter(Boolean).join('\n');
+        try {
+          const notification = new Notification(title, {
+            body,
+            tag: 'infocus-' + String(item?.id || title),
+            renotify: false,
+            icon: '/favicon.ico',
+          });
+          notification.onclick = () => {
+            window.focus();
+            if (item?.id) markNotificationRead(String(item.id));
+            if (item?.url) window.location.href = String(item.url);
+            notification.close();
+          };
+        } catch (e) {}
+      }
+
+      function notifyNewBrowserNotifications(items) {
+        const unread = (Array.isArray(items) ? items : []).filter((item) => item && !item.read && item.id);
+        if (browserNotificationsInitialLoad) {
+          rememberBrowserNotifications(unread.map((item) => item.id));
+          browserNotificationsInitialLoad = false;
+          return;
+        }
+        const fresh = unread.filter((item) => !browserNotificationsSeen.has(String(item.id)));
+        if (!fresh.length) return;
+        rememberBrowserNotifications(fresh.map((item) => item.id));
+        if (!browserNotificationsSupported() || Notification.permission !== 'granted') return;
+        fresh.slice(0, 3).forEach(pushBrowserNotification);
+        if (fresh.length > 3) {
+          pushBrowserNotification({
+            id: 'summary:' + Date.now(),
+            title: `${fresh.length} notificaciones nuevas`,
+            message: 'Abre Infocus para revisar todas las notificaciones pendientes.',
+            date: new Date().toISOString(),
+            url: window.location.href,
+          });
+        }
+      }
+
       function applyPresence(status) {
         const safe = statusMap[status] ? status : 'available';
         const info = statusMap[safe];
@@ -3937,14 +4215,21 @@
             ? 'border-rose-200 bg-rose-50'
             : (item.kind === 'upcoming' || item.kind === 'meeting_reminder' ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50');
           const visual = notificationVisual(item);
-          return `<a href="${item.url || '#'}" data-notification-id="${item.id}" class="relative block rounded-xl border ${tone} px-3 py-3 pr-8 hover:bg-white transition-colors">
+          const dateLabel = formatNotificationDate(item.date);
+          return `<a href="${escapeHtml(item.url || '#')}" data-notification-id="${escapeHtml(item.id)}" class="relative block rounded-xl border ${tone} px-3 py-3 pr-8 hover:bg-white transition-colors">
             <div class="flex items-start gap-3">
               <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${visual.wrap}">
                 <i class="${visual.icon} text-sm" aria-hidden="true"></i>
               </span>
               <div class="min-w-0 flex-1">
-                <div class="text-sm font-bold text-slate-900">${item.title || 'Notificación'}</div>
-                <div class="mt-1 text-xs text-slate-600 leading-5">${item.message || ''}</div>
+                <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                  <div class="text-sm font-bold text-slate-900">${escapeHtml(item.title || 'Notificación')}</div>
+                  ${dateLabel ? `<div class="inline-flex items-center gap-1 rounded-full bg-white/75 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200">
+                    <i class="fa-regular fa-clock text-[10px]" aria-hidden="true"></i>
+                    ${escapeHtml(dateLabel)}
+                  </div>` : ''}
+                </div>
+                <div class="mt-1 text-xs text-slate-600 leading-5">${escapeHtml(item.message || '')}</div>
               </div>
               ${item.read ? '<span class="shrink-0 text-[11px] font-semibold text-slate-400">Leída</span>' : ''}
             </div>
@@ -3969,6 +4254,7 @@
           renderNotificationCounter();
           renderNotifications();
           renderModuleCounters();
+          notifyNewBrowserNotifications(notifications);
         } catch (error) {
           notifications = [];
           renderNotificationCounter();
@@ -4212,6 +4498,8 @@
         });
       });
 
+      browserNotificationsBtn?.addEventListener('click', requestBrowserNotificationsPermission);
+
       profileBtn.addEventListener('click', (event) => {
         event.stopPropagation();
         toggleProfileMenu();
@@ -4384,7 +4672,17 @@
       loadReminders();
       updateReminderPriorityPicker('');
       renderReminders();
+      loadRemindersFromServer();
+      loadBrowserNotificationsSeen();
+      updateBrowserNotificationsButton();
       loadNotifications();
+      window.setInterval(loadNotifications, 60000);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          updateBrowserNotificationsButton();
+          loadNotifications();
+        }
+      });
     })();
 
     (function () {
@@ -7324,6 +7622,8 @@
         const params = new URLSearchParams(window.location.search || '');
         const currentProject = window.__infocusAiCurrentProject || null;
         const rawCurrentNote = window.__infocusAiCurrentNote || null;
+        const formClientId = document.getElementById('clienteIdField')?.value || '';
+        const formClientName = document.getElementById('clienteField')?.value || document.getElementById('clienteSearch')?.value || '';
         const isMisNotasPage = /\/mis-notas(?:$|[/?#])/.test(window.location.pathname + window.location.search);
         const currentNote = rawCurrentNote && (isMisNotasPage || messageAsksForCurrentNote(messageText))
           ? rawCurrentNote
@@ -7337,6 +7637,7 @@
               : null
           ),
           current_note: currentNote,
+          current_client: (formClientId || formClientName) ? { id: formClientId, name: formClientName } : null,
           task_id: params.get('open_task') || '',
         };
 

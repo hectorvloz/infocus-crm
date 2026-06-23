@@ -122,6 +122,11 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/api/header/active-timer', [ProyectosController::class, 'activeTimer'])->name('api.header.active-timer');
     Route::post('/api/header/notifications/read-one', [ProfileController::class, 'markNotificationRead'])->name('api.header.notifications.read-one');
     Route::post('/api/header/notifications/read-all', [ProfileController::class, 'markAllNotificationsRead'])->name('api.header.notifications.read-all');
+    Route::get('/api/header/notifications/push-key', [ProfileController::class, 'pushPublicKey'])->name('api.header.notifications.push-key');
+    Route::post('/api/header/notifications/push-subscribe', [ProfileController::class, 'subscribePush'])->name('api.header.notifications.push-subscribe');
+    Route::post('/api/header/notifications/push-unsubscribe', [ProfileController::class, 'unsubscribePush'])->name('api.header.notifications.push-unsubscribe');
+    Route::get('/api/header/reminders', [ProfileController::class, 'headerReminders'])->name('api.header.reminders');
+    Route::put('/api/header/reminders', [ProfileController::class, 'saveHeaderReminders'])->name('api.header.reminders.save');
     Route::get('/leads', [LeadsController::class, 'index'])->name('leads.index');
     Route::get('/leads/crear', [LeadsController::class, 'create'])->name('leads.create');
     Route::post('/leads', [LeadsController::class, 'store'])->name('leads.store');
@@ -228,6 +233,8 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/ajustes/integraciones/google-calendar/desconectar', [SettingsController::class, 'googleCalendarDisconnect'])->name('settings.integrations.google.disconnect');
     Route::get('/ajustes/ia', [SettingsController::class, 'ai'])->name('settings.ai');
     Route::put('/ajustes/ia', [SettingsController::class, 'updateAi'])->name('settings.ai.update');
+    Route::put('/ajustes/ia/memoria/{id}', [SettingsController::class, 'updateAiMemory'])->name('settings.ai.memory.update');
+    Route::delete('/ajustes/ia/memoria/{id}', [SettingsController::class, 'deleteAiMemory'])->name('settings.ai.memory.delete');
     Route::get('/pagos', [PagosController::class, 'index'])->name('pagos.index');
     Route::delete('/pagos/{facturaId}/{pagoIndex}', [PagosController::class, 'destroy'])->name('pagos.destroy');
 

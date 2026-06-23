@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
+use App\Support\Notifications\WebPushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +21,7 @@ class ProfileController extends Controller
     protected FileStore $roles;
     protected FileStore $portalAccess;
     protected FileStore $meetingReminders;
+    protected FileStore $headerReminders;
 
     public function __construct()
     {
@@ -32,6 +34,7 @@ class ProfileController extends Controller
         $this->roles = new FileStore('roles.json');
         $this->portalAccess = new FileStore('portal_access_logs.json');
         $this->meetingReminders = new FileStore('meeting_reminders.json');
+        $this->headerReminders = new FileStore('header_reminders.json');
     }
 
     public function show(Request $request)
@@ -299,6 +302,95 @@ class ProfileController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function pushPublicKey(WebPushNotificationService $webPush)
+    {
+        return response()->json([
+            'ok' => true,
+            'public_key' => $webPush->publicKey(),
+        ]);
+    }
+
+    public function subscribePush(Request $request, WebPushNotificationService $webPush)
+    {
+        $data = $request->validate([
+            'subscription' => 'required|array',
+            'subscription.endpoint' => 'required|string|max:2048',
+            'subscription.keys' => 'required|array',
+            'subscription.keys.p256dh' => 'required|string|max:500',
+            'subscription.keys.auth' => 'required|string|max:255',
+        ]);
+
+        try {
+            $result = $webPush->saveSubscription(
+                $this->resolveIdentity($request),
+                $data['subscription'],
+                (string) $request->userAgent()
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['ok' => true, ...$result]);
+    }
+
+    public function unsubscribePush(Request $request, WebPushNotificationService $webPush)
+    {
+        $data = $request->validate([
+            'endpoint' => 'required|string|max:2048',
+        ]);
+
+        $webPush->deleteSubscription((string) $data['endpoint']);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function headerReminders(Request $request)
+    {
+        $identity = $this->resolveIdentity($request);
+        $stateKey = $this->notificationStateKey($identity);
+        $row = $this->headerReminders->find($stateKey);
+
+        return response()->json([
+            'ok' => true,
+            'exists' => is_array($row),
+            'payload' => is_array($row['payload'] ?? null) ? $row['payload'] : null,
+            'updated_at' => (string) ($row['updated_at'] ?? ''),
+        ]);
+    }
+
+    public function saveHeaderReminders(Request $request)
+    {
+        $data = $request->validate([
+            'payload' => 'required|array',
+        ]);
+
+        $payload = $this->normalizeHeaderRemindersPayload($data['payload']);
+        $identity = $this->resolveIdentity($request);
+        $stateKey = $this->notificationStateKey($identity);
+        $row = [
+            'id' => $stateKey,
+            'identity' => [
+                'id' => (string) ($identity['id'] ?? ''),
+                'email' => (string) ($identity['email'] ?? ''),
+                'name' => (string) ($identity['name'] ?? ''),
+            ],
+            'payload' => $payload,
+            'updated_at' => now()->toIso8601String(),
+        ];
+
+        if ($this->headerReminders->find($stateKey)) {
+            $this->headerReminders->update($stateKey, $row);
+        } else {
+            $this->headerReminders->create($row);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'payload' => $payload,
+            'updated_at' => $row['updated_at'],
+        ]);
+    }
+
     protected function resolveIdentity(Request $request): array
     {
         if (Auth::check()) {
@@ -329,6 +421,78 @@ class ProfileController extends Controller
     {
         $base = trim((string) ($identity['email'] ?: $identity['id']));
         return 'user:'.Str::slug(Str::lower($base), '-');
+    }
+
+    protected function normalizeHeaderRemindersPayload(array $payload): array
+    {
+        $categories = collect($payload['categories'] ?? [])
+            ->filter(fn ($item) => is_array($item))
+            ->take(80)
+            ->map(fn ($item) => [
+                'id' => Str::limit((string) ($item['id'] ?? Str::ulid()), 80, ''),
+                'title' => Str::limit(trim((string) ($item['title'] ?? 'Recordatorios')), 120, ''),
+                'collapsed' => (bool) ($item['collapsed'] ?? false),
+            ])
+            ->values()
+            ->all();
+
+        $sections = collect($payload['sections'] ?? [])
+            ->filter(fn ($item) => is_array($item))
+            ->take(160)
+            ->map(fn ($item) => [
+                'id' => Str::limit((string) ($item['id'] ?? Str::ulid()), 80, ''),
+                'categoryId' => Str::limit((string) ($item['categoryId'] ?? ($categories[0]['id'] ?? 'default-cat')), 80, ''),
+                'title' => Str::limit(trim((string) ($item['title'] ?? 'Recordatorios')), 120, ''),
+                'collapsed' => (bool) ($item['collapsed'] ?? false),
+            ])
+            ->values()
+            ->all();
+
+        $items = collect($payload['items'] ?? [])
+            ->filter(fn ($item) => is_array($item) && trim((string) ($item['text'] ?? '')) !== '')
+            ->take(1000)
+            ->map(function ($item) use ($sections) {
+                $link = is_array($item['link'] ?? null) ? $item['link'] : null;
+                if ($link) {
+                    $link = [
+                        'type' => Str::limit((string) ($link['type'] ?? ''), 40, ''),
+                        'id' => Str::limit((string) ($link['id'] ?? ''), 100, ''),
+                        'projectId' => Str::limit((string) ($link['projectId'] ?? ''), 100, ''),
+                        'taskId' => Str::limit((string) ($link['taskId'] ?? ''), 100, ''),
+                        'title' => Str::limit((string) ($link['title'] ?? ''), 180, ''),
+                        'subtitle' => Str::limit((string) ($link['subtitle'] ?? ''), 180, ''),
+                    ];
+                }
+
+                return [
+                    'id' => Str::limit((string) ($item['id'] ?? Str::ulid()), 80, ''),
+                    'sectionId' => Str::limit((string) ($item['sectionId'] ?? ($sections[0]['id'] ?? 'default')), 80, ''),
+                    'text' => Str::limit(trim((string) ($item['text'] ?? '')), 500, ''),
+                    'done' => (bool) ($item['done'] ?? false),
+                    'priority' => in_array((string) ($item['priority'] ?? ''), ['Urgente', 'Atención', 'Con calma'], true) ? (string) $item['priority'] : '',
+                    'dueDate' => Str::limit((string) ($item['dueDate'] ?? ''), 40, ''),
+                    'createdAt' => (int) ($item['createdAt'] ?? now()->timestamp * 1000),
+                    'updatedAt' => (int) ($item['updatedAt'] ?? now()->timestamp * 1000),
+                    'link' => $link,
+                ];
+            })
+            ->values()
+            ->all();
+
+        if (!$categories) {
+            $categories = [['id' => 'default-cat', 'title' => 'Recordatorios', 'collapsed' => false]];
+        }
+        if (!$sections) {
+            $sections = [['id' => 'default', 'categoryId' => $categories[0]['id'], 'title' => 'Recordatorios', 'collapsed' => false]];
+        }
+
+        return [
+            'categories' => $categories,
+            'sections' => $sections,
+            'items' => $items,
+            'allViewMode' => (($payload['allViewMode'] ?? '') === 'priority') ? 'priority' : 'clients',
+            'priorityCollapsed' => is_array($payload['priorityCollapsed'] ?? null) ? $payload['priorityCollapsed'] : [],
+        ];
     }
 
     protected function saveNotificationState(string $stateKey, array $payload): void
@@ -370,7 +534,7 @@ class ProfileController extends Controller
         return false;
     }
 
-    protected function buildNotifications(array $identity): array
+    public function buildNotifications(array $identity): array
     {
         $access = $this->resolveNotificationAccess($identity);
         $items = [];

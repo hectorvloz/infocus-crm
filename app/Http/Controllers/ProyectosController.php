@@ -1049,6 +1049,7 @@ class ProyectosController extends Controller
             'id' => 'required|string',
             'tarea_id' => 'required|string',
             'message' => 'required|string|max:3000',
+            'current_description' => 'nullable|string|max:20000',
         ]);
 
         $project = $this->store->find($data['id']);
@@ -1065,6 +1066,9 @@ class ProyectosController extends Controller
         abort_if($targetIndex === null, 404);
 
         $task = $tasks[$targetIndex];
+        if (array_key_exists('current_description', $data)) {
+            $task['descripcion'] = (string) ($data['current_description'] ?? '');
+        }
         $prompt = $this->buildTaskAiSupportPrompt($project, $task, (string) $data['message']);
         $result = $this->ai->reply($prompt, [], [
             'current_project' => [
@@ -1087,11 +1091,21 @@ class ProyectosController extends Controller
             ], 422);
         }
 
-        $summary = trim((string) ($plan['summary'] ?? 'Listo, ajusté el checklist.'));
+        $target = $this->normalizeTaskAiSupportTarget((string) ($plan['target'] ?? ''));
+        $summary = trim((string) ($plan['summary'] ?? 'Listo, apliqué los cambios.'));
         $currentSubtasks = array_values($task['subtasks'] ?? []);
+        $descriptionChanged = false;
+        $checklistChanged = false;
+
+        if (array_key_exists('description_html', $plan) && $plan['description_html'] !== null) {
+            $descriptionHtml = $this->sanitizeAiDescriptionHtml((string) ($plan['description_html'] ?? ''));
+            $tasks[$targetIndex]['descripcion'] = $descriptionHtml;
+            $descriptionChanged = true;
+        }
 
         if (array_key_exists('replace_subtasks', $plan) && is_array($plan['replace_subtasks'])) {
             $currentSubtasks = $this->normalizeAiSubtasks($plan['replace_subtasks']);
+            $checklistChanged = true;
         }
 
         if (!empty($plan['add_subtasks']) && is_array($plan['add_subtasks'])) {
@@ -1099,11 +1113,13 @@ class ProyectosController extends Controller
                 $currentSubtasks,
                 $this->normalizeAiSubtasks($plan['add_subtasks'])
             ));
+            $checklistChanged = true;
         }
 
         $tasks[$targetIndex]['subtasks'] = $currentSubtasks;
 
         if (!empty($plan['add_tasks']) && is_array($plan['add_tasks'])) {
+            $checklistChanged = true;
             foreach ($plan['add_tasks'] as $item) {
                 $title = trim(is_array($item) ? (string) ($item['texto'] ?? $item['title'] ?? '') : (string) $item);
                 if ($title === '') {
@@ -1136,6 +1152,8 @@ class ProyectosController extends Controller
             'ok' => true,
             'message' => $summary,
             'item' => $updated,
+            'changed_target' => $descriptionChanged && $checklistChanged ? 'mixed' : ($descriptionChanged ? 'description' : ($checklistChanged ? 'checklist' : $target)),
+            'description_html' => $tasks[$targetIndex]['descripcion'] ?? '',
         ]);
     }
 
@@ -1538,16 +1556,49 @@ class ProyectosController extends Controller
             ->implode("\n");
 
         return "Actúa como asistente de gestión de proyectos. Responde solo con JSON válido, sin markdown.\n"
-            . "Puedes agregar subtareas, reemplazar subtareas existentes o agregar tareas nuevas al mismo tablero.\n"
+            . "Debes decidir si la solicitud modifica la descripción, el checklist/subtareas, o ambas cosas.\n"
+            . "Si el usuario pide descripción, información, redactar, editar, mejorar, organizar, resumir o dar estilo, modifica description_html.\n"
+            . "Si el usuario pide checklist, tareas, subtareas, pasos o pendientes, modifica replace_subtasks/add_subtasks/add_tasks.\n"
             . "Formato exacto:\n"
-            . "{\"summary\":\"texto breve\",\"replace_subtasks\":[{\"texto\":\"...\",\"priority\":\"Con calma\"}],\"add_subtasks\":[{\"texto\":\"...\",\"priority\":\"Con calma\"}],\"add_tasks\":[{\"texto\":\"...\"}]}\n"
+            . "{\"target\":\"description|checklist|mixed\",\"summary\":\"texto breve\",\"description_html\":\"...\",\"replace_subtasks\":[{\"texto\":\"...\",\"priority\":\"Con calma\"}],\"add_subtasks\":[{\"texto\":\"...\",\"priority\":\"Con calma\"}],\"add_tasks\":[{\"texto\":\"...\"}]}\n"
+            . "Para description_html usa HTML enriquecido compatible con el editor: h1, h2, p, strong, em, s, mark, ul, ol, li, hr, div.\n"
+            . "Usa jerarquía visual cuando aporte claridad: <h1>/<h2> para títulos, <strong> para negrita, <mark> para resaltador, listas y separadores. Puedes usar MAYÚSCULAS en etiquetas o encabezados cortos si el usuario lo pide o mejora la lectura. No uses scripts, enlaces, imágenes ni estilos inline.\n"
+            . "Si modificas solo checklist, conserva description_html como null u omítelo. Si modificas solo descripción, deja arrays de tareas vacíos u omitidos.\n"
             . "Usa solo estas prioridades: Con calma, Atención, Urgente. Si no aplica, usa Con calma.\n"
             . "Si el usuario pide reescribir, ordenar o mejorar el checklist actual, usa replace_subtasks. Si pide añadir, usa add_subtasks o add_tasks.\n\n"
             . "Proyecto: " . (string) ($project['titulo'] ?? 'Proyecto') . "\n"
             . "Tarea actual: " . (string) ($task['texto'] ?? 'Tarea') . "\n"
-            . "Descripción: " . (string) ($task['descripcion'] ?? '') . "\n"
+            . "Descripción actual HTML: " . (string) ($task['descripcion'] ?? '') . "\n"
             . "Checklist actual:\n" . ($subtasks !== '' ? $subtasks : '- Sin subtareas') . "\n\n"
             . "Solicitud del usuario: {$message}";
+    }
+
+    private function normalizeTaskAiSupportTarget(string $target): string
+    {
+        $target = strtolower(trim($target));
+        return in_array($target, ['description', 'checklist', 'mixed'], true) ? $target : 'checklist';
+    }
+
+    private function sanitizeAiDescriptionHtml(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '' || strtolower($html) === 'null') {
+            return '';
+        }
+
+        $html = preg_replace('/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>.*?<\s*\/\s*\1\s*>/isu', '', $html) ?? $html;
+        $html = preg_replace('/<\s*(script|style|iframe|object|embed|link|meta)[^>]*\/?>/isu', '', $html) ?? $html;
+        $html = strip_tags($html, '<b><strong><i><em><s><strike><u><mark><p><div><br><ul><ol><li><h1><h2><h3><hr><span>');
+        $html = preg_replace('/\s+on[a-z]+\s*=\s*(["\']).*?\1/isu', '', $html) ?? $html;
+        $html = preg_replace('/\s+(href|src|target|rel)\s*=\s*(["\']).*?\2/isu', '', $html) ?? $html;
+        $html = preg_replace_callback('/\s+style\s*=\s*(["\'])(.*?)\1/isu', function ($matches) {
+            $style = (string) ($matches[2] ?? '');
+            return preg_match('/background(?:-color)?\s*:\s*(?:rgb\(254,\s*240,\s*138\)|#?fef08a|yellow)/iu', $style)
+                ? ' style="background-color:#fef08a"'
+                : '';
+        }, $html) ?? $html;
+
+        return trim($html);
     }
 
     private function decodeTaskAiSupportPlan(string $content): ?array

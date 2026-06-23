@@ -40,7 +40,21 @@
     <p class="mt-2 text-lg text-slate-500">Conecta el asistente del CRM con Gemini, OpenAI o DeepSeek por API.</p>
   </div>
 
-  <form method="POST" action="{{ route('settings.ai.update') }}" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-7">
+  @php
+    $activeAiTab = request('tab') === 'memoria' ? 'memoria' : 'conexion';
+    $memoryGroups = [
+      'client' => ['label' => 'Clientes', 'empty' => 'Todavía no hay memorias vinculadas a clientes.'],
+      'user' => ['label' => 'De mí', 'empty' => 'Todavía no hay memorias personales.'],
+      'company' => ['label' => 'Mi empresa', 'empty' => 'Todavía no hay memorias de empresa.'],
+    ];
+  @endphp
+
+  <div class="mb-5 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+    <button type="button" data-ai-settings-tab="conexion" class="ai-settings-tab rounded-xl px-4 py-2 text-sm font-extrabold {{ $activeAiTab === 'conexion' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Conexión</button>
+    <button type="button" data-ai-settings-tab="memoria" class="ai-settings-tab rounded-xl px-4 py-2 text-sm font-extrabold {{ $activeAiTab === 'memoria' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Memoria</button>
+  </div>
+
+  <form method="POST" action="{{ route('settings.ai.update') }}" data-ai-settings-panel="conexion" class="{{ $activeAiTab === 'conexion' ? '' : 'hidden' }} bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-7">
     @csrf
     @method('PUT')
 
@@ -114,6 +128,51 @@
     </div>
   </form>
 
+  <section data-ai-settings-panel="memoria" class="{{ $activeAiTab === 'memoria' ? '' : 'hidden' }} space-y-5">
+    <div class="rounded-3xl border border-fuchsia-100 bg-fuchsia-50 px-5 py-4 text-sm leading-relaxed text-fuchsia-900">
+      <div class="font-black text-slate-900">Cómo funciona la memoria</div>
+      <p class="mt-1">La IA guarda preferencias cuando dices cosas como “recuerda”, “ten en cuenta”, “este cliente prefiere...” o “mi empresa usa...”. Si hay cliente activo en factura, proyecto o nota, se vincula a ese cliente. Puedes editar o borrar cualquier memoria aquí.</p>
+    </div>
+
+    @foreach($memoryGroups as $scope => $group)
+      @php $items = $aiMemories[$scope] ?? []; @endphp
+      <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-xl font-black text-slate-900">{{ $group['label'] }}</h2>
+          <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{{ count($items) }}</span>
+        </div>
+
+        @forelse($items as $memory)
+          <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 last:mb-0">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div class="min-w-0">
+                <div class="truncate text-sm font-black text-slate-900">{{ $memory['entity_name'] ?? ($scope === 'company' ? 'Mi empresa' : 'Usuario') }}</div>
+                <div class="text-xs font-semibold text-slate-400">Actualizada: {{ !empty($memory['updated_at']) ? \Carbon\Carbon::parse($memory['updated_at'])->format('d/m/Y H:i') : '—' }}</div>
+              </div>
+              <form method="POST" action="{{ route('settings.ai.memory.delete', $memory['id'] ?? '') }}" onsubmit="return confirm('¿Eliminar esta memoria?')">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-500 hover:bg-rose-50" title="Eliminar memoria" aria-label="Eliminar memoria">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-8 0h10"/></svg>
+                </button>
+              </form>
+            </div>
+            <form method="POST" action="{{ route('settings.ai.memory.update', $memory['id'] ?? '') }}" class="space-y-2">
+              @csrf
+              @method('PUT')
+              <textarea name="text" rows="3" maxlength="700" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-relaxed text-slate-800 focus:border-fuchsia-300 focus:ring-fuchsia-200">{{ $memory['text'] ?? '' }}</textarea>
+              <div class="flex justify-end">
+                <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white hover:bg-slate-800">Guardar memoria</button>
+              </div>
+            </form>
+          </div>
+        @empty
+          <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-400">{{ $group['empty'] }}</div>
+        @endforelse
+      </div>
+    @endforeach
+  </section>
+
   <script>
     const infocusAiModels = @json($modelOptions);
     const selectedAiModel = @json($selectedModel);
@@ -142,5 +201,25 @@
     });
 
     rebuildAiModels(document.getElementById('aiProvider')?.value || 'gemini', selectedAiModel);
+
+    document.querySelectorAll('[data-ai-settings-tab]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const tab = button.dataset.aiSettingsTab || 'conexion';
+        document.querySelectorAll('[data-ai-settings-tab]').forEach((item) => {
+          const active = item.dataset.aiSettingsTab === tab;
+          item.classList.toggle('bg-slate-900', active);
+          item.classList.toggle('text-white', active);
+          item.classList.toggle('text-slate-600', !active);
+          item.classList.toggle('hover:bg-slate-50', !active);
+        });
+        document.querySelectorAll('[data-ai-settings-panel]').forEach((panel) => {
+          panel.classList.toggle('hidden', panel.dataset.aiSettingsPanel !== tab);
+        });
+        const url = new URL(window.location.href);
+        if (tab === 'memoria') url.searchParams.set('tab', 'memoria');
+        else url.searchParams.delete('tab');
+        window.history.replaceState({}, '', url.toString());
+      });
+    });
   </script>
 @endsection
