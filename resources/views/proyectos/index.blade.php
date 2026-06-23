@@ -2598,7 +2598,7 @@
   </div>
 
   <!-- Modal para agregar tiempo manualmente -->
-  <div id="addTimeModal" class="fixed inset-0 z-[110] hidden" aria-modal="true" role="dialog">
+  <div id="addTimeModal" class="fixed inset-0 z-[2147483660] hidden" aria-modal="true" role="dialog">
     <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeAddTimeModal()"></div>
     <div class="fixed inset-0 flex items-center justify-center p-4">
       <div class="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-visible">
