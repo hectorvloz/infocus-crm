@@ -5165,9 +5165,6 @@
         modal.classList.remove('hidden');
       };
 
-      const isProjectsPage = @json(request()->routeIs('proyectos.index'));
-      if (isProjectsPage) return;
-
       const host = document.getElementById('headerTaskTimerHost');
       if (!host) return;
 
@@ -6219,6 +6216,8 @@
           renderGlobalTimer();
         }
       }
+
+      window.syncGlobalTimerFromServer = syncGlobalTimerFromServer;
 
       document.getElementById('globalTimerFullscreenCloseBtn')?.addEventListener('click', closeGlobalTimerFullscreen);
       document.getElementById('globalTimerFullscreenPipBtn')?.addEventListener('click', toggleGlobalTimerMiniPip);

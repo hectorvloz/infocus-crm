@@ -986,15 +986,16 @@
     .project-cover-popover {
       position: fixed;
       z-index: 2147482200;
-      width: min(19.5rem, calc(100vw - 1.5rem));
-      max-height: min(28rem, calc(100vh - 1.5rem));
+      width: min(36rem, calc(100vw - 1.5rem));
+      max-height: min(34rem, calc(100vh - 1.5rem));
       overflow-y: auto;
-      border-radius: .95rem;
+      overscroll-behavior: contain;
+      border-radius: 1.15rem;
       border: 1px solid #dbe5f2;
       background: #fff;
-      padding: .75rem;
+      padding: .9rem;
       color: #0f172a;
-      box-shadow: 0 18px 42px rgba(15, 23, 42, .16);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
       scrollbar-width: thin;
       scrollbar-color: #cbd5e1 transparent;
     }
@@ -1050,12 +1051,12 @@
 
     .project-cover-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: .45rem;
     }
 
     .project-cover-grid.is-colors {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .project-cover-option {
@@ -1166,11 +1167,33 @@
 
     @media (max-width: 640px) {
       .project-cover-popover {
+        left: .5rem !important;
+        right: .5rem !important;
+        bottom: max(.5rem, env(safe-area-inset-bottom)) !important;
+        top: auto !important;
         width: calc(100vw - 1rem);
+        max-height: min(78dvh, 38rem);
+        border-radius: 1.25rem;
+        padding: .8rem;
       }
 
       .project-cover-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .project-cover-grid.is-colors {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 641px) and (max-width: 1100px) {
+      .project-cover-popover {
+        width: min(34rem, calc(100vw - 1.5rem));
+        max-height: min(72dvh, 34rem);
+      }
+
+      .project-cover-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
 
@@ -1235,6 +1258,14 @@
     body.project-modal-open #projectModal,
     body.project-modal-open #taskDetailModal {
       z-index: 2147483600 !important;
+    }
+
+    #addTimeModal {
+      z-index: 2147483670 !important;
+    }
+
+    #addTimeModal > .fixed {
+      z-index: 1;
     }
 
     .project-board-anim {
@@ -2600,7 +2631,7 @@
   <!-- Modal para agregar tiempo manualmente -->
   <div id="addTimeModal" class="fixed inset-0 z-[2147483660] hidden" aria-modal="true" role="dialog">
     <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeAddTimeModal()"></div>
-    <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="fixed inset-0 flex items-start justify-center overflow-y-auto px-4 pb-4 pt-[max(1rem,6vh)] sm:pt-[max(1.5rem,8vh)]">
       <div class="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-visible">
         <div class="px-5 py-4 border-b border-slate-100">
           <div class="text-lg font-extrabold text-slate-900">Agregar tiempo manualmente</div>
@@ -3378,6 +3409,32 @@
       ['#14532d', '#84cc16'],
       ['#be123c', '#fb7185'],
       ['#581c87', '#c084fc'],
+      ['#020617', '#a3e635'],
+      ['#172554', '#60a5fa'],
+      ['#164e63', '#67e8f9'],
+      ['#064e3b', '#34d399'],
+      ['#365314', '#bef264'],
+      ['#713f12', '#facc15'],
+      ['#7f1d1d', '#fb923c'],
+      ['#831843', '#f9a8d4'],
+      ['#312e81', '#818cf8'],
+      ['#4c1d95', '#e879f9'],
+      ['#0c4a6e', '#38bdf8'],
+      ['#1e293b', '#94a3b8'],
+      ['#18181b', '#f4f4f5'],
+      ['#3f3f46', '#d4d4d8'],
+      ['#047857', '#fde68a'],
+      ['#1d4ed8', '#f0abfc'],
+      ['#9333ea', '#f97316'],
+      ['#dc2626', '#fef08a'],
+      ['#0f766e', '#2dd4bf'],
+      ['#0f172a', '#ef4444'],
+      ['#1e1b4b', '#c4b5fd'],
+      ['#334155', '#d9f99d'],
+      ['#0e7490', '#f472b6'],
+      ['#065f46', '#86efac'],
+      ['#6d28d9', '#22d3ee'],
+      ['#9f1239', '#fb7185'],
     ];
     const PROJECT_COVER_PRESETS = [
       { name: 'Neon suave', url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80' },
@@ -3392,6 +3449,26 @@
       { name: 'Tinta', url: 'https://images.unsplash.com/photo-1574169208507-84376144848b?auto=format&fit=crop&w=1200&q=80' },
       { name: 'Pulso', url: 'https://images.unsplash.com/photo-1620121684840-edffcfc4b878?auto=format&fit=crop&w=1200&q=80' },
       { name: 'Líneas', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Escritorio foco', url: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Código nocturno', url: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Tablero creativo', url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Oficina cálida', url: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Mesa productiva', url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Laptop limpia', url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Estrategia', url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Notas y café', url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Arquitectura', url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Ciudad azul', url: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Montañas', url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Bosque', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Océano', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Arena', url: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Niebla verde', url: 'https://images.unsplash.com/photo-1473773508845-188df298d2d1?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Minimal blanco', url: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Luces ciudad', url: 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Gradiente solar', url: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80&sat=-20' },
+      { name: 'Textura papel', url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Trabajo en equipo', url: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80' },
     ];
     let modalDescAutosaveTimer = null;
     let taskDescAutosaveTimer = null;
@@ -6607,6 +6684,9 @@
     function openAddTimeModal(preselectedProjectId = currentProjectId, preselectedTaskId = '') {
       const modal = document.getElementById('addTimeModal');
       if (!modal) return;
+      if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
 
       modal.classList.remove('hidden');
 
@@ -6936,7 +7016,11 @@
       if (!res.ok || !data.ok) {
         throw new Error('timer_action_failed');
       }
-      window.dispatchEvent(new Event('infocus-global-timer-updated'));
+      if (typeof window.syncGlobalTimerFromServer === 'function') {
+        await window.syncGlobalTimerFromServer();
+      } else {
+        window.dispatchEvent(new Event('infocus-global-timer-updated'));
+      }
       return data.item;
     }
 
@@ -7059,6 +7143,15 @@
       gallery.style.visibility = 'hidden';
       gallery.classList.remove('hidden');
 
+      if (window.innerWidth <= 640) {
+        gallery.style.left = '';
+        gallery.style.right = '';
+        gallery.style.top = '';
+        gallery.style.bottom = '';
+        gallery.style.visibility = '';
+        return;
+      }
+
       const triggerRect = trigger.getBoundingClientRect();
       const popoverRect = gallery.getBoundingClientRect();
       const maxLeft = window.innerWidth - popoverRect.width - margin;
@@ -7072,6 +7165,7 @@
       gallery.style.left = `${left}px`;
       gallery.style.top = `${top}px`;
       gallery.style.right = 'auto';
+      gallery.style.bottom = 'auto';
       gallery.style.visibility = '';
     }
 
@@ -7224,6 +7318,11 @@
     function closeProjectCoverPickers() {
       document.getElementById('newProjectCoverGallery')?.classList.add('hidden');
       document.getElementById('modalCoverGallery')?.classList.add('hidden');
+    }
+
+    function repositionOpenProjectCoverPickers() {
+      positionOpenProjectCoverPicker('new');
+      positionOpenProjectCoverPicker('modal');
     }
 
     function selectModalCoverPreset(index) {
@@ -13260,6 +13359,9 @@
         closeListFilterDropdowns();
       }
     });
+
+    window.addEventListener('resize', repositionOpenProjectCoverPickers);
+    document.addEventListener('scroll', repositionOpenProjectCoverPickers, true);
 
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) {
