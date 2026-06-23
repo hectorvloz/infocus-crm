@@ -94,16 +94,61 @@ class ProyectosController extends Controller
         $project = $this->store->find($data['id']);
         if (!$project) abort(404);
         
-        $logs = $project['time_logs'] ?? [];
-        $current = end($logs);
+        $logs = array_values($project['time_logs'] ?? []);
+        $currentUser = Str::lower(trim((string) (optional(auth()->user())->name ?? '')));
+        $requestedTaskId = trim((string) ($data['tarea_id'] ?? ''));
+        $matchesCurrentUser = function ($log) use ($currentUser): bool {
+            $actor = Str::lower(trim((string) ($log['user'] ?? '')));
+            return $currentUser === '' || $actor === '' || $actor === $currentUser;
+        };
+        $findRunningIndexes = function (bool $respectRequestedTask = false) use (&$logs, $matchesCurrentUser, $requestedTaskId): array {
+            $indexes = [];
+            for ($i = count($logs) - 1; $i >= 0; $i--) {
+                $log = $logs[$i] ?? [];
+                if (!empty($log['end']) || empty($log['start']) || !$matchesCurrentUser($log)) {
+                    continue;
+                }
+                if ($respectRequestedTask && $requestedTaskId !== '' && (string) ($log['task_id'] ?? '') !== $requestedTaskId) {
+                    continue;
+                }
+                $indexes[] = $i;
+            }
+            return $indexes;
+        };
         
         if ($data['action'] === 'start') {
-            // Check if already running
-            if ($current && empty($current['end'])) {
+            // Check if already running for this user, even if it is not the last log.
+            if (!empty($findRunningIndexes(false))) {
                 return response()->json(['ok'=>true, 'item'=>$project]);
             }
 
-            $taskId = trim((string) ($data['tarea_id'] ?? ''));
+            foreach ($this->store->all() as $candidateProject) {
+                if ((string) ($candidateProject['id'] ?? '') === (string) $data['id']) {
+                    continue;
+                }
+                if ((bool) ($candidateProject['archived'] ?? false)) {
+                    continue;
+                }
+
+                $runningLog = collect($candidateProject['time_logs'] ?? [])->last(function ($log) use ($matchesCurrentUser) {
+                    return empty($log['end']) && !empty($log['start']) && $matchesCurrentUser($log);
+                });
+
+                if ($runningLog) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Ya tienes un temporizador activo. Guarda o elimina el actual antes de iniciar otro.',
+                        'active' => [
+                            'project_id' => (string) ($candidateProject['id'] ?? ''),
+                            'project_title' => (string) ($candidateProject['titulo'] ?? 'Proyecto'),
+                            'task_id' => (string) ($runningLog['task_id'] ?? ''),
+                            'task_name' => (string) ($runningLog['task_name'] ?? 'Temporizador activo'),
+                        ],
+                    ], 409);
+                }
+            }
+
+            $taskId = $requestedTaskId;
             $taskName = null;
             if ($taskId !== '') {
                 $task = collect($project['tareas'] ?? [])->first(fn($t) => (string) ($t['id'] ?? '') === $taskId);
@@ -122,10 +167,10 @@ class ProyectosController extends Controller
                 'task_name' => $taskName,
             ];
         } else {
-            // Stop
-            if ($current && empty($current['end'])) {
-                $keys = array_keys($logs);
-                $lastParams = array_pop($keys);
+            // Stop every running log for this user in this project. This prevents ghost timers
+            // when a stale active log is not the last item in the history.
+            $runningIndexes = $findRunningIndexes(false);
+            foreach ($runningIndexes as $lastParams) {
                 $endTs = now()->timestamp;
                 $logs[$lastParams]['end'] = $endTs;
 
@@ -160,6 +205,7 @@ class ProyectosController extends Controller
     {
         $data = $request->validate([
             'id' => 'required|string',
+            'tarea_id' => 'nullable|string',
         ]);
 
         $project = $this->store->find($data['id']);
@@ -172,18 +218,45 @@ class ProyectosController extends Controller
             return response()->json(['ok' => true, 'item' => $project]);
         }
 
-        $removed = array_pop($logs);
-        $taskId = trim((string) ($removed['task_id'] ?? ''));
-        $startTs = (int) ($removed['start'] ?? 0);
-        $endTs = (int) ($removed['end'] ?? 0);
-        $duration = 0;
-
-        if ($startTs > 0) {
-            $duration = max(0, ($endTs > 0 ? $endTs : now()->timestamp) - $startTs);
+        $currentUser = Str::lower(trim((string) (optional(auth()->user())->name ?? '')));
+        $removeIndexes = [];
+        for ($i = count($logs) - 1; $i >= 0; $i--) {
+            $log = $logs[$i] ?? [];
+            $actor = Str::lower(trim((string) ($log['user'] ?? '')));
+            $isCurrentUser = $currentUser === '' || $actor === '' || $actor === $currentUser;
+            if ($isCurrentUser && empty($log['end']) && !empty($log['start'])) {
+                $removeIndexes[] = $i;
+            }
         }
 
-        $tasks = collect($project['tareas'] ?? [])->map(function ($task) use ($taskId, $duration, $endTs) {
-            if ($taskId === '' || (string) ($task['id'] ?? '') !== $taskId || $duration <= 0 || $endTs <= 0) {
+        if (empty($removeIndexes)) {
+            $removeIndexes[] = count($logs) - 1;
+        }
+
+        $removedLogs = [];
+        foreach ($removeIndexes as $removeIndex) {
+            if (isset($logs[$removeIndex])) {
+                $removedLogs[] = $logs[$removeIndex];
+                unset($logs[$removeIndex]);
+            }
+        }
+        $logs = array_values($logs);
+
+        $durationByTask = [];
+        foreach ($removedLogs as $removed) {
+            $taskId = trim((string) ($removed['task_id'] ?? ''));
+            $startTs = (int) ($removed['start'] ?? 0);
+            $endTs = (int) ($removed['end'] ?? 0);
+            if ($taskId === '' || $startTs <= 0 || $endTs <= 0) {
+                continue;
+            }
+            $durationByTask[$taskId] = ($durationByTask[$taskId] ?? 0) + max(0, $endTs - $startTs);
+        }
+
+        $tasks = collect($project['tareas'] ?? [])->map(function ($task) use ($durationByTask) {
+            $taskId = (string) ($task['id'] ?? '');
+            $duration = (int) ($durationByTask[$taskId] ?? 0);
+            if ($taskId === '' || $duration <= 0) {
                 return $task;
             }
 

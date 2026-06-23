@@ -5052,15 +5052,18 @@
               tarea_id: headerTimerPickerState.selectedTaskId || null,
             }),
           });
-          if (!response.ok) throw new Error('timer_start_failed');
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data?.ok === false) {
+            throw new Error(data?.message || 'timer_start_failed');
+          }
 
           const modal = document.getElementById('headerTimerPickerModal');
           if (modal) modal.classList.add('hidden');
           document.body.classList.remove('header-timer-picker-open');
           await syncGlobalTimerFromServer();
           if (window.showNotification) window.showNotification('Temporizador iniciado', 'success');
-        } catch (_) {
-          if (window.showNotification) window.showNotification('No se pudo iniciar el temporizador.', 'error');
+        } catch (error) {
+          if (window.showNotification) window.showNotification(error?.message || 'No se pudo iniciar el temporizador.', 'error');
         }
       }
 
@@ -5217,6 +5220,24 @@
             localStorage.removeItem(GLOBAL_TIMER_STATE_KEY);
           }
         } catch (_) {}
+      }
+
+      function clearGlobalTimerState() {
+        const fallback = document.getElementById('globalTimerMiniPip');
+        const video = document.getElementById('globalTimerPipVideo');
+        closeGlobalTimerFullscreen();
+        fallback?.classList.add('hidden');
+        if (video && document.pictureInPictureElement === video && document.exitPictureInPicture) {
+          document.exitPictureInPicture().catch(() => {});
+        }
+        if (video && video.webkitPresentationMode === 'picture-in-picture') {
+          try { video.webkitSetPresentationMode('inline'); } catch (_) {}
+        }
+        stopGlobalPipRenderLoop();
+        resetGlobalPipSource();
+        globalTimerProjectSnapshot = null;
+        setStoredState(null);
+        renderGlobalTimer();
       }
 
       function getDisplayedSeconds() {
@@ -6046,12 +6067,19 @@
         // Stop timer on server first if running
         if (globalTimerState.isRunning) {
           try {
-            await fetch('/api/proyectos/timer', {
+            const stopResponse = await fetch('/api/proyectos/timer', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
               body: JSON.stringify({ id: projectId, action: 'stop', tarea_id: globalTimerState.taskId || null }),
             });
-          } catch (_) {}
+            const stopJson = await stopResponse.json().catch(() => ({}));
+            if (!stopResponse.ok || stopJson?.ok === false) {
+              throw new Error('stop_failed');
+            }
+          } catch (error) {
+            if (window.showNotification) window.showNotification('No se pudo guardar el temporizador. Intenta de nuevo.', 'error');
+            return;
+          }
         }
         let entries = [];
         try {
@@ -6067,9 +6095,7 @@
           task_name: String(globalTimerState.taskName || ''),
         });
         localStorage.setItem(TIMER_HISTORY_PREFIX + projectId, JSON.stringify(entries));
-        closeGlobalTimerFullscreen();
-        setStoredState(null);
-        renderGlobalTimer();
+        clearGlobalTimerState();
         if (window.showNotification) window.showNotification('Tiempo guardado', 'success');
       }
 
@@ -6077,7 +6103,7 @@
         if (!globalTimerState?.projectId) return;
         const currentSeconds = getDisplayedSeconds();
         try {
-          await fetch('/api/proyectos/timer', {
+          const response = await fetch('/api/proyectos/timer', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -6090,6 +6116,10 @@
               tarea_id: globalTimerState.taskId || null,
             }),
           });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data?.ok === false) {
+            throw new Error(data?.message || 'timer_toggle_failed');
+          }
 
           setStoredState({
             ...globalTimerState,
@@ -6114,9 +6144,12 @@
               'X-CSRF-TOKEN': window.csrfToken,
               'X-Requested-With': 'XMLHttpRequest',
             },
-            body: JSON.stringify({ id: projectId }),
+            body: JSON.stringify({ id: projectId, tarea_id: globalTimerState.taskId || null }),
           });
           const json = await response.json().catch(() => ({}));
+          if (!response.ok || json?.ok === false) {
+            throw new Error('delete_failed');
+          }
           const logs = Array.isArray(json?.item?.time_logs) ? json.item.time_logs : [];
           const gross = logs.reduce((acc, log) => {
             const start = Number(log?.start || 0);
@@ -6125,9 +6158,7 @@
             return acc + (end - start);
           }, 0);
           localStorage.setItem(`project_timer_reset_v1_${projectId}`, String(Math.max(0, Number(gross) || 0)));
-          closeGlobalTimerFullscreen();
-          setStoredState(null);
-          renderGlobalTimer();
+          clearGlobalTimerState();
           if (window.showNotification) window.showNotification('Registro de tiempo eliminado', 'success');
         } catch (error) {
           if (window.showNotification) window.showNotification('No se pudo eliminar el registro', 'error');
@@ -6161,12 +6192,7 @@
               syncedAt: Date.now(),
             });
           } else if (stored?.projectId && stored.isRunning) {
-            setStoredState({
-              ...stored,
-              currentSeconds: getDisplayedSeconds(),
-              isRunning: false,
-              syncedAt: Date.now(),
-            });
+            setStoredState(null);
           } else {
             globalTimerState = stored;
           }
@@ -6251,8 +6277,7 @@
       });
 
       window.addEventListener('infocus-global-timer-updated', () => {
-        globalTimerState = getStoredState();
-        renderGlobalTimer();
+        syncGlobalTimerFromServer();
       });
 
       window.addEventListener('tdah-pomodoro-state-updated', () => {

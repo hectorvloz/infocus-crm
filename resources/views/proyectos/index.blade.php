@@ -6936,6 +6936,7 @@
       if (!res.ok || !data.ok) {
         throw new Error('timer_action_failed');
       }
+      window.dispatchEvent(new Event('infocus-global-timer-updated'));
       return data.item;
     }
 
@@ -7900,18 +7901,8 @@
     }
 
     function persistGlobalTimerState(project, task, currentSeconds, isRunning) {
-      if (!project?.id) return;
-      const payload = {
-        projectId: String(project.id),
-        projectTitle: String(project.titulo || 'Proyecto'),
-        clientName: String(project.cliente || 'Sin Cliente'),
-        taskId: String(task?.id || task?.task_id || pinnedTimerTaskId || ''),
-        taskName: String(task?.texto || task?.task_name || 'Temporizador activo'),
-        currentSeconds: Math.max(0, Number(currentSeconds || 0)),
-        isRunning: !!isRunning,
-        syncedAt: Date.now(),
-      };
-      localStorage.setItem(GLOBAL_TIMER_STATE_KEY, JSON.stringify(payload));
+      // El header global es el único dueño del estado visual/local del temporizador.
+      // Proyectos solo notifica cambios reales desde las acciones de API.
     }
 
     function getGlobalTimerState() {
@@ -7925,9 +7916,7 @@
     }
 
     function clearGlobalTimerState() {
-      try {
-        localStorage.removeItem(GLOBAL_TIMER_STATE_KEY);
-      } catch (_) {}
+      window.dispatchEvent(new Event('infocus-global-timer-updated'));
     }
 
     function getHeaderPomodoroState() {
@@ -8410,28 +8399,24 @@
     }
 
     function updateHeaderTaskTimer(project, task) {
-      const host = document.getElementById('headerTaskTimerHost');
-      if (!host) return;
-
       const pomodoroHeaderState = getHeaderPomodoroState();
       if (pomodoroHeaderState) {
-        renderProjectPomodoroHeader(host, pomodoroHeaderState);
         return;
       }
 
       if (!project) {
-        host.classList.add('hidden');
-        host.innerHTML = '';
-        clearGlobalTimerState();
-        window.updateHeaderTimerButtonVisibility?.(true);
         return;
       }
 
       const running = getRunningLog(project);
+      if (!running) {
+        return;
+      }
+
       const taskName = task?.texto || running?.task_name || 'Temporizador activo';
       const compactTaskName = compactTimerTaskTitle(taskName);
       const projectName = project.titulo || 'Proyecto';
-      const isRunning = !!running;
+      const isRunning = true;
       const currentSecondsRaw = getCurrentProjectTotalSeconds(project);
       const projectId = String(project.id || '');
       const taskId = String(running?.task_id || task?.id || pinnedTimerTaskId || '');
@@ -8453,62 +8438,7 @@
       syncTimerPanelsMeta(project, task || running);
       syncTimerPanelsDisplay(timeValue);
 
-      host.classList.remove('hidden');
-      window.updateHeaderTimerButtonVisibility?.(false);
-
-      // Render once; update text/icons only to avoid hover flicker every second.
-      if (!host.querySelector('#headerTimerCard')) {
-        host.innerHTML = `<div id="headerTimerCard" role="button" tabindex="0" onclick="openPinnedTimerDetailPanel(event)" onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); openPinnedTimerDetailPanel(event);}" class="group cursor-pointer relative rounded-2xl border border-[#2b3658] bg-[#101729] px-2 py-1.5 shadow-[0_10px_22px_rgba(16,23,41,0.32)] min-w-0 w-full text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_14px_24px_rgba(16,23,41,0.36)] focus:outline-none focus:ring-2 focus:ring-[#dff47f]/55">
-          <div class="absolute top-1.5 right-1.5 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0">
-            <button type="button" data-advanced-control onclick="event.stopPropagation(); openPinnedTimerPip();" class="w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 flex items-center justify-center" title="Modo PiP" aria-label="Modo PiP">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke-width="2"></rect><rect x="12" y="11" width="8" height="6" rx="1.5" ry="1.5" stroke-width="2"></rect></svg>
-            </button>
-          </div>
-          <div class="flex items-center gap-2 min-w-0">
-            <button id="headerTimerToggleBtn" type="button" onclick="event.stopPropagation(); togglePinnedTimerRun()" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f0fe97] text-[#101729]" title="${isRunning ? 'Pausar temporizador' : 'Continuar temporizador'}">${isRunning ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>'}</button>
-            <div class="min-w-0 flex-1">
-              <div class="text-[10px] font-extrabold uppercase tracking-[0.28em] text-[#f0fe97]/70">En foco</div>
-              <button id="headerTimerTask" type="button" onclick="event.stopPropagation(); openActiveTaskFromFocus()" class="block max-w-full truncate text-left text-xs lg:text-sm font-extrabold text-[#f0fe97] underline-offset-2 hover:underline focus:outline-none focus:underline">${compactTaskName}</button>
-              <div id="headerTimerProject" class="truncate text-[10px] lg:text-[11px] font-semibold text-[#f0fe97]/60">${projectName}</div>
-            </div>
-            <div class="shrink-0 text-right min-w-[86px] lg:min-w-[98px]">
-              <div id="headerPinnedTimerValue" class="text-2xl lg:text-[30px] font-mono font-extrabold tracking-tight text-[#f0fe97] leading-none">${timeValue}</div>
-              <div class="mt-1 flex items-center justify-end gap-1.5">
-                <button type="button" onclick="event.stopPropagation(); savePinnedTimerLog()" class="text-[10px] lg:text-[11px] font-bold text-[#f0fe97]/75 hover:text-[#f0fe97]">Guardar</button>
-                <button type="button" onclick="event.stopPropagation(); deletePinnedTimerEntry()" class="text-[10px] lg:text-[11px] font-bold text-rose-300/90 hover:text-rose-200">Eliminar</button>
-              </div>
-            </div>
-          </div>
-        </div>`;
-      }
-
-      const headerCard = host.querySelector('#headerTimerCard');
-      if (headerCard) {
-        headerCard.dataset.projectId = String(project.id || '');
-      }
-
-      const headerTask = host.querySelector('#headerTimerTask');
-      if (headerTask) {
-        headerTask.innerText = compactTaskName;
-        headerTask.title = compactTaskName;
-      }
-
-      const headerProject = host.querySelector('#headerTimerProject');
-      if (headerProject) headerProject.innerText = `${projectName}`;
-
-      const headerValue = host.querySelector('#headerPinnedTimerValue');
-      if (headerValue) headerValue.innerText = timeValue;
-
-      const headerToggleBtn = host.querySelector('#headerTimerToggleBtn');
-      if (headerToggleBtn) {
-        headerToggleBtn.title = isRunning ? 'Pausar temporizador' : 'Continuar temporizador';
-        headerToggleBtn.innerHTML = isRunning
-          ? '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
-          : '<svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>';
-      }
-
       persistGlobalTimerState(project, task || running, stableSeconds, isRunning);
-
       syncTimerFullscreenActionButtons(isRunning);
     }
 
@@ -8524,12 +8454,6 @@
       if (runningProject) {
         const running = getRunningLog(runningProject);
         setPinnedTimerContext(runningProject.id, running?.task_id || null);
-      } else if (!pinnedTimerProjectId) {
-        const stored = getGlobalTimerState();
-        if (stored?.projectId) {
-          setPinnedTimerContext(stored.projectId, stored.taskId || null);
-          project = projects.find((entry) => String(entry.id) === String(stored.projectId)) || null;
-        }
       } else if (pinnedTimerProjectId) {
         project = projects.find((entry) => String(entry.id) === String(pinnedTimerProjectId)) || null;
       }
