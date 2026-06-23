@@ -2428,6 +2428,7 @@
       let reminderDatePickerOpen = false;
       let reminderRemoteLoaded = false;
       let reminderRemoteSaveTimer = null;
+      let pendingReminderCategoryPromotionId = '';
       const ALL_REMINDERS_CATEGORY_ID = '__all__';
 
       function escapeHtml(value) {
@@ -2944,13 +2945,29 @@
         return String(categoryId || '') === ALL_REMINDERS_CATEGORY_ID;
       }
 
-      function moveReminderCategoryToFront(categoryId) {
+      function isRemindersPanelOpen() {
+        return Boolean(remindersPanel && !remindersPanel.classList.contains('translate-x-[calc(100%+2rem)]'));
+      }
+
+      function moveReminderCategoryToFront(categoryId, options = {}) {
         const id = String(categoryId || '');
+        if (!id || isAllRemindersCategoryId(id)) return false;
         const index = reminderCategoriesData.findIndex((category) => String(category.id) === id);
-        if (index <= 0) return false;
+        if (index < 0) return false;
+        if (options.deferIfOpen !== false && isRemindersPanelOpen()) {
+          pendingReminderCategoryPromotionId = id;
+          return false;
+        }
+        if (index === 0) return false;
         const [category] = reminderCategoriesData.splice(index, 1);
         reminderCategoriesData.unshift(category);
         return true;
+      }
+
+      function applyPendingReminderCategoryPromotion() {
+        const id = pendingReminderCategoryPromotionId;
+        pendingReminderCategoryPromotionId = '';
+        return id ? moveReminderCategoryToFront(id, { deferIfOpen: false }) : false;
       }
 
       function touchReminderCategoryBySection(sectionId) {
@@ -4322,6 +4339,11 @@
 
       function openRemindersPanel() {
         closeNotificationsPanel();
+        const categoryMoved = applyPendingReminderCategoryPromotion();
+        if (categoryMoved) {
+          persistRemindersOnly();
+          queueSaveRemindersRemote();
+        }
         remindersBackdrop?.classList.remove('hidden');
         remindersPanel?.classList.remove('translate-x-[calc(100%+2rem)]');
         profileMenu.classList.add('hidden');
@@ -4330,6 +4352,11 @@
       }
 
       function closeRemindersPanel() {
+        const categoryMoved = applyPendingReminderCategoryPromotion();
+        if (categoryMoved) {
+          persistRemindersOnly();
+          queueSaveRemindersRemote();
+        }
         remindersPanel?.classList.add('translate-x-[calc(100%+2rem)]');
         remindersBackdrop?.classList.add('hidden');
         hideReminderLinkDropdown();

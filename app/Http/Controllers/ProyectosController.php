@@ -795,6 +795,57 @@ class ProyectosController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function proyectoIaApoyo(Request $request)
+    {
+        $data = $request->validate([
+            'id' => 'required|string',
+            'message' => 'required|string|max:3000',
+            'current_description' => 'nullable|string|max:20000',
+        ]);
+
+        $project = $this->store->find($data['id']);
+        abort_if(!$project, 404);
+
+        if (array_key_exists('current_description', $data)) {
+            $project['descripcion'] = (string) ($data['current_description'] ?? '');
+        }
+
+        $prompt = $this->buildProjectAiSupportPrompt($project, (string) $data['message']);
+        $result = $this->ai->reply($prompt, [], [
+            'current_project' => [
+                'id' => $project['id'] ?? '',
+                'title' => $project['titulo'] ?? '',
+                'client_id' => $project['cliente_id'] ?? '',
+                'client_name' => $project['cliente'] ?? '',
+            ],
+        ]);
+
+        $rawContent = (string) ($result['content'] ?? '');
+        $plan = $this->decodeTaskAiSupportPlan($rawContent);
+        if (!$plan || !array_key_exists('description_html', $plan)) {
+            $friendlyMessage = trim($rawContent);
+            if ($friendlyMessage === '' || str_contains($friendlyMessage, '{')) {
+                $friendlyMessage = 'La IA no devolvió una descripción aplicable. Intenta pedirlo con más detalle.';
+            }
+            return response()->json([
+                'ok' => false,
+                'message' => $friendlyMessage,
+                'raw' => $rawContent,
+            ], 422);
+        }
+
+        $descriptionHtml = $this->sanitizeAiDescriptionHtml((string) ($plan['description_html'] ?? ''));
+        $summary = trim((string) ($plan['summary'] ?? 'Listo, actualicé la descripción del proyecto.'));
+        $updated = $this->store->update($data['id'], ['descripcion' => $descriptionHtml]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => $summary,
+            'item' => $updated,
+            'description_html' => $descriptionHtml,
+        ]);
+    }
+
     protected function syncGoogleCalendarEvent(array $project): array
     {
         $settings = $this->settings->find('settings') ?: [];
@@ -1547,6 +1598,20 @@ class ProyectosController extends Controller
 
         $updated = $this->store->update($data['id'], ['tareas' => $tasks]);
         return response()->json(['ok' => true, 'item' => $updated]);
+    }
+
+    private function buildProjectAiSupportPrompt(array $project, string $message): string
+    {
+        return "Actúa como asistente de gestión de proyectos. Responde solo con JSON válido, sin markdown.\n"
+            . "Tu única tarea es crear, editar, mejorar, resumir u organizar la descripción del proyecto. No crees tareas, checklist ni subtareas.\n"
+            . "Formato exacto:\n"
+            . "{\"summary\":\"texto breve\",\"description_html\":\"...\"}\n"
+            . "Para description_html usa HTML enriquecido compatible con el editor: h1, h2, h3, p, strong, em, s, u, mark, ul, ol, li, hr, div.\n"
+            . "Usa jerarquía visual cuando aporte claridad: <h1>/<h2> para títulos, <strong> para negrita, <mark> para resaltador, listas y separadores. Puedes usar MAYÚSCULAS en encabezados cortos si mejora la lectura. No uses scripts, enlaces, imágenes ni estilos inline.\n\n"
+            . "Proyecto: " . (string) ($project['titulo'] ?? 'Proyecto') . "\n"
+            . "Cliente: " . (string) ($project['cliente'] ?? 'Sin Cliente') . "\n"
+            . "Descripción actual HTML: " . (string) ($project['descripcion'] ?? '') . "\n\n"
+            . "Solicitud del usuario: {$message}";
     }
 
     private function buildTaskAiSupportPrompt(array $project, array $task, string $message): string

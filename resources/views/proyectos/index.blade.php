@@ -423,7 +423,8 @@
       background: linear-gradient(180deg, rgba(253, 244, 255, .76), rgba(255, 255, 255, .9));
     }
 
-    #taskModalDescription .task-desc-ai-enter {
+    #taskModalDescription .task-desc-ai-enter,
+    #modalDesc .task-desc-ai-enter {
       animation: taskDescriptionAiEnter .46s cubic-bezier(.2, .8, .2, 1) both;
     }
 
@@ -674,10 +675,12 @@
 
     .project-upload-progress {
       position: fixed;
-      right: 1rem;
-      bottom: 1rem;
-      z-index: 2147482550;
-      width: min(360px, calc(100vw - 2rem));
+      left: 50%;
+      top: max(1rem, env(safe-area-inset-top));
+      z-index: 2147483647;
+      width: min(520px, calc(100vw - 2rem));
+      max-height: calc(100dvh - 2rem);
+      transform: translateX(-50%);
       border: 1px solid #e2e8f0;
       border-radius: 1.35rem;
       background: rgba(255,255,255,.96);
@@ -736,6 +739,13 @@
     }
 
     @media (max-width: 520px) {
+      .project-upload-progress {
+        top: max(.65rem, env(safe-area-inset-top));
+        width: calc(100vw - 1rem);
+        max-height: calc(100dvh - 1.3rem);
+        border-radius: 1rem;
+      }
+
       .project-file-card {
         grid-template-columns: 3.9rem minmax(0, 1fr);
       }
@@ -2172,10 +2182,39 @@
                    
                    <!-- Description -->
                    <div>
-                       <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                         <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
                            Descripción
-                       </label>
+                         </label>
+                         <button id="projectAiSupportTrigger" type="button" onclick="toggleProjectAiSupport()" class="inline-flex h-9 items-center gap-2 rounded-xl border-2 border-fuchsia-300 bg-white px-3 text-xs font-extrabold text-slate-800 shadow-sm hover:bg-fuchsia-50">
+                           <svg class="h-3.5 w-3.5 text-fuchsia-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.5l1.8 5.1 5.1 1.8-5.1 1.8L12 16.3l-1.8-5.1-5.1-1.8 5.1-1.8L12 2.5Zm6.2 10.5.9 2.5 2.4.9-2.4.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5ZM5.2 14l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1Z"/></svg>
+                           Apoyo de IA
+                         </button>
+                       </div>
+                       <div id="projectAiSupportPanel" class="fixed hidden w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-fuchsia-200 bg-white shadow-2xl ring-1 ring-fuchsia-100" style="z-index:2147482500;">
+                         <div class="flex items-center justify-between gap-2 border-b border-fuchsia-100 bg-white px-3 py-2">
+                           <div class="flex min-w-0 items-center gap-2">
+                             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-fuchsia-50 text-fuchsia-500">
+                               <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.5l1.8 5.1 5.1 1.8-5.1 1.8L12 16.3l-1.8-5.1-5.1-1.8 5.1-1.8L12 2.5Zm6.2 10.5.9 2.5 2.4.9-2.4.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9.9-2.5ZM5.2 14l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1Z"/></svg>
+                             </span>
+                             <div class="min-w-0">
+                               <div class="truncate text-sm font-black text-slate-900">Apoyo de IA</div>
+                               <div class="truncate text-[10px] font-semibold text-slate-400">Solo descripción del proyecto</div>
+                             </div>
+                           </div>
+                           <button type="button" onclick="toggleProjectAiSupport(false)" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar apoyo de IA">
+                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M6 18L18 6M6 6l12 12"/></svg>
+                           </button>
+                         </div>
+                         <div id="projectAiSupportMessages" class="max-h-40 space-y-2 overflow-y-auto bg-slate-50 px-2.5 py-2.5 text-sm">
+                           <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Pídeme redactar, mejorar, resumir u organizar la descripción del proyecto.</div>
+                         </div>
+                         <div class="flex gap-2 border-t border-slate-100 bg-white p-2">
+                           <input id="projectAiSupportInput" class="min-w-0 flex-1 rounded-lg border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 focus:border-fuchsia-300 focus:ring-fuchsia-200" placeholder="Ej. mejora esta descripción..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); sendProjectAiSupport(); }">
+                           <button id="projectAiSupportSendBtn" type="button" onclick="sendProjectAiSupport()" class="rounded-lg bg-fuchsia-100 px-3 py-2 text-xs font-extrabold text-slate-900 hover:bg-fuchsia-200">Enviar</button>
+                         </div>
+                       </div>
                        <div id="projectDescShell" class="project-desc-shell is-collapsed">
                          <div class="compact-rich-editor-shell" data-desc-editor-shell>
                            <div class="compact-desc-toolbar" aria-label="Herramientas de descripcion">
@@ -2622,6 +2661,13 @@
     <div class="fixed inset-0 z-10 overflow-y-auto">
       <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
         <div class="relative transform overflow-visible rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl h-[85vh] flex flex-col">
+          <div id="taskModalDropOverlay" class="project-modal-drop-overlay">
+            <div class="project-modal-drop-box">
+              <svg class="h-16 w-16 text-lime-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              <div class="text-2xl font-black text-slate-900">Suelta para cargar archivos</div>
+              <div class="mt-2 text-sm font-semibold text-slate-500">Se guardarán como adjuntos de esta tarea.</div>
+            </div>
+          </div>
           <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-start justify-between gap-3 flex-none rounded-t-2xl">
             <div class="flex items-start gap-3 w-full min-w-0">
               <button id="taskModalDoneBtn" type="button" onclick="if(currentTaskId) toggleTask(currentTaskId)" class="mt-1 w-7 h-7 rounded-full border-2 border-slate-300 bg-white text-transparent hover:border-lime-300 flex items-center justify-center shrink-0" title="Completar tarea" aria-label="Completar tarea">
@@ -4121,18 +4167,27 @@
       saveSubtaskDetails({ closeAfter: true });
     });
     document.addEventListener('pointerdown', (event) => {
-      const panel = document.getElementById('taskAiSupportPanel');
-      if (!panel || panel.classList.contains('hidden')) return;
-      if (event.target?.closest?.('#taskAiSupportPanel, #taskAiSupportTrigger')) return;
-      panel.classList.add('hidden');
+      [
+        { panelId: 'projectAiSupportPanel', triggerId: 'projectAiSupportTrigger' },
+        { panelId: 'taskAiSupportPanel', triggerId: 'taskAiSupportTrigger' },
+      ].forEach(({ panelId, triggerId }) => {
+        const panel = document.getElementById(panelId);
+        if (!panel || panel.classList.contains('hidden')) return;
+        if (event.target?.closest?.(`#${panelId}, #${triggerId}`)) return;
+        panel.classList.add('hidden');
+      });
     });
     window.addEventListener('resize', () => {
+      positionProjectAiSupportPanel();
       positionTaskAiSupportPanel();
       if (document.body.classList.contains('project-board-open')) {
         fitProjectBoardViewport();
       }
     });
-    window.addEventListener('scroll', positionTaskAiSupportPanel, true);
+    window.addEventListener('scroll', () => {
+      positionProjectAiSupportPanel();
+      positionTaskAiSupportPanel();
+    }, true);
     const responsibleCatalogByName = {};
     const LIST_PRIORITY_OPTIONS = [
       { value: '', label: 'Todas' },
@@ -7147,6 +7202,7 @@
       const prioritySelector = document.getElementById('modalPrioritySelector');
       const responsablesInput = document.getElementById('newResponsibleInput');
       const dueDateInput = document.getElementById('modalDueDate');
+      const projectAiTrigger = document.getElementById('projectAiSupportTrigger');
 
       if (titleInput) {
         titleInput.readOnly = projectModalReadOnly;
@@ -7155,6 +7211,7 @@
       if (clientSelect) clientSelect.disabled = projectModalReadOnly;
       if (desc) setCompactDescEditable('modalDesc', !projectModalReadOnly);
       if (descAutosaveStatus) descAutosaveStatus.classList.toggle('hidden', projectModalReadOnly);
+      if (projectAiTrigger) projectAiTrigger.classList.toggle('hidden', projectModalReadOnly);
       if (taskInput) taskInput.disabled = projectModalReadOnly;
       if (taskAddWrap) taskAddWrap.classList.toggle('hidden', projectModalReadOnly);
       if (dropzone) dropzone.classList.toggle('hidden', projectModalReadOnly);
@@ -7169,6 +7226,7 @@
       if (dueDateInput) dueDateInput.disabled = projectModalReadOnly;
 
       if (projectModalReadOnly) {
+        resetProjectAiSupport();
         setProjectModalTab('info');
       }
     }
@@ -7180,6 +7238,7 @@
       currentProjectModalTab = 'info';
       currentProjectEditingNoteId = null;
       isProjectNoteComposerOpen = false;
+      resetProjectAiSupport();
       const useArchivedData = !!options?.useArchivedData;
       const sourceList = useArchivedData ? archivedProjects : projects;
       let p = sourceList.find(x => String(x.id) === String(id));
@@ -7275,6 +7334,7 @@
         document.getElementById('projectModal')?.classList.add('hidden');
       document.body.classList.remove('project-modal-open');
       window.__infocusAiCurrentProject = null;
+      resetProjectAiSupport();
       if (typeof hideProjectDropOverlay === 'function') hideProjectDropOverlay();
       closeTaskModal();
       stopPipRenderLoop();
@@ -10498,6 +10558,7 @@
         clearInterval(taskTimerInterval);
         taskTimerInterval = null;
       }
+      if (typeof hideTaskDropOverlay === 'function') hideTaskDropOverlay();
       if (currentProjectId && currentTaskId) {
         const pendingDesc = getCompactDescValue('taskModalDescription');
         if (typeof pendingDesc === 'string') {
@@ -10927,6 +10988,168 @@
         await sleepTaskAi(55);
       }
       syncCompactDescEditorState('taskModalDescription');
+    }
+
+    function positionProjectAiSupportPanel() {
+      const panel = document.getElementById('projectAiSupportPanel');
+      const trigger = document.getElementById('projectAiSupportTrigger');
+      if (!panel || !trigger || panel.classList.contains('hidden')) return;
+      const rect = trigger.getBoundingClientRect();
+      const gap = 10;
+      const panelWidth = Math.min(320, window.innerWidth - 24);
+      panel.style.width = `${panelWidth}px`;
+      const left = Math.max(12, Math.min(window.innerWidth - panelWidth - 12, rect.right - panelWidth));
+      const panelHeight = panel.offsetHeight || 320;
+      const topAbove = rect.top - panelHeight - gap;
+      const top = topAbove >= 12
+        ? topAbove
+        : Math.min(window.innerHeight - panelHeight - 12, rect.bottom + gap);
+      panel.style.left = `${left}px`;
+      panel.style.top = `${Math.max(12, top)}px`;
+    }
+
+    function toggleProjectAiSupport(forceState = null) {
+      if (projectModalReadOnly) return;
+      const panel = document.getElementById('projectAiSupportPanel');
+      if (!panel) return;
+      const shouldShow = forceState === null ? panel.classList.contains('hidden') : !!forceState;
+      panel.classList.toggle('hidden', !shouldShow);
+      if (shouldShow) {
+        requestAnimationFrame(positionProjectAiSupportPanel);
+        setTimeout(() => document.getElementById('projectAiSupportInput')?.focus(), 0);
+      }
+    }
+
+    function resetProjectAiSupport() {
+      const panel = document.getElementById('projectAiSupportPanel');
+      const messages = document.getElementById('projectAiSupportMessages');
+      const input = document.getElementById('projectAiSupportInput');
+      if (panel) panel.classList.add('hidden');
+      if (input) input.value = '';
+      if (messages) {
+        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Pídeme redactar, mejorar, resumir u organizar la descripción del proyecto.</div>';
+      }
+    }
+
+    function appendProjectAiSupportMessage(role, text) {
+      const box = document.getElementById('projectAiSupportMessages');
+      if (!box) return;
+      const isUser = role === 'user';
+      const node = document.createElement('div');
+      node.className = `rounded-xl px-3 py-2 text-xs font-semibold shadow-sm ${isUser ? 'ml-8 bg-slate-900 text-white' : 'mr-8 bg-white text-slate-600'}`;
+      node.textContent = text;
+      box.appendChild(node);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function setProjectAiDescriptionWorking(working = false) {
+      const editor = document.getElementById('modalDesc');
+      const shell = editor?.closest?.('[data-desc-editor-shell]');
+      shell?.classList.toggle('is-ai-writing', !!working);
+    }
+
+    async function animateProjectDescriptionAiReplacement(html) {
+      const editor = document.getElementById('modalDesc');
+      if (!editor) return;
+
+      const template = document.createElement('template');
+      template.innerHTML = sanitizeDescriptionHtml(html) || '<p><br></p>';
+      const nodes = Array.from(template.content.childNodes).filter((node) => {
+        return node.nodeType === Node.ELEMENT_NODE || String(node.textContent || '').trim() !== '';
+      });
+
+      editor.innerHTML = '';
+      setProjectAiDescriptionWorking(true);
+      projectDescriptionExpanded = true;
+      document.getElementById('projectDescShell')?.classList.add('toggle-dismissed');
+      for (const node of nodes) {
+        const clone = node.cloneNode(true);
+        if (clone.nodeType === Node.ELEMENT_NODE) {
+          clone.classList.add('task-desc-ai-enter');
+          clone.style.animationDelay = `${Math.min(editor.children.length, 8) * 45}ms`;
+        }
+        editor.appendChild(clone);
+        await sleepTaskAi(55);
+      }
+      syncCompactDescEditorState('modalDesc');
+      refreshProjectDescriptionClamp();
+    }
+
+    async function sendProjectAiSupport() {
+      if (!currentProjectId || projectModalReadOnly) return;
+      const input = document.getElementById('projectAiSupportInput');
+      const button = document.getElementById('projectAiSupportSendBtn');
+      const message = String(input?.value || '').trim();
+      if (!message) return;
+
+      appendProjectAiSupportMessage('user', message);
+      if (input) input.value = '';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Pensando...';
+      }
+      appendProjectAiSupportMessage('assistant', 'Estoy trabajando la descripción del proyecto...');
+      setProjectAiDescriptionWorking(true);
+
+      try {
+        const projectId = String(currentProjectId);
+        const currentDescription = getCompactDescValue('modalDesc');
+        const hadPendingDescription = Object.prototype.hasOwnProperty.call(pendingProjectDescriptions, projectId);
+        clearTimeout(modalDescAutosaveTimer);
+        const response = await fetch('/api/proyectos/ia-apoyo', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
+          body: JSON.stringify({
+            id: projectId,
+            message,
+            current_description: currentDescription,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+          appendProjectAiSupportMessage('assistant', data.message || 'No pude aplicar la descripción con IA.');
+          if (hadPendingDescription) {
+            setDescriptionAutosaveStatus('saving');
+            modalDescAutosaveTimer = setTimeout(() => saveDescriptionAutosave(projectId, currentDescription), 650);
+          }
+          setProjectAiDescriptionWorking(false);
+          return;
+        }
+
+        const descriptionHtml = sanitizeDescriptionHtml(data.description_html || data.item?.descripcion || '');
+        const idx = projects.findIndex((item) => String(item.id) === projectId);
+        if (idx >= 0) {
+          projects[idx] = { ...projects[idx], ...(data.item || {}), descripcion: descriptionHtml };
+        }
+        delete pendingProjectDescriptions[projectId];
+        await animateProjectDescriptionAiReplacement(descriptionHtml);
+        setDescriptionAutosaveStatus('saved');
+        renderKanban(projects);
+        renderProjectListView(projects);
+        if (String(currentBoardProjectId || '') === projectId) {
+          renderProjectBoard(projectId);
+        }
+        appendProjectAiSupportMessage('assistant', data.message || 'Listo, actualicé la descripción.');
+        setTimeout(() => setProjectAiDescriptionWorking(false), 950);
+      } catch (error) {
+        console.error(error);
+        appendProjectAiSupportMessage('assistant', 'No pude conectar con el apoyo de IA.');
+        if (currentProjectId) {
+          const projectId = String(currentProjectId);
+          if (Object.prototype.hasOwnProperty.call(pendingProjectDescriptions, projectId)) {
+            const currentDescription = getCompactDescValue('modalDesc');
+            setDescriptionAutosaveStatus('saving');
+            modalDescAutosaveTimer = setTimeout(() => saveDescriptionAutosave(projectId, currentDescription), 650);
+          }
+        }
+        setProjectAiDescriptionWorking(false);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = 'Enviar';
+        }
+        input?.focus();
+      }
     }
 
     function inferTaskAiSupportTarget(message = '') {
@@ -13030,11 +13253,14 @@
 
     const projectDropzone = document.getElementById('modalDropzone');
     const projectModalEl = document.getElementById('projectModal');
+    const taskModalEl = document.getElementById('taskDetailModal');
     const projectDropOverlay = document.getElementById('projectModalDropOverlay');
+    const taskDropOverlay = document.getElementById('taskModalDropOverlay');
     let projectModalDragCounter = 0;
+    let taskModalDragCounter = 0;
 
     function showProjectDropOverlay() {
-      if (projectModalReadOnly || !projectDropOverlay) return;
+      if (projectModalReadOnly || !projectDropOverlay || isElementOpen(taskModalEl)) return;
       projectDropOverlay.classList.add('is-active');
       projectDropzone?.classList.add('is-dragging');
     }
@@ -13045,15 +13271,27 @@
       projectDropzone?.classList.remove('is-dragging');
     }
 
+    function showTaskDropOverlay() {
+      if (projectModalReadOnly || !currentProjectId || !currentTaskId || !taskDropOverlay) return;
+      taskDropOverlay.classList.add('is-active');
+      document.getElementById('taskFileDropzone')?.classList.add('is-dragging');
+    }
+
+    function hideTaskDropOverlay() {
+      taskModalDragCounter = 0;
+      taskDropOverlay?.classList.remove('is-active');
+      document.getElementById('taskFileDropzone')?.classList.remove('is-dragging');
+    }
+
     projectModalEl?.addEventListener('dragenter', (event) => {
-      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      if (projectModalReadOnly || isElementOpen(taskModalEl) || !projectDragHasFiles(event)) return;
       event.preventDefault();
       projectModalDragCounter++;
       showProjectDropOverlay();
     });
 
     projectModalEl?.addEventListener('dragover', (event) => {
-      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      if (projectModalReadOnly || isElementOpen(taskModalEl) || !projectDragHasFiles(event)) return;
       event.preventDefault();
       showProjectDropOverlay();
     });
@@ -13065,7 +13303,7 @@
     });
 
     projectModalEl?.addEventListener('drop', (event) => {
-      if (projectModalReadOnly || !projectDragHasFiles(event)) return;
+      if (projectModalReadOnly || isElementOpen(taskModalEl) || !projectDragHasFiles(event)) return;
       event.preventDefault();
       const files = event.dataTransfer?.files;
       hideProjectDropOverlay();
@@ -13078,20 +13316,49 @@
       showProjectDropOverlay();
     });
 
+    taskModalEl?.addEventListener('dragenter', (event) => {
+      if (projectModalReadOnly || !currentProjectId || !currentTaskId || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      taskModalDragCounter++;
+      showTaskDropOverlay();
+    });
+
+    taskModalEl?.addEventListener('dragover', (event) => {
+      if (projectModalReadOnly || !currentProjectId || !currentTaskId || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      showTaskDropOverlay();
+    });
+
+    taskModalEl?.addEventListener('dragleave', (event) => {
+      if (!projectDragHasFiles(event)) return;
+      taskModalDragCounter = Math.max(0, taskModalDragCounter - 1);
+      if (taskModalDragCounter === 0) hideTaskDropOverlay();
+    });
+
+    taskModalEl?.addEventListener('drop', (event) => {
+      if (projectModalReadOnly || !currentProjectId || !currentTaskId || !projectDragHasFiles(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const files = event.dataTransfer?.files;
+      hideTaskDropOverlay();
+      if (files && files.length) handleTaskFileUpload(files);
+    });
+
     const taskFileDropzone = document.getElementById('taskFileDropzone');
     taskFileDropzone?.addEventListener('dragover', (event) => {
       if (!projectDragHasFiles(event)) return;
       event.preventDefault();
-      taskFileDropzone.classList.add('is-dragging');
+      showTaskDropOverlay();
     });
     taskFileDropzone?.addEventListener('dragleave', (event) => {
       if (taskFileDropzone.contains(event.relatedTarget)) return;
-      taskFileDropzone.classList.remove('is-dragging');
+      hideTaskDropOverlay();
     });
     taskFileDropzone?.addEventListener('drop', (event) => {
       if (!projectDragHasFiles(event)) return;
       event.preventDefault();
-      taskFileDropzone.classList.remove('is-dragging');
+      event.stopPropagation();
+      hideTaskDropOverlay();
       const files = event.dataTransfer?.files;
       if (files && files.length) handleTaskFileUpload(files);
     });
