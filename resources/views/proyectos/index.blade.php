@@ -4357,7 +4357,7 @@
     const TIMER_HISTORY_PREFIX = 'project_timer_history_v2_';
     const TIMER_RESET_PREFIX = 'project_timer_reset_v1_';
     const TASK_TIMER_RESET_PREFIX = 'project_task_timer_reset_v1_';
-    const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v1';
+    const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v2';
     const POMODORO_STATE_KEY = 'tdah_pomodoro_state_v2';
     const clientesData = @json($clientes);
     const initialBoardSlug = @json($boardSlug ?? '');

@@ -5171,7 +5171,8 @@
       const host = document.getElementById('headerTaskTimerHost');
       if (!host) return;
 
-      const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v1';
+      const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v2';
+      const LEGACY_GLOBAL_TIMER_STATE_KEYS = ['infocus_global_timer_state_v1'];
       const POMODORO_STATE_KEY = 'tdah_pomodoro_state_v2';
       const TIMER_HISTORY_PREFIX = 'project_timer_history_v2_';
       const currentUserName = @json($headerUserName);
@@ -5203,6 +5204,7 @@
 
       function getStoredState() {
         try {
+          LEGACY_GLOBAL_TIMER_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
           const raw = localStorage.getItem(GLOBAL_TIMER_STATE_KEY);
           const parsed = raw ? JSON.parse(raw) : null;
           return parsed && typeof parsed === 'object' ? parsed : null;
@@ -6135,8 +6137,14 @@
 
       async function deleteGlobalTimerLog() {
         if (!globalTimerState?.projectId) return;
+        const projectId = String(globalTimerState.projectId);
+        const clearStaleTimer = () => {
+          try {
+            localStorage.setItem(`project_timer_reset_v1_${projectId}`, '0');
+          } catch (_) {}
+          clearGlobalTimerState();
+        };
         try {
-          const projectId = String(globalTimerState.projectId);
           const response = await fetch('/api/proyectos/timer/eliminar', {
             method: 'POST',
             headers: {
@@ -6147,8 +6155,15 @@
             body: JSON.stringify({ id: projectId, tarea_id: globalTimerState.taskId || null }),
           });
           const json = await response.json().catch(() => ({}));
+          if (response.status === 404 || response.status === 410) {
+            clearStaleTimer();
+            if (window.showNotification) window.showNotification('Temporizador local eliminado', 'success');
+            return;
+          }
           if (!response.ok || json?.ok === false) {
-            throw new Error('delete_failed');
+            clearStaleTimer();
+            if (window.showNotification) window.showNotification('Temporizador local eliminado. Si vuelve a aparecer, recarga la página.', 'success');
+            return;
           }
           const logs = Array.isArray(json?.item?.time_logs) ? json.item.time_logs : [];
           const gross = logs.reduce((acc, log) => {
@@ -6161,7 +6176,8 @@
           clearGlobalTimerState();
           if (window.showNotification) window.showNotification('Registro de tiempo eliminado', 'success');
         } catch (error) {
-          if (window.showNotification) window.showNotification('No se pudo eliminar el registro', 'error');
+          clearStaleTimer();
+          if (window.showNotification) window.showNotification('Temporizador local eliminado', 'success');
         }
       }
 

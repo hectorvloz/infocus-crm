@@ -2017,7 +2017,7 @@
 
         const ONE_THING_TASK_KEY = 'tdah_one_thing_task_v1';
         const POMODORO_STATE_KEY = 'tdah_pomodoro_state_v2';
-        const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v1';
+        const GLOBAL_TIMER_STATE_KEY = 'infocus_global_timer_state_v2';
         const TIMER_HISTORY_PREFIX = 'project_timer_history_v2_';
         const DEFAULT_BREAK_MINUTES = 15;
         const BREAK_MINUTES_OPTIONS = [5, 15, 30];
