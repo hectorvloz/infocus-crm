@@ -109,18 +109,27 @@ class FacturasController extends Controller
             $f['_due_base'] = $pendingBase($f);
             $rec = (array) ($f['recurrencia'] ?? []);
             $everyMonths = null;
+            $recurrenceEnabled = false;
+            $recurrenceTargetId = null;
 
-            if (!empty($rec['enabled'])) {
+            if ($this->isConfiguredRecurrence($rec)) {
                 $everyMonths = max(1, (int) ($rec['every_months'] ?? 1));
+                $recurrenceEnabled = !array_key_exists('enabled', $rec) || !empty($rec['enabled']);
+                $recurrenceTargetId = (string) ($f['id'] ?? '');
             } elseif (!empty($f['recurrencia_origen_id'])) {
                 $template = $templatesById->get((string) $f['recurrencia_origen_id']);
                 $templateRec = (array) (($template['recurrencia'] ?? []) ?: []);
-                if (!empty($templateRec['enabled'])) {
+                if ($this->isConfiguredRecurrence($templateRec)) {
                     $everyMonths = max(1, (int) ($templateRec['every_months'] ?? 1));
+                    $recurrenceEnabled = !array_key_exists('enabled', $templateRec) || !empty($templateRec['enabled']);
+                    $recurrenceTargetId = (string) ($template['id'] ?? '');
                 }
             }
 
             $f['_is_recurrente'] = $everyMonths !== null || !empty($f['recurrencia_origen_id']) || in_array(($f['origen'] ?? ''), ['recurrente', 'recurrente_preemitida'], true);
+            $f['_recurrencia_enabled'] = $recurrenceEnabled;
+            $f['_recurrencia_target_id'] = $recurrenceTargetId;
+            $f['_recurrencia_toggleable'] = $recurrenceTargetId !== null && $recurrenceTargetId !== '';
             if ($everyMonths !== null) {
                 $f['_recurrencia_label'] = $everyMonths === 1 ? 'Cada mes' : "Cada {$everyMonths} meses";
             } elseif ($f['_is_recurrente']) {
@@ -137,7 +146,7 @@ class FacturasController extends Controller
                 if ($estado === 'Recurrente') {
                     return $c->filter(function ($f) {
                         $rec = (array) ($f['recurrencia'] ?? []);
-                        return !empty($rec['enabled'])
+                        return $this->isConfiguredRecurrence($rec)
                             || !empty($f['recurrencia_origen_id'])
                             || in_array(($f['origen'] ?? ''), ['recurrente', 'recurrente_preemitida'], true);
                     });
@@ -197,7 +206,7 @@ class FacturasController extends Controller
             'Vencida'=>$filtered->where('estado','Vencida')->count(),
             'Recurrente'=>$filtered->filter(function ($f) {
                 $rec = (array) ($f['recurrencia'] ?? []);
-                return !empty($rec['enabled'])
+                return $this->isConfiguredRecurrence($rec)
                     || !empty($f['recurrencia_origen_id'])
                     || in_array(($f['origen'] ?? ''), ['recurrente', 'recurrente_preemitida'], true);
             })->count(),
@@ -704,6 +713,53 @@ class FacturasController extends Controller
         return response()->json(['ok'=>true,'item'=>$item]);
     }
 
+    public function toggleRecurrencia(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'enabled' => ['required', 'boolean'],
+        ]);
+
+        $invoice = $this->store->find($id);
+        abort_if(!$invoice, 404);
+
+        $target = $invoice;
+        $recurrence = (array) ($target['recurrencia'] ?? []);
+        if (!$this->isConfiguredRecurrence($recurrence) && !empty($invoice['recurrencia_origen_id'])) {
+            $target = $this->store->find((string) $invoice['recurrencia_origen_id']);
+            $recurrence = (array) (($target['recurrencia'] ?? []) ?: []);
+        }
+
+        if (!$target || !$this->isConfiguredRecurrence($recurrence)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Esta factura no tiene una programación recurrente editable.',
+            ], 422);
+        }
+
+        $enabled = (bool) $data['enabled'];
+        $recurrence['enabled'] = $enabled;
+        if ($enabled) {
+            $recurrence = $this->moveRecurrenceToNextAvailableCycle($target, $recurrence);
+            $recurrence['enabled_at'] = now()->toIso8601String();
+            unset($recurrence['disabled_at']);
+        } else {
+            $recurrence['disabled_at'] = now()->toIso8601String();
+        }
+
+        $targetId = (string) ($target['id'] ?? '');
+        $this->store->update($targetId, ['recurrencia' => $recurrence]);
+
+        return response()->json([
+            'ok' => true,
+            'enabled' => $enabled,
+            'recurrence_id' => $targetId,
+            'next_send' => (string) ($recurrence['next_send'] ?? $recurrence['siguiente'] ?? ''),
+            'message' => $enabled
+                ? 'Recurrencia activada. La próxima factura seguirá la programación indicada.'
+                : 'Recurrencia desactivada. No se generarán ni enviarán nuevas facturas.',
+        ]);
+    }
+
     // autoclonar al entrar al índice
     protected function autoClonarRecurrencias()
     {
@@ -711,7 +767,8 @@ class FacturasController extends Controller
         $changed = false;
         foreach ($list as $f) {
             $rec = $f['recurrencia'] ?? null;
-            if ($rec && !empty($rec['siguiente']) && strtotime($rec['siguiente']) <= strtotime(date('Y-m-d'))) {
+            $legacyEnabled = !is_array($rec) || !array_key_exists('enabled', $rec) || !empty($rec['enabled']);
+            if ($rec && $legacyEnabled && !empty($rec['siguiente']) && strtotime($rec['siguiente']) <= strtotime(date('Y-m-d'))) {
                 // clonar
                 $new = $f;
                 unset($new['id'], $new['recurrencia']);
@@ -1500,6 +1557,61 @@ class FacturasController extends Controller
         }
 
         return $candidate->format('Y-m-d');
+    }
+
+    private function isConfiguredRecurrence(array $recurrence): bool
+    {
+        return !empty($recurrence['next_send'])
+            || !empty($recurrence['day_of_month'])
+            || !empty($recurrence['every_months'])
+            || !empty($recurrence['siguiente'])
+            || !empty($recurrence['freq']);
+    }
+
+    private function moveRecurrenceToNextAvailableCycle(array $invoice, array $recurrence): array
+    {
+        $isLegacy = empty($recurrence['next_send'])
+            && empty($recurrence['day_of_month'])
+            && empty($recurrence['every_months'])
+            && (!empty($recurrence['siguiente']) || !empty($recurrence['freq']));
+        $nextKey = $isLegacy ? 'siguiente' : 'next_send';
+        $day = max(1, min(31, (int) ($recurrence['day_of_month'] ?? date('j', strtotime((string) ($recurrence[$nextKey] ?? 'now'))))));
+        $everyMonths = max(1, min(12, (int) ($recurrence['every_months'] ?? 1)));
+        $leadDays = max(0, (int) ($recurrence['lead_days_before'] ?? 0));
+
+        try {
+            $candidate = !empty($recurrence[$nextKey])
+                ? \Illuminate\Support\Carbon::parse((string) $recurrence[$nextKey])->startOfDay()
+                : null;
+        } catch (\Throwable) {
+            $candidate = null;
+        }
+
+        if (!$candidate) {
+            $recurrence[$nextKey] = $this->calculateNextRecurringSendDate(
+                $day,
+                $everyMonths,
+                (string) ($invoice['fecha'] ?? date('Y-m-d')),
+                $invoice['vencimiento'] ?? null,
+                (array) ($invoice['items'] ?? [])
+            );
+            return $recurrence;
+        }
+
+        $today = \Illuminate\Support\Carbon::today();
+        while ($candidate->lt($today)) {
+            if ($leadDays > 0) {
+                $nextDue = $candidate->copy()->addDays($leadDays)->addMonthsNoOverflow($everyMonths);
+                $nextDue->day(min($day, $nextDue->daysInMonth));
+                $candidate = $nextDue->subDays($leadDays)->startOfDay();
+            } else {
+                $candidate->addMonthsNoOverflow($everyMonths);
+                $candidate->day(min($day, $candidate->daysInMonth));
+            }
+        }
+
+        $recurrence[$nextKey] = $candidate->format('Y-m-d');
+        return $recurrence;
     }
 
     protected function calculateNextRecurringSendDate(int $dayOfMonth, int $everyMonths = 1, ?string $issueDate = null, ?string $dueDate = null, array $items = []): string

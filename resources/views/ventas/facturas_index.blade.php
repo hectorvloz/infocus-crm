@@ -167,9 +167,37 @@
               </td>
               <td class="py-3 pr-6 md:pr-8 whitespace-nowrap">
                 @if(($f['_is_recurrente'] ?? false))
-                  <span class="inline-flex items-center rounded-full bg-sky-50 text-sky-700 border border-sky-200 px-3 py-1 text-sm font-medium">
-                    {{ $f['_recurrencia_label'] ?? 'Recurrente' }}
-                  </span>
+                  @php
+                    $recurrenceEnabled = (bool) ($f['_recurrencia_enabled'] ?? false);
+                    $recurrenceLabel = $f['_recurrencia_label'] ?? 'Recurrente';
+                    $recurrenceTargetId = $f['_recurrencia_target_id'] ?? null;
+                  @endphp
+                  <div class="inline-flex items-center gap-2">
+                    <span
+                      data-recurrence-badge="{{ $recurrenceTargetId }}"
+                      class="inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium {{ $recurrenceEnabled ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-50 text-slate-500 border-slate-200' }}"
+                    >
+                      {{ $recurrenceLabel }}
+                    </span>
+                    @if(($f['_recurrencia_toggleable'] ?? false))
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked="{{ $recurrenceEnabled ? 'true' : 'false' }}"
+                        aria-label="{{ $recurrenceEnabled ? 'Desactivar' : 'Activar' }} recurrencia {{ $recurrenceLabel }}"
+                        title="{{ $recurrenceEnabled ? 'Desactivar próximas facturas' : 'Activar próximas facturas' }}"
+                        data-recurrence-toggle="{{ $recurrenceTargetId }}"
+                        data-recurrence-url="{{ route('api.facturas.recurrencia.toggle', $f['id']) }}"
+                        data-recurrence-enabled="{{ $recurrenceEnabled ? '1' : '0' }}"
+                        data-recurrence-frequency="{{ $recurrenceLabel }}"
+                        class="group inline-flex shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+                      >
+                        <span data-recurrence-track class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {{ $recurrenceEnabled ? 'bg-sky-500' : 'bg-slate-300' }}">
+                          <span data-recurrence-knob class="inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform {{ $recurrenceEnabled ? 'translate-x-4' : 'translate-x-0.5' }}"></span>
+                        </span>
+                      </button>
+                    @endif
+                  </div>
                 @else
                   <span class="text-slate-400">—</span>
                 @endif
@@ -478,6 +506,73 @@
           }
         } catch(e) {
           btn.disabled = false;
+        }
+      });
+    });
+
+    function paintRecurrenceToggle(button, enabled) {
+      const frequency = button.dataset.recurrenceFrequency || 'Recurrente';
+      const track = button.querySelector('[data-recurrence-track]');
+      const knob = button.querySelector('[data-recurrence-knob]');
+      const badge = button.closest('div')?.querySelector('[data-recurrence-badge]');
+
+      button.dataset.recurrenceEnabled = enabled ? '1' : '0';
+      button.setAttribute('aria-checked', enabled ? 'true' : 'false');
+      button.setAttribute('aria-label', `${enabled ? 'Desactivar' : 'Activar'} recurrencia ${frequency}`);
+      button.title = enabled ? 'Desactivar próximas facturas' : 'Activar próximas facturas';
+      track?.classList.toggle('bg-sky-500', enabled);
+      track?.classList.toggle('bg-slate-300', !enabled);
+      knob?.classList.toggle('translate-x-4', enabled);
+      knob?.classList.toggle('translate-x-0.5', !enabled);
+      badge?.classList.toggle('bg-sky-50', enabled);
+      badge?.classList.toggle('text-sky-700', enabled);
+      badge?.classList.toggle('border-sky-200', enabled);
+      badge?.classList.toggle('bg-slate-50', !enabled);
+      badge?.classList.toggle('text-slate-500', !enabled);
+      badge?.classList.toggle('border-slate-200', !enabled);
+    }
+
+    document.querySelectorAll('[data-recurrence-toggle]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (button.disabled) return;
+
+        const recurrenceId = button.dataset.recurrenceToggle;
+        const enabled = button.dataset.recurrenceEnabled !== '1';
+        const relatedButtons = Array.from(document.querySelectorAll('[data-recurrence-toggle]'))
+          .filter((candidate) => candidate.dataset.recurrenceToggle === recurrenceId);
+
+        relatedButtons.forEach((candidate) => {
+          candidate.disabled = true;
+          candidate.setAttribute('aria-busy', 'true');
+          candidate.classList.add('opacity-60');
+        });
+
+        try {
+          const response = await fetch(button.dataset.recurrenceUrl, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-CSRF-TOKEN': window.csrfToken,
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ enabled }),
+          });
+          const json = await response.json().catch(() => null);
+          if (!response.ok || !json?.ok) {
+            throw new Error(json?.message || 'No se pudo actualizar la recurrencia');
+          }
+
+          relatedButtons.forEach((candidate) => paintRecurrenceToggle(candidate, json.enabled));
+          window.showNotification?.(json.message, 'success');
+        } catch (error) {
+          window.showNotification?.(error?.message || 'No se pudo actualizar la recurrencia', 'error');
+        } finally {
+          relatedButtons.forEach((candidate) => {
+            candidate.disabled = false;
+            candidate.removeAttribute('aria-busy');
+            candidate.classList.remove('opacity-60');
+          });
         }
       });
     });

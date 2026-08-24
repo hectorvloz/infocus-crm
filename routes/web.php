@@ -202,6 +202,7 @@ Route::middleware('auth.session')->group(function () {
     
     Route::post('/api/facturas/duplicar/{id}', [FacturasController::class, 'duplicar'])->name('api.facturas.duplicar');
     Route::post('/api/facturas/recurrencia', [FacturasController::class, 'programarRecurrencia'])->name('api.facturas.recurrencia');
+    Route::patch('/api/facturas/{id}/recurrencia', [FacturasController::class, 'toggleRecurrencia'])->name('api.facturas.recurrencia.toggle');
     Route::post('/api/facturas/enviar', [FacturasController::class, 'enviarEmail'])->name('api.facturas.enviar');
     Route::post('/api/facturas/estado', [FacturasController::class, 'cambiarEstado'])->name('api.facturas.estado');
     Route::get('/configuracion', [\App\Http\Controllers\SettingsController::class, 'edit'])->name('settings.edit');

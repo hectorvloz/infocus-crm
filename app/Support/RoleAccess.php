@@ -116,6 +116,7 @@ class RoleAccess
         'facturas.update' => 'facturas.update',
         'api.facturas.pagar' => 'facturas.update',
         'api.facturas.draft' => 'facturas.update',
+        'api.facturas.recurrencia.toggle' => 'facturas.update',
         'api.facturas.enviar' => 'facturas.read',
         'api.facturas.estado' => 'facturas.update',
         'facturas.destroy' => 'facturas.delete',
