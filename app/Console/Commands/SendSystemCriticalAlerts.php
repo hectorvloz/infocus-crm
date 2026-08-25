@@ -97,10 +97,10 @@ class SendSystemCriticalAlerts extends Command
 
         $gateway = strtolower((string) ($settings['payment_gateway'] ?? ''));
         if ($gateway === 'wompi') {
-            if (empty($settings['wompi_public_key']) || empty($settings['wompi_integrity_secret'])) {
+            if (empty($settings['wompi_public_key']) || empty($settings['wompi_integrity_secret']) || empty($settings['wompi_event_secret'])) {
                 $issues[] = [
                     'title' => 'Wompi incompleto',
-                    'detail' => 'Falta llave publica o secreto de integridad.',
+                    'detail' => 'Falta llave publica, secreto de integridad o secreto de eventos.',
                 ];
             }
         }

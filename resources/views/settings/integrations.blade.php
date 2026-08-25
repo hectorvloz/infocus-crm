@@ -164,11 +164,25 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Moneda</label>
                         <input type="text" name="wompi_currency" value="{{ $settings['wompi_currency'] ?? 'COP' }}" maxlength="3" placeholder="COP" class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-[#ecfe88] focus:border-[#ecfe88] sm:text-sm font-mono text-xs uppercase">
                     </div>
+                    <div>
+                        <label for="wompi_event_secret" class="block text-sm font-medium text-slate-700 mb-1">Event Secret</label>
+                        <input id="wompi_event_secret" type="password" name="wompi_event_secret" placeholder="{{ !empty($settings['wompi_event_secret']) ? '•••••••••• (guardado) - escribe solo para cambiar' : 'prod_events_...' }}" autocomplete="new-password" class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-[#ecfe88] focus:border-[#ecfe88] sm:text-sm font-mono text-xs">
+                        @if(!empty($settings['wompi_event_secret']))
+                            <div class="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">Event Secret guardado</div>
+                        @else
+                            <div class="mt-2 text-[11px] text-amber-600 font-semibold">Necesario para autenticar los webhooks de Wompi</div>
+                        @endif
+                    </div>
+                    <div>
+                        <label for="wompi_webhook_url" class="block text-sm font-medium text-slate-700 mb-1">URL de Eventos</label>
+                        <input id="wompi_webhook_url" type="url" value="{{ route('webhooks.wompi') }}" readonly class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl bg-slate-50 text-slate-600 sm:text-sm font-mono text-xs cursor-text">
+                        <p class="mt-2 text-[11px] text-slate-500">Copia esta URL en Wompi → Seguimiento de transacciones.</p>
+                    </div>
                 </div>
                 <div class="md:pl-13 mt-2 text-xs text-slate-500 space-y-1">
-                    <div><strong>Si debes poner aqui:</strong> Llave publica en <strong>Public Key</strong> y Secreto de Integridad en <strong>Integrity Secret</strong>.</div>
-                    <div><strong>No debes poner aqui:</strong> Llave privada ni Secreto de eventos.</div>
-                    <div>Motivo: esos dos datos se usan para acciones de servidor/webhooks y no para abrir el checkout del cliente.</div>
+                    <div><strong>Debes poner aqui:</strong> Llave publica, Secreto de Integridad y Secreto de Eventos del mismo ambiente.</div>
+                    <div><strong>No debes poner aqui:</strong> La llave privada; este flujo de Checkout Web no la necesita.</div>
+                    <div>El Secreto de Integridad firma el checkout y el Secreto de Eventos autentica los webhooks antes de marcar una factura como pagada.</div>
                     <div>Wompi solo se usa para facturas en <strong>COP</strong>. Para otras monedas se usara Stripe o PayPal.</div>
                 </div>
             </div>

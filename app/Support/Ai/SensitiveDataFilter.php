@@ -17,6 +17,7 @@ class SensitiveDataFilter
         'stripe_secret',
         'paypal_secret',
         'wompi_integrity_secret',
+        'wompi_event_secret',
     ];
 
     public function cleanText(?string $text): string

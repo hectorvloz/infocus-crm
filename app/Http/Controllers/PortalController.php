@@ -916,12 +916,25 @@ class PortalController extends Controller
             ]);
         }
 
+        $eventSecret = trim($this->decryptSetting($settings['wompi_event_secret'] ?? ''));
+        if ($eventSecret === '') {
+            return back()->withErrors([
+                'pago' => 'Wompi no esta configurado completamente: falta el Secreto de Eventos.',
+            ]);
+        }
+
         // Evitar configuraciones cruzadas (llave live en test o viceversa).
         if ($mode === 'test' && !str_starts_with($publicKey, 'pub_test_')) {
             return back()->withErrors(['pago' => 'Wompi en modo Test requiere una llave publica que empiece por pub_test_.']);
         }
         if ($mode === 'live' && !str_starts_with($publicKey, 'pub_prod_')) {
             return back()->withErrors(['pago' => 'Wompi en modo Live requiere una llave publica que empiece por pub_prod_.']);
+        }
+        if ($mode === 'test' && (!str_starts_with($integritySecret, 'test_integrity_') || !str_starts_with($eventSecret, 'test_events_'))) {
+            return back()->withErrors(['pago' => 'Los secretos de Wompi no corresponden al modo Test.']);
+        }
+        if ($mode === 'live' && (!str_starts_with($integritySecret, 'prod_integrity_') || !str_starts_with($eventSecret, 'prod_events_'))) {
+            return back()->withErrors(['pago' => 'Los secretos de Wompi no corresponden al modo Live.']);
         }
 
         $amount = (int) round((float) ($invoice['total'] ?? 0) * 100);
@@ -1188,14 +1201,12 @@ class PortalController extends Controller
         $client = $this->getClient($id, $token);
         $invoiceId = (string) $request->query('invoice_id');
         $reference = (string) $request->query('reference');
-        $status = strtoupper((string) $request->query('status', 'APPROVED'));
+        $transactionId = trim((string) $request->query('id'));
 
-        if ($status !== 'APPROVED') {
+        if ($transactionId === '' || !$this->confirmWompiRedirectPayment($invoiceId, $client, $transactionId, $reference)) {
             return redirect()->route('portal.dashboard', compact('id', 'token'))
-                ->withErrors(['pago' => 'El pago en Wompi no fue aprobado.']);
+                ->withErrors(['pago' => 'El pago en Wompi aun no ha podido ser confirmado.']);
         }
-
-        $this->markInvoicePaidByWompi($invoiceId, $client, $reference);
 
         return redirect()->route('portal.dashboard', compact('id', 'token'))
             ->with('msg_ok', 'Pago recibido correctamente por Wompi. ¡Gracias!');
@@ -1206,14 +1217,12 @@ class PortalController extends Controller
         $client = $this->getClientFromAuth();
         $invoiceId = (string) $request->query('invoice_id');
         $reference = (string) $request->query('reference');
-        $status = strtoupper((string) $request->query('status', 'APPROVED'));
+        $transactionId = trim((string) $request->query('id'));
 
-        if ($status !== 'APPROVED') {
+        if ($transactionId === '' || !$this->confirmWompiRedirectPayment($invoiceId, $client, $transactionId, $reference)) {
             return redirect()->route('portal.auth.dashboard')
-                ->withErrors(['pago' => 'El pago en Wompi no fue aprobado.']);
+                ->withErrors(['pago' => 'El pago en Wompi aun no ha podido ser confirmado.']);
         }
-
-        $this->markInvoicePaidByWompi($invoiceId, $client, $reference);
 
         return redirect()->route('portal.auth.dashboard')
             ->with('msg_ok', 'Pago recibido correctamente por Wompi. ¡Gracias!');
@@ -1223,14 +1232,12 @@ class PortalController extends Controller
     {
         [$invoice, $client] = $this->getPublicInvoiceAndClient($invoiceId);
         $reference = (string) $request->query('reference');
-        $status = strtoupper((string) $request->query('status', 'APPROVED'));
+        $transactionId = trim((string) $request->query('id'));
 
-        if ($status !== 'APPROVED') {
+        if ($transactionId === '' || !$this->confirmWompiRedirectPayment((string) ($invoice['id'] ?? $invoiceId), $client, $transactionId, $reference)) {
             return redirect()->route('facturas.public', $invoiceId)
-                ->withErrors(['pago' => 'El pago en Wompi no fue aprobado.']);
+                ->withErrors(['pago' => 'El pago en Wompi aun no ha podido ser confirmado.']);
         }
-
-        $this->markInvoicePaidByWompi((string) ($invoice['id'] ?? $invoiceId), $client, $reference);
 
         return redirect()->route('facturas.public', $invoiceId)
             ->with('msg_ok', 'Pago recibido correctamente por Wompi. ¡Gracias!');
@@ -1367,7 +1374,7 @@ class PortalController extends Controller
         $this->sendInvoicePaidEmail($updated, $client, $pago);
     }
 
-    private function markInvoicePaidByWompi(string $invoiceId, array $client, ?string $reference): void
+    private function markInvoicePaidByWompi(string $invoiceId, array $client, ?string $reference, ?string $transactionId = null): void
     {
         $invoice = $this->facturas->find($invoiceId);
         if (!$invoice || ($invoice['cliente_id'] ?? '') !== ($client['id'] ?? '')) return;
@@ -1378,7 +1385,10 @@ class PortalController extends Controller
             'fecha' => now()->toDateString(),
             'monto' => $invoice['total'] ?? 0,
             'metodo' => 'Wompi',
-            'nota' => $reference ? 'Referencia: '.$reference : '',
+            'nota' => implode(' | ', array_filter([
+                $reference ? 'Referencia: '.$reference : null,
+                $transactionId ? 'Transaccion: '.$transactionId : null,
+            ])),
             'created_at' => now()->toISOString(),
         ];
 
@@ -1495,12 +1505,28 @@ class PortalController extends Controller
     public function wompiWebhook(Request $request)
     {
         $payload = $request->all();
+        $settings = $this->settings->find('settings') ?: [];
+        $eventSecret = trim($this->decryptSetting($settings['wompi_event_secret'] ?? ''));
+
+        if ($eventSecret === '') {
+            return response()->json(['ok' => false, 'error' => 'webhook_not_configured'], 503);
+        }
+
+        if (!$this->hasValidWompiEventSignature($payload, $eventSecret, (string) $request->header('X-Event-Checksum', ''))) {
+            return response()->json(['ok' => false, 'error' => 'invalid_signature'], 401);
+        }
+
+        $expectedEnvironment = strtolower((string) ($settings['wompi_mode'] ?? 'test')) === 'live' ? 'prod' : 'test';
+        if (strtolower((string) ($payload['environment'] ?? '')) !== $expectedEnvironment) {
+            return response()->json(['ok' => true, 'ignored' => 'environment']);
+        }
+
         $event = (string) ($payload['event'] ?? '');
         $data = $payload['data'] ?? [];
         $transaction = is_array($data) ? ($data['transaction'] ?? $data) : [];
 
-        // Process only approved transaction updates; ignore other events gracefully.
-        if ($event !== '' && !in_array($event, ['transaction.updated', 'transaction.created'], true)) {
+        // Process only transaction status updates; ignore other signed events gracefully.
+        if ($event !== 'transaction.updated') {
             return response()->json(['ok' => true, 'ignored' => 'event']);
         }
 
@@ -1520,6 +1546,10 @@ class PortalController extends Controller
             return response()->json(['ok' => true, 'ignored' => 'invoice_not_found']);
         }
 
+        if (!$this->wompiTransactionMatchesInvoice($transaction, $invoice, $reference)) {
+            return response()->json(['ok' => false, 'error' => 'transaction_mismatch'], 422);
+        }
+
         $clientId = (string) ($invoice['cliente_id'] ?? '');
         if ($clientId === '') {
             return response()->json(['ok' => true, 'ignored' => 'client_missing']);
@@ -1530,9 +1560,148 @@ class PortalController extends Controller
             return response()->json(['ok' => true, 'ignored' => 'client_not_found']);
         }
 
-        $this->markInvoicePaidByWompi($invoiceId, $client, $reference);
+        $this->markInvoicePaidByWompi(
+            $invoiceId,
+            $client,
+            $reference,
+            trim((string) ($transaction['id'] ?? ''))
+        );
 
         return response()->json(['ok' => true, 'processed' => true]);
+    }
+
+    private function hasValidWompiEventSignature(array $payload, string $eventSecret, string $headerChecksum): bool
+    {
+        $signature = $payload['signature'] ?? null;
+        $properties = is_array($signature) ? ($signature['properties'] ?? null) : null;
+        $bodyChecksum = is_array($signature) ? trim((string) ($signature['checksum'] ?? '')) : '';
+        $timestamp = $payload['timestamp'] ?? null;
+        $data = $payload['data'] ?? null;
+
+        if (!is_array($properties) || $properties === [] || count($properties) > 50 || !is_array($data)) {
+            return false;
+        }
+
+        $timestamp = is_int($timestamp) || is_string($timestamp) ? (string) $timestamp : '';
+        if ($timestamp === '' || preg_match('/^\d{1,20}$/', $timestamp) !== 1) {
+            return false;
+        }
+
+        $signedValues = '';
+        foreach ($properties as $property) {
+            if (!is_string($property) || preg_match('/^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/', $property) !== 1) {
+                return false;
+            }
+
+            $value = $this->wompiEventPropertyValue($data, $property);
+            if ($value === null) {
+                return false;
+            }
+            $signedValues .= $value;
+        }
+
+        $expectedChecksum = hash('sha256', $signedValues.$timestamp.$eventSecret);
+        $providedChecksums = array_values(array_filter([
+            strtolower(trim($headerChecksum)),
+            strtolower($bodyChecksum),
+        ], fn (string $checksum) => $checksum !== ''));
+
+        if ($providedChecksums === []) {
+            return false;
+        }
+
+        foreach ($providedChecksums as $providedChecksum) {
+            if (!hash_equals($expectedChecksum, $providedChecksum)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function wompiEventPropertyValue(array $data, string $property): ?string
+    {
+        $value = $data;
+        foreach (explode('.', $property) as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return null;
+            }
+            $value = $value[$segment];
+        }
+
+        return is_scalar($value) ? (string) $value : null;
+    }
+
+    private function confirmWompiRedirectPayment(string $invoiceId, array $client, string $transactionId, string $reference): bool
+    {
+        $invoice = $this->facturas->find($invoiceId);
+        if (!$invoice || ($invoice['cliente_id'] ?? '') !== ($client['id'] ?? '')) {
+            return false;
+        }
+        if (($invoice['estado'] ?? '') === 'Pagada') {
+            return true;
+        }
+
+        $transaction = $this->fetchWompiTransaction($transactionId);
+        if (!$transaction || !$this->wompiTransactionMatchesInvoice($transaction, $invoice, $reference)) {
+            return false;
+        }
+
+        $this->markInvoicePaidByWompi($invoiceId, $client, $reference, $transactionId);
+
+        return true;
+    }
+
+    private function fetchWompiTransaction(string $transactionId): ?array
+    {
+        if (preg_match('/^[A-Za-z0-9._-]{1,255}$/', $transactionId) !== 1) {
+            return null;
+        }
+
+        $settings = $this->settings->find('settings') ?: [];
+        $publicKey = trim((string) ($settings['wompi_public_key'] ?? ''));
+        if ($publicKey === '') {
+            return null;
+        }
+
+        $mode = strtolower((string) ($settings['wompi_mode'] ?? 'test'));
+        $apiBase = $mode === 'live' ? 'https://production.wompi.co/v1' : 'https://sandbox.wompi.co/v1';
+
+        try {
+            $response = Http::withToken($publicKey)
+                ->acceptJson()
+                ->timeout(10)
+                ->get($apiBase.'/transactions/'.rawurlencode($transactionId));
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $transaction = $response->successful() ? $response->json('data') : null;
+
+        return is_array($transaction) && (string) ($transaction['id'] ?? '') === $transactionId
+            ? $transaction
+            : null;
+    }
+
+    private function wompiTransactionMatchesInvoice(array $transaction, array $invoice, string $reference): bool
+    {
+        $transactionId = trim((string) ($transaction['id'] ?? ''));
+        $transactionReference = trim((string) ($transaction['reference'] ?? ''));
+        $transactionStatus = strtoupper((string) ($transaction['status'] ?? ''));
+        $transactionCurrency = strtoupper((string) ($transaction['currency'] ?? ''));
+        $amountInCents = filter_var($transaction['amount_in_cents'] ?? null, FILTER_VALIDATE_INT);
+        $expectedAmountInCents = (int) round((float) ($invoice['total'] ?? 0) * 100);
+        $invoiceCurrency = strtoupper((string) ($invoice['moneda'] ?? 'COP'));
+
+        return $transactionId !== ''
+            && $transactionStatus === 'APPROVED'
+            && $transactionReference !== ''
+            && ($reference === '' || hash_equals($reference, $transactionReference))
+            && hash_equals((string) ($invoice['id'] ?? ''), $this->extractInvoiceIdFromWompiReference($transactionReference))
+            && $amountInCents !== false
+            && $amountInCents === $expectedAmountInCents
+            && $invoiceCurrency === 'COP'
+            && $transactionCurrency === 'COP';
     }
 
     private function extractInvoiceIdFromWompiReference(string $reference): string
@@ -1540,7 +1709,7 @@ class PortalController extends Controller
         $reference = trim($reference);
         if ($reference === '') return '';
 
-        if (preg_match('/^INV-([A-Za-z0-9]+)(?:-[A-Za-z0-9]+)?$/', $reference, $matches) === 1) {
+        if (preg_match('/^INV-([A-Za-z0-9_-]+)-[A-Za-z0-9]{6}$/', $reference, $matches) === 1) {
             return (string) ($matches[1] ?? '');
         }
 

@@ -965,6 +965,7 @@ class SettingsController extends Controller
             'stripe_currency' => 'nullable|string|size:3',
             'wompi_public_key' => 'nullable|string',
             'wompi_integrity_secret' => 'nullable|string',
+            'wompi_event_secret' => 'nullable|string|max:1000',
             'wompi_mode' => 'nullable|in:test,live',
             'wompi_currency' => 'nullable|string|size:3',
             'google_analytics_id' => 'nullable|string',
@@ -983,7 +984,36 @@ class SettingsController extends Controller
         ]);
         // Encrypt sensitive secrets — only overwrite if a new non-empty value was submitted
         $current = $this->store->find('settings') ?: [];
-        $secretFields = ['stripe_secret', 'paypal_secret', 'wompi_integrity_secret'];
+        $gateway = strtolower((string) ($data['payment_gateway'] ?? $current['payment_gateway'] ?? ''));
+        if ($gateway === 'wompi') {
+            $mode = strtolower((string) ($data['wompi_mode'] ?? $current['wompi_mode'] ?? 'test'));
+            $expectedPrefixes = $mode === 'live'
+                ? ['wompi_public_key' => 'pub_prod_', 'wompi_integrity_secret' => 'prod_integrity_', 'wompi_event_secret' => 'prod_events_']
+                : ['wompi_public_key' => 'pub_test_', 'wompi_integrity_secret' => 'test_integrity_', 'wompi_event_secret' => 'test_events_'];
+            $configuredValues = [
+                'wompi_public_key' => trim((string) ($data['wompi_public_key'] ?? $current['wompi_public_key'] ?? '')),
+                'wompi_integrity_secret' => filled($data['wompi_integrity_secret'] ?? null) && $data['wompi_integrity_secret'] !== '••••••••'
+                    ? trim((string) $data['wompi_integrity_secret'])
+                    : $this->decryptSetting($current['wompi_integrity_secret'] ?? ''),
+                'wompi_event_secret' => filled($data['wompi_event_secret'] ?? null) && $data['wompi_event_secret'] !== '••••••••'
+                    ? trim((string) $data['wompi_event_secret'])
+                    : $this->decryptSetting($current['wompi_event_secret'] ?? ''),
+            ];
+            $errors = [];
+            foreach ($expectedPrefixes as $field => $prefix) {
+                if ($configuredValues[$field] === '' || !str_starts_with($configuredValues[$field], $prefix)) {
+                    $errors[$field] = 'Este valor debe corresponder al ambiente '.($mode === 'live' ? 'Live' : 'Test').' y comenzar por '.$prefix;
+                }
+            }
+            if (strtoupper((string) ($data['wompi_currency'] ?? $current['wompi_currency'] ?? 'COP')) !== 'COP') {
+                $errors['wompi_currency'] = 'Wompi Colombia solo permite pagos en COP.';
+            }
+            if ($errors !== []) {
+                throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            }
+        }
+
+        $secretFields = ['stripe_secret', 'paypal_secret', 'wompi_integrity_secret', 'wompi_event_secret'];
         foreach ($secretFields as $field) {
             if (!empty($data[$field])) {
                 // Only re-encrypt if user typed something new (not the masked placeholder)
