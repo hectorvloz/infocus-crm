@@ -909,6 +909,13 @@ class PortalController extends Controller
             return back()->withErrors(['pago' => 'Wompi no esta configurado. Contacta al equipo.']);
         }
 
+        $integritySecret = trim($this->decryptSetting($settings['wompi_integrity_secret'] ?? ''));
+        if ($integritySecret === '') {
+            return back()->withErrors([
+                'pago' => 'Wompi no esta configurado completamente: falta el Secreto de Integridad.',
+            ]);
+        }
+
         // Evitar configuraciones cruzadas (llave live en test o viceversa).
         if ($mode === 'test' && !str_starts_with($publicKey, 'pub_test_')) {
             return back()->withErrors(['pago' => 'Wompi en modo Test requiere una llave publica que empiece por pub_test_.']);
@@ -964,10 +971,7 @@ class PortalController extends Controller
             $query['customer-data:email'] = $email;
         }
 
-        $integritySecret = trim($this->decryptSetting($settings['wompi_integrity_secret'] ?? ''));
-        if ($integritySecret !== '') {
-            $query['signature:integrity'] = hash('sha256', $reference.$amount.$currency.$integritySecret);
-        }
+        $query['signature:integrity'] = hash('sha256', $reference.$amount.$currency.$integritySecret);
 
         return redirect()->away('https://checkout.wompi.co/p/?'.http_build_query($query));
     }
