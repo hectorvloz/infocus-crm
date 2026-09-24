@@ -6871,6 +6871,39 @@
     .infocus-ai-message strong {
       font-weight: 900;
     }
+    .infocus-ai-message.assistant { white-space: normal; }
+    .infocus-ai-message.assistant p { margin: 0; }
+    .infocus-ai-message.assistant p + p,
+    .infocus-ai-message.assistant ul + p,
+    .infocus-ai-message.assistant ol + p,
+    .infocus-ai-message.assistant .infocus-ai-table-wrap + p,
+    .infocus-ai-message.assistant .infocus-ai-code-block + p { margin-top: .65rem; }
+    .infocus-ai-message.assistant h1,
+    .infocus-ai-message.assistant h2,
+    .infocus-ai-message.assistant h3 { margin: .15rem 0 .42rem; color: #0f172a; font-weight: 950; line-height: 1.2; }
+    .infocus-ai-message.assistant h1 { font-size: 1.05rem; }
+    .infocus-ai-message.assistant h2 { font-size: .96rem; }
+    .infocus-ai-message.assistant h3 { font-size: .88rem; }
+    .infocus-ai-message.assistant ul,
+    .infocus-ai-message.assistant ol { margin: .4rem 0; padding-left: 1.3rem; }
+    .infocus-ai-message.assistant ul { list-style: disc; }
+    .infocus-ai-message.assistant ol { list-style: decimal; }
+    .infocus-ai-message.assistant li + li { margin-top: .25rem; }
+    .infocus-ai-message.assistant blockquote { margin: .5rem 0; border-left: 3px solid #c4b5fd; padding: .35rem .6rem; color: #475569; background: rgba(245,243,255,.7); }
+    .infocus-ai-inline-code { border: 1px solid #dbe4f0; border-radius: .35rem; background: #f1f5f9; padding: .08rem .3rem; color: #be123c; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .76rem; }
+    .infocus-ai-table-wrap { width: 100%; margin: .55rem 0; overflow-x: auto; border: 1px solid #dbe4f0; border-radius: .7rem; background: #fff; }
+    .infocus-ai-table { width: 100%; min-width: 28rem; border-collapse: collapse; font-size: .74rem; line-height: 1.35; }
+    .infocus-ai-table th { background: #f1f5f9; color: #0f172a; font-weight: 950; text-align: left; }
+    .infocus-ai-table th,
+    .infocus-ai-table td { padding: .48rem .55rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .infocus-ai-table tbody tr:last-child td { border-bottom: 0; }
+    .infocus-ai-table tbody tr:nth-child(even) { background: #f8fafc; }
+    .infocus-ai-code-block { width: 100%; margin: .55rem 0; overflow: hidden; border: 1px solid #263247; border-radius: .72rem; background: #0f172a; box-shadow: 0 12px 26px rgba(15,23,42,.14); }
+    .infocus-ai-code-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .42rem .58rem; border-bottom: 1px solid #263247; background: #111c31; color: #94a3b8; font-size: .66rem; font-weight: 850; }
+    .infocus-ai-code-copy { display: inline-flex; align-items: center; gap: .3rem; border: 0; border-radius: .4rem; background: #25324a; padding: .3rem .48rem; color: #e2e8f0; font-size: .65rem; font-weight: 850; }
+    .infocus-ai-code-copy:hover { background: #334155; color: #fff; }
+    .infocus-ai-code-block pre { margin: 0; max-width: 100%; overflow: auto; padding: .75rem; color: #e2e8f0; white-space: pre; tab-size: 2; }
+    .infocus-ai-code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .73rem; line-height: 1.55; }
     .infocus-ai-message .infocus-ai-action-link {
       display: inline-flex;
       align-items: center;
@@ -7060,6 +7093,12 @@
 
     .infocus-ai-composer {
       padding: .62rem .72rem .72rem;
+      border-radius: 1.1rem;
+      transition: background-color .16s ease, box-shadow .16s ease;
+    }
+    .infocus-ai-composer.is-image-dragover {
+      background: rgba(236, 254, 136, .52);
+      box-shadow: inset 0 0 0 2px #84cc16;
     }
     .infocus-ai-input-shell {
       position: relative;
@@ -7381,15 +7420,169 @@
         }[char]));
       }
 
-      function renderAiMarkdown(value) {
+      function renderAiInlineMarkdown(value) {
         let html = escapeHtml(value);
-        html = html.replace(/\*\*([^*\n][\s\S]*?[^*\n])\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g, (match, label, href) => {
+        const inlineCode = [];
+        html = html.replace(/`([^`\n]+)`/g, (_match, code) => {
+          const token = `\uE000${inlineCode.length}\uE001`;
+          inlineCode.push(`<code class="infocus-ai-inline-code">${code}</code>`);
+          return token;
+        });
+        html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+        html = html.replace(/~~([^~\n]+)~~/g, '<s>$1</s>');
+        html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+        html = html.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+|\/(?!\/)[^\s)]+)\)/g, (match, label, href) => {
           const safeHref = String(href || '').replace(/"/g, '%22');
           const icon = safeHref.startsWith('/facturas/') ? '<i class="fa-regular fa-file-lines" aria-hidden="true"></i>' : '<i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>';
-          return `<a class="infocus-ai-action-link" href="${safeHref}">${icon}<span>${label}</span></a>`;
+          const external = /^https?:\/\//i.test(safeHref) ? ' target="_blank" rel="noopener noreferrer"' : '';
+          return `<a class="infocus-ai-action-link" href="${safeHref}"${external}>${icon}<span>${label}</span></a>`;
         });
+        html = html.replace(/\uE000(\d+)\uE001/g, (_match, index) => inlineCode[Number(index)] || '');
         return html;
+      }
+
+      function aiMarkdownTableCells(line) {
+        const normalized = String(line || '').trim().replace(/^\|/, '').replace(/\|$/, '');
+        return normalized.split('|').map((cell) => cell.trim());
+      }
+
+      function isAiMarkdownTableSeparator(line) {
+        const cells = aiMarkdownTableCells(line);
+        return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+      }
+
+      function renderAiMarkdownTable(headerLine, separatorLine, rowLines) {
+        const headers = aiMarkdownTableCells(headerLine);
+        const alignments = aiMarkdownTableCells(separatorLine).map((cell) => {
+          if (/^:-+:$/.test(cell)) return 'center';
+          if (/-+:$/.test(cell)) return 'right';
+          return 'left';
+        });
+        const head = headers.map((cell, index) => `<th style="text-align:${alignments[index] || 'left'}">${renderAiInlineMarkdown(cell)}</th>`).join('');
+        const rows = rowLines.map((line) => {
+          const cells = aiMarkdownTableCells(line);
+          while (cells.length < headers.length) cells.push('');
+          return `<tr>${headers.map((_, index) => `<td style="text-align:${alignments[index] || 'left'}">${renderAiInlineMarkdown(cells[index] || '')}</td>`).join('')}</tr>`;
+        }).join('');
+        return `<div class="infocus-ai-table-wrap"><table class="infocus-ai-table"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
+
+      function renderAiMarkdown(value) {
+        const lines = String(value || '').replace(/\r\n?/g, '\n').split('\n');
+        const blocks = [];
+        const startsBlock = (index) => {
+          const line = lines[index] || '';
+          const next = lines[index + 1] || '';
+          return /^```/.test(line.trim())
+            || /^#{1,3}\s+/.test(line)
+            || /^\s*(?:[-*+]\s+|\d+[.)]\s+)/.test(line)
+            || /^\s*>\s?/.test(line)
+            || /^\s*(?:-{3,}|\*{3,})\s*$/.test(line)
+            || (line.includes('|') && isAiMarkdownTableSeparator(next));
+        };
+
+        for (let index = 0; index < lines.length;) {
+          const line = lines[index];
+          if (line.trim() === '') {
+            index += 1;
+            continue;
+          }
+
+          const fence = line.trim().match(/^```\s*([a-z0-9_+.-]*)/i);
+          if (fence) {
+            const language = fence[1] || 'código';
+            const code = [];
+            index += 1;
+            while (index < lines.length && !/^```\s*$/.test(lines[index].trim())) {
+              code.push(lines[index]);
+              index += 1;
+            }
+            if (index < lines.length) index += 1;
+            blocks.push(`<div class="infocus-ai-code-block"><div class="infocus-ai-code-head"><span>${escapeHtml(language)}</span><button type="button" class="infocus-ai-code-copy" data-copy-ai-code><i class="fa-regular fa-copy" aria-hidden="true"></i><span>Copiar</span></button></div><pre><code>${escapeHtml(code.join('\n'))}</code></pre></div>`);
+            continue;
+          }
+
+          if (line.includes('|') && isAiMarkdownTableSeparator(lines[index + 1] || '')) {
+            const rows = [];
+            const separator = lines[index + 1];
+            index += 2;
+            while (index < lines.length && lines[index].includes('|') && lines[index].trim() !== '') {
+              rows.push(lines[index]);
+              index += 1;
+            }
+            blocks.push(renderAiMarkdownTable(line, separator, rows));
+            continue;
+          }
+
+          const heading = line.match(/^(#{1,3})\s+(.+)$/);
+          if (heading) {
+            const level = heading[1].length;
+            blocks.push(`<h${level}>${renderAiInlineMarkdown(heading[2])}</h${level}>`);
+            index += 1;
+            continue;
+          }
+
+          const listMatch = line.match(/^\s*([-*+]|\d+[.)])\s+(.+)$/);
+          if (listMatch) {
+            const ordered = /^\d/.test(listMatch[1]);
+            const items = [];
+            while (index < lines.length) {
+              const item = lines[index].match(/^\s*([-*+]|\d+[.)])\s+(.+)$/);
+              if (!item || /^\d/.test(item[1]) !== ordered) break;
+              items.push(`<li>${renderAiInlineMarkdown(item[2])}</li>`);
+              index += 1;
+            }
+            const tag = ordered ? 'ol' : 'ul';
+            blocks.push(`<${tag}>${items.join('')}</${tag}>`);
+            continue;
+          }
+
+          if (/^\s*>\s?/.test(line)) {
+            const quote = [];
+            while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+              quote.push(lines[index].replace(/^\s*>\s?/, ''));
+              index += 1;
+            }
+            blocks.push(`<blockquote>${quote.map(renderAiInlineMarkdown).join('<br>')}</blockquote>`);
+            continue;
+          }
+
+          if (/^\s*(?:-{3,}|\*{3,})\s*$/.test(line)) {
+            blocks.push('<hr>');
+            index += 1;
+            continue;
+          }
+
+          const paragraph = [line];
+          index += 1;
+          while (index < lines.length && lines[index].trim() !== '' && !startsBlock(index)) {
+            paragraph.push(lines[index]);
+            index += 1;
+          }
+          blocks.push(`<p>${paragraph.map(renderAiInlineMarkdown).join('<br>')}</p>`);
+        }
+
+        return blocks.join('');
+      }
+
+      async function copyAiCodeText(code) {
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(code);
+            return;
+          } catch (_) {}
+        }
+        const helper = document.createElement('textarea');
+        helper.value = code;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'fixed';
+        helper.style.opacity = '0';
+        document.body.appendChild(helper);
+        helper.select();
+        const copied = document.execCommand('copy');
+        helper.remove();
+        if (!copied) throw new Error('copy_failed');
       }
 
       function aiExtractField(content, labels) {
@@ -7602,23 +7795,22 @@
         const displayText = cleanAiDisplayText(text);
         const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         const shouldAnimate = options.animate !== false && !reducedMotion;
-        const lines = displayText.split(/\n/);
-
         node.classList.remove('thinking');
         node.classList.add('is-revealing');
         node.innerHTML = '';
 
-        for (const line of lines) {
-          const lineNode = document.createElement('span');
-          lineNode.className = 'infocus-ai-line';
-          if (line.trim() === '') lineNode.classList.add('is-blank');
-          if (shouldAnimate) lineNode.classList.add('is-appearing');
-          lineNode.innerHTML = line.trim() === '' ? '&nbsp;' : renderAiMarkdown(line);
-          node.appendChild(lineNode);
+        const template = document.createElement('template');
+        template.innerHTML = renderAiMarkdown(displayText);
+        const blocks = Array.from(template.content.childNodes);
+        for (const block of blocks) {
+          if (block.nodeType === Node.ELEMENT_NODE && shouldAnimate) {
+            block.classList.add('infocus-ai-line', 'is-appearing');
+          }
+          node.appendChild(block);
           scrollAiToBottom('smooth');
 
           if (shouldAnimate) {
-            const delay = Math.min(72, Math.max(28, line.length * 2.2));
+            const delay = Math.min(90, Math.max(34, String(block.textContent || '').length * 1.4));
             await waitAiReveal(delay);
           }
         }
@@ -8506,6 +8698,9 @@
         sendBtn.disabled = true;
         attachBtn.disabled = true;
         const userBubble = appendMessage('user', messageText, '', [], sentImages.map((item) => ({ url: item.url, name: item.file.name })));
+        pendingImages = [];
+        renderPendingImages();
+        if (imageInput) imageInput.value = '';
         input.value = '';
         autosizeInput();
         const thinking = appendThinkingMessage();
@@ -8527,15 +8722,14 @@
           const json = await response.json();
           if (!response.ok) throw new Error(Object.values(json.errors || {})[0]?.[0] || json.message || 'Error');
           currentChatId = json.chat_id || currentChatId;
-          pendingImages = [];
-          renderPendingImages();
-          imageInput.value = '';
           await revealAssistantMessage(thinking, json.message?.content || 'No recibí respuesta.', {
             actions: json.message?.actions || [],
           });
           loadHistory();
         } catch (error) {
           userBubble.remove();
+          pendingImages = [...sentImages, ...pendingImages].slice(0, 3);
+          renderPendingImages();
           input.value = text;
           autosizeInput();
           thinking.classList.remove('thinking');
@@ -8713,6 +8907,7 @@
       });
       attachBtn?.addEventListener('click', () => imageInput?.click());
       async function addAiImages(files) {
+        if (sending) return;
         for (const original of files) {
           if (pendingImages.length >= 3) {
             window.showNotification?.('Puedes adjuntar hasta 3 imágenes por mensaje.', 'error');
@@ -8731,10 +8926,44 @@
         renderPendingImages();
       }
       imageInput?.addEventListener('change', () => addAiImages(Array.from(imageInput.files || [])));
-      input?.addEventListener('paste', (event) => {
-        const images = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith('image/'));
+      shell?.addEventListener('paste', (event) => {
+        const clipboardFiles = Array.from(event.clipboardData?.items || [])
+          .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+          .map((item) => item.getAsFile())
+          .filter(Boolean);
+        const images = clipboardFiles.length
+          ? clipboardFiles
+          : Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith('image/'));
         if (!images.length) return;
         event.preventDefault();
+        addAiImages(images);
+      });
+      let aiImageDragDepth = 0;
+      shell?.addEventListener('dragenter', (event) => {
+        if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
+        event.preventDefault();
+        aiImageDragDepth += 1;
+        form?.classList.add('is-image-dragover');
+      });
+      shell?.addEventListener('dragover', (event) => {
+        if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+        form?.classList.add('is-image-dragover');
+      });
+      shell?.addEventListener('dragleave', () => {
+        aiImageDragDepth = Math.max(0, aiImageDragDepth - 1);
+        if (aiImageDragDepth === 0) form?.classList.remove('is-image-dragover');
+      });
+      shell?.addEventListener('drop', (event) => {
+        event.preventDefault();
+        aiImageDragDepth = 0;
+        form?.classList.remove('is-image-dragover');
+        const images = Array.from(event.dataTransfer?.files || []).filter((file) => file.type.startsWith('image/'));
+        if (!images.length) {
+          window.showNotification?.('Arrastra imágenes JPG, PNG, WebP o GIF.', 'error');
+          return;
+        }
         addAiImages(images);
       });
       imagePreview?.addEventListener('click', (event) => {
@@ -8756,6 +8985,16 @@
         }
       });
       body?.addEventListener('click', (event) => {
+        const copyCodeButton = event.target.closest('[data-copy-ai-code]');
+        if (copyCodeButton) {
+          const code = copyCodeButton.closest('.infocus-ai-code-block')?.querySelector('code')?.textContent || '';
+          copyAiCodeText(code).then(() => {
+            const label = copyCodeButton.querySelector('span');
+            if (label) label.textContent = 'Copiado';
+            setTimeout(() => { if (label) label.textContent = 'Copiar'; }, 1600);
+          }).catch(() => window.showNotification?.('No pude copiar el código.', 'error'));
+          return;
+        }
         const createButton = event.target.closest('[data-ai-confirm-create]');
         if (createButton) {
           executeConfirmedAction(createButton.closest('.infocus-ai-confirm-actions'));

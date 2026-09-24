@@ -7,11 +7,12 @@ use App\Support\Ai\AiActionExecutor;
 use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
 use App\Support\Ai\AiChatImageStore;
+use App\Support\Ai\AiSupportConversationStore;
 use App\Support\Ai\SensitiveDataFilter;
-use App\Support\Ai\NoteClient;
 use App\Support\Ai\ProjectAiContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -21,6 +22,7 @@ class AiController extends Controller
     private FileStore $chats;
     private SensitiveDataFilter $filter;
     private AiMemoryService $memoryService;
+    private AiSupportConversationStore $supportConversations;
 
     public function __construct(
         private readonly AiService $ai,
@@ -30,6 +32,7 @@ class AiController extends Controller
         $this->chats = new FileStore('ai_chats.json');
         $this->filter = new SensitiveDataFilter();
         $this->memoryService = new AiMemoryService($this->filter);
+        $this->supportConversations = new AiSupportConversationStore();
     }
 
     public function index(): JsonResponse
@@ -37,6 +40,7 @@ class AiController extends Controller
         $userId = (string) Auth::id();
         $items = collect($this->chats->all())
             ->filter(fn ($chat) => (string) ($chat['user_id'] ?? '') === $userId)
+            ->filter(fn ($chat) => empty($chat['support_scope']))
             ->sortByDesc(fn ($chat) => (string) ($chat['updated_at'] ?? $chat['created_at'] ?? ''))
             ->values()
             ->map(fn ($chat) => [
@@ -76,6 +80,8 @@ class AiController extends Controller
             'context' => 'nullable|array',
             'images' => 'nullable|array|max:3',
             'images.*' => 'image|mimes:jpeg,png,webp,gif|max:2048',
+            'support_scope' => 'nullable|in:note',
+            'support_entity_id' => 'nullable|string|max:100',
         ]);
 
         $message = trim((string) ($data['message'] ?? ''));
@@ -85,10 +91,18 @@ class AiController extends Controller
         if ($message === '') $message = 'Analiza estas imágenes y dime qué observas.';
 
         $userId = (string) Auth::id();
+        $supportScope = (string) ($data['support_scope'] ?? '');
+        $supportEntityId = trim((string) ($data['support_entity_id'] ?? ''));
+        if ($supportScope !== '') {
+            abort_if($supportEntityId === '', 422);
+            $this->authorizeSupportEntity($supportScope, $supportEntityId);
+        }
         $chat = null;
 
         if (!empty($data['chat_id'])) {
             $chat = $this->ownedChat((string) $data['chat_id'], false);
+        } elseif ($supportScope !== '') {
+            $chat = $this->findSupportChat($userId, $supportScope, $supportEntityId);
         }
 
         $scopeKey = $this->contextScopeKey($data['context'] ?? [], $message);
@@ -103,11 +117,15 @@ class AiController extends Controller
                 'title' => $this->ai->makeTitle($message),
                 'messages' => [],
                 'scope_key' => $scopeKey,
+                'support_scope' => $supportScope ?: null,
+                'support_entity_id' => $supportEntityId ?: null,
                 'created_at' => now()->toISOString(),
             ];
         }
 
-        $history = is_array($chat['messages'] ?? null) ? $chat['messages'] : [];
+        $history = $supportScope !== ''
+            ? $this->supportConversations->history($userId, $supportScope, $supportEntityId)
+            : (is_array($chat['messages'] ?? null) ? $chat['messages'] : []);
         $imageStore = new AiChatImageStore();
         $images = [];
         foreach ($request->file('images', []) as $file) {
@@ -141,6 +159,17 @@ class AiController extends Controller
             'actions' => $this->normalizeResponseActions($result['actions'] ?? []),
         ];
 
+        if ($supportScope !== '') {
+            $visibleUserMessage = trim((string) data_get($data, 'context.last_user_message', $message)) ?: $message;
+            $this->supportConversations->recordExchange(
+                $userId,
+                $supportScope,
+                $supportEntityId,
+                $visibleUserMessage,
+                (string) ($assistantMessage['content'] ?? ''),
+            );
+        }
+
         $chat['messages'] = array_values(array_slice([...$history, $userMessage, $assistantMessage], -60));
         $chat['updated_at'] = now()->toISOString();
 
@@ -151,6 +180,69 @@ class AiController extends Controller
             'title' => $chat['title'],
             'message' => $assistantMessage,
         ]);
+    }
+
+    public function supportHistory(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'scope' => 'required|in:project,task,note',
+            'entity_id' => 'required|string|max:100',
+            'project_id' => 'nullable|string|max:100',
+        ]);
+        $this->authorizeSupportEntity((string) $data['scope'], (string) $data['entity_id'], (string) ($data['project_id'] ?? ''));
+
+        return response()->json([
+            'messages' => $this->supportConversations->messages(
+                (string) Auth::id(),
+                (string) $data['scope'],
+                (string) $data['entity_id'],
+            ),
+            'expires_in_hours' => 24,
+        ]);
+    }
+
+    private function authorizeSupportEntity(string $scope, string $entityId, string $projectId = ''): array
+    {
+        if ($scope === 'project') {
+            $project = (new FileStore('proyectos.json'))->find($entityId);
+            abort_if(!$project, 404);
+            return $project;
+        }
+
+        if ($scope === 'task') {
+            $projects = (new FileStore('proyectos.json'))->all();
+            foreach ($projects as $project) {
+                if ($projectId !== '' && (string) ($project['id'] ?? '') !== $projectId) continue;
+                foreach (($project['tareas'] ?? []) as $task) {
+                    if ((string) ($task['id'] ?? '') === $entityId) return $task;
+                }
+            }
+            abort(404);
+        }
+
+        $note = (new FileStore('mis_notas.json'))->find($entityId);
+        $userId = (string) Auth::id();
+        $canSee = $note && ((string) ($note['ownerKey'] ?? '') === $userId
+            || collect($note['collaborators'] ?? [])->contains(fn ($item) => (string) ($item['userKey'] ?? '') === $userId));
+        abort_unless($canSee, 404);
+        return $note;
+    }
+
+    private function findSupportChat(string $userId, string $scope, string $entityId): ?array
+    {
+        return collect($this->chats->all())
+            ->filter(fn ($chat) => (string) ($chat['user_id'] ?? '') === $userId)
+            ->filter(fn ($chat) => (string) ($chat['support_scope'] ?? '') === $scope)
+            ->filter(fn ($chat) => (string) ($chat['support_entity_id'] ?? '') === $entityId)
+            ->filter(function ($chat) {
+                try {
+                    return Carbon::parse($chat['updated_at'] ?? $chat['created_at'] ?? null)->greaterThan(now()->subDay());
+                } catch (\Throwable) {
+                    return false;
+                }
+            })
+            ->sortByDesc(fn ($chat) => (string) ($chat['updated_at'] ?? $chat['created_at'] ?? ''))
+            ->first();
     }
 
     private function contextScopeKey(array $context, string $message = ''): string
@@ -177,8 +269,7 @@ class AiController extends Controller
             $canSee = $note && ((string) ($note['ownerKey'] ?? '') === $userId
                 || collect($note['collaborators'] ?? [])->contains(fn ($item) => (string) ($item['userKey'] ?? '') === $userId));
             if ($canSee) {
-                $clientId = (string) ((new NoteClient())->resolve($note)['id'] ?? '');
-                return $clientId !== '' ? 'client:' . $clientId : 'note:' . $noteId;
+                return 'note:' . $noteId;
             }
         }
         return '';

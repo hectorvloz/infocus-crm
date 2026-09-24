@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Repositories\FileStore;
 use App\Support\DocumentThumbnail;
+use App\Support\DocumentStorage;
 use App\Repositories\TimelineStore;
 use App\Support\Ai\AiService;
+use App\Support\Ai\AiSupportConversationStore;
 use App\Support\Ai\ProjectAiContext;
 use App\Support\RoleAccess;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ class ProyectosController extends Controller
     protected FileStore $documents;
     protected FileStore $folders;
     protected AiService $ai;
+    protected AiSupportConversationStore $aiSupportConversations;
 
     public function __construct()
     {
@@ -36,6 +39,7 @@ class ProyectosController extends Controller
         $this->documents = new FileStore('documentos.json');
         $this->folders = new FileStore('document_folders.json');
         $this->ai = app(AiService::class);
+        $this->aiSupportConversations = app(AiSupportConversationStore::class);
     }
 
     public function getStages() {
@@ -386,7 +390,7 @@ class ProyectosController extends Controller
         $request->validate([
             'id' => 'required|string',
             'tarea_id' => 'nullable|string',
-            'file' => 'required|file|max:10240', // 10MB
+            'file' => ['required', ...DocumentStorage::allowedUploadRules(10240)], // 10MB
         ]);
         
         $project = $this->store->find($request->id);
@@ -478,14 +482,14 @@ class ProyectosController extends Controller
             ]);
         }
 
-        // Ruta física: storage/app/public/documentos/{cliente}/proyectos/{proyecto}/archivo
+        // Ruta física privada: storage/app/private/documentos/{cliente}/proyectos/{proyecto}/archivo
         $safeClient = 'infocus-'.Str::slug($clienteEmpresa);
         $safeProject = Str::slug($projectName);
         $baseName = Str::slug(pathinfo($originalName, PATHINFO_FILENAME));
         $finalName = now()->format('YmdHis').'_'.Str::ulid().'_'.$baseName.($extension !== '' ? '.'.$extension : '');
         $path = 'documentos/'.$safeClient.'/proyectos/'.$safeProject.'/'.$finalName;
 
-        Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+        abort_unless(DocumentStorage::put($path, file_get_contents($file->getRealPath())), 500, 'No se pudo guardar el archivo.');
 
         // Registro de documento para que aparezca en Documentos del cliente
         $doc = $this->documents->create([
@@ -593,9 +597,7 @@ class ProyectosController extends Controller
                 if ($doc) {
                     $storage = (string) ($doc['storage'] ?? '');
                     $path = trim((string) ($doc['path'] ?? ''));
-                    if ($storage === 'local' && $path !== '' && Storage::disk('public')->exists($path)) {
-                        Storage::disk('public')->delete($path);
-                    }
+                    if ($storage === 'local' && $path !== '') DocumentStorage::delete($path);
                     if ($path !== '') (new DocumentThumbnail())->delete((string) $data['file_id'], $path);
                     $this->documents->delete((string) $data['file_id']);
                 }
@@ -617,9 +619,7 @@ class ProyectosController extends Controller
             $storage = (string) ($doc['storage'] ?? '');
             $path = trim((string) ($doc['path'] ?? ''));
 
-            if ($storage === 'local' && $path !== '' && Storage::disk('public')->exists($path)) {
-                Storage::disk('public')->delete($path);
-            }
+            if ($storage === 'local' && $path !== '') DocumentStorage::delete($path);
 
             if ($path !== '') (new DocumentThumbnail())->delete((string) $data['file_id'], $path);
 
@@ -896,7 +896,9 @@ class ProyectosController extends Controller
         }
 
         $prompt = $this->buildProjectAiSupportPrompt($project, (string) $data['message']);
-        $result = $this->ai->reply($prompt, [], [
+        $userId = (string) $request->user()->id;
+        $history = $this->aiSupportConversations->history($userId, 'project', (string) $project['id']);
+        $result = $this->ai->reply($prompt, $history, [
             'current_project' => [
                 'id' => $project['id'] ?? '',
                 'title' => $project['titulo'] ?? '',
@@ -922,6 +924,14 @@ class ProyectosController extends Controller
         $descriptionHtml = $this->sanitizeAiDescriptionHtml((string) ($plan['description_html'] ?? ''));
         $summary = trim((string) ($plan['summary'] ?? 'Listo, actualicé la descripción del proyecto.'));
         $updated = $this->store->update($data['id'], ['descripcion' => $descriptionHtml]);
+        $this->aiSupportConversations->recordExchange(
+            $userId,
+            'project',
+            (string) $project['id'],
+            (string) $data['message'],
+            $rawContent,
+            $summary,
+        );
 
         return response()->json([
             'ok' => true,
@@ -1206,7 +1216,9 @@ class ProyectosController extends Controller
             $task['descripcion'] = (string) ($data['current_description'] ?? '');
         }
         $prompt = $this->buildTaskAiSupportPrompt($project, $task, (string) $data['message']);
-        $result = $this->ai->reply($prompt, [], [
+        $userId = (string) $request->user()->id;
+        $history = $this->aiSupportConversations->history($userId, 'task', (string) $data['tarea_id']);
+        $result = $this->ai->reply($prompt, $history, [
             'current_project' => [
                 'id' => $project['id'] ?? '',
                 'title' => $project['titulo'] ?? '',
@@ -1283,6 +1295,14 @@ class ProyectosController extends Controller
         }
 
         $updated = $this->store->update($data['id'], ['tareas' => $tasks]);
+        $this->aiSupportConversations->recordExchange(
+            $userId,
+            'task',
+            (string) $data['tarea_id'],
+            (string) $data['message'],
+            $rawContent,
+            $summary,
+        );
 
         return response()->json([
             'ok' => true,
@@ -1737,7 +1757,22 @@ class ProyectosController extends Controller
         $client ??= ['id' => $clientId, 'empresa' => $project['cliente'] ?? 'Cliente'];
         $relatedProjects = RoleAccess::can(auth()->user(), 'proyectos.read') ? $this->store->all() : [];
 
-        return (new ProjectAiContext())->clientContext($project, $client, $relatedProjects);
+        $contextBuilder = new ProjectAiContext();
+        $context = $contextBuilder->clientContext($project, $client, $relatedProjects);
+
+        if (RoleAccess::can(auth()->user(), 'mis-notas.read')) {
+            $userKey = (string) (auth()->id() ?? auth()->user()?->email ?? '');
+            $notesContext = $contextBuilder->clientNotesContext(
+                $project,
+                (new FileStore('mis_notas.json'))->all(),
+                $userKey
+            );
+            if ($notesContext !== '') {
+                $context .= "\n" . $notesContext;
+            }
+        }
+
+        return trim($context);
     }
 
     private function normalizeTaskAiSupportTarget(string $target): string

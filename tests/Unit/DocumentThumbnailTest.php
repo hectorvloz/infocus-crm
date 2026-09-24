@@ -36,7 +36,9 @@ class DocumentThumbnailTest extends TestCase
         $thumbnail = $service->path('d1', $sourcePath);
         $this->assertNotNull($thumbnail);
         $this->assertSame([640, 400], array_slice(getimagesize($thumbnail), 0, 2));
-        $this->assertLessThan(filesize(Storage::disk('public')->path($sourcePath)) / 3, filesize($thumbnail));
+        Storage::disk('local')->assertExists($sourcePath);
+        Storage::disk('public')->assertMissing($sourcePath);
+        $this->assertLessThan(filesize(Storage::disk('local')->path($sourcePath)) / 3, filesize($thumbnail));
         $this->assertSame($thumbnail, $service->path('d1', $sourcePath));
 
         $controller = new DocumentosController();
@@ -45,6 +47,6 @@ class DocumentThumbnailTest extends TestCase
         $this->assertSame('image/webp', $boardResponse->headers->get('Content-Type'));
         $this->assertStringContainsString('max-age=', $boardResponse->headers->get('Cache-Control'));
         $this->assertSame('image/jpeg', $originalResponse->headers->get('Content-Type'));
-        $this->assertSame(Storage::disk('public')->path($sourcePath), $originalResponse->getFile()->getPathname());
+        $this->assertSame(Storage::disk('local')->path($sourcePath), $originalResponse->getFile()->getPathname());
     }
 }

@@ -9,6 +9,9 @@ Options -Indexes
 
     RewriteEngine On
 
+    # Los documentos se sirven únicamente mediante controladores autorizados.
+    RewriteRule ^storage/(documentos|document-thumbnails)(/|$) - [F,L,NC]
+
     # Bloquear carpetas internas de Laravel cuando todo vive en la raiz web.
     RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|vendor)(/|$) - [F,L]
 

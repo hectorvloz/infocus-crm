@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Support\RoleAccess;
 
 class AuthController extends Controller
@@ -333,8 +334,13 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
         $credentials['email'] = strtolower(trim((string) $credentials['email']));
+        $rateLimitKey = 'login:'.hash('sha256', $credentials['email'].'|'.$request->ip());
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            abort(429, 'Demasiados intentos. Espera '.RateLimiter::availableIn($rateLimitKey).' segundos antes de volver a intentar.');
+        }
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            RateLimiter::clear($rateLimitKey);
             $request->session()->regenerate();
 
             return redirect()->intended($this->redirectAfterLogin(Auth::user()));
@@ -348,6 +354,7 @@ class AuthController extends Controller
             });
 
         if ($teamUser) {
+            RateLimiter::clear($rateLimitKey);
             $user = User::updateOrCreate(
                 ['email' => $credentials['email']],
                 [
@@ -368,15 +375,19 @@ class AuthController extends Controller
         $demoEmail = env('DEMO_LOGIN_EMAIL');
         $demoPass = env('DEMO_LOGIN_PASSWORD');
         if ($demoEmail && $demoPass && $credentials['email'] === $demoEmail && $credentials['password'] === $demoPass) {
+            RateLimiter::clear($rateLimitKey);
             $request->session()->put('user', [
                 'id' => 'demo',
                 'email' => $demoEmail,
                 'name' => 'Demo User',
                 'role' => 'admin',
             ]);
+            $request->session()->regenerate();
 
             return redirect()->intended(route('dashboard'));
         }
+
+        RateLimiter::hit($rateLimitKey, 60);
 
         return back()->withErrors([
             'email' => 'Credenciales incorrectas',

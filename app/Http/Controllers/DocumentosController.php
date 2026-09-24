@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
 use App\Support\DocumentThumbnail;
+use App\Support\DocumentStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -422,7 +423,7 @@ class DocumentosController extends Controller
             'cliente_id' => 'nullable|string',
             'folder' => 'required|string|max:120',
             'storage_mode' => 'required|in:local,drive',
-            'archivo' => 'nullable|file|max:204800',
+            'archivo' => ['nullable', ...DocumentStorage::allowedUploadRules(51200)],
             'drive_url' => 'nullable|url|max:2000',
             'name' => 'nullable|string|max:255',
             'folder_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
@@ -510,7 +511,7 @@ class DocumentosController extends Controller
         $finalName = now()->format('YmdHis').'_'.Str::ulid().'_'.$base.($ext ? '.'.$ext : '');
         $path = 'documentos/'.$safeClient.'/'.$safeFolder.'/'.$finalName;
 
-        Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+        abort_unless(DocumentStorage::put($path, file_get_contents($file->getRealPath())), 500, 'No se pudo guardar el archivo.');
 
         $this->documents->create([
             'cliente_id' => $clienteId !== '' ? $clienteId : null,
@@ -555,9 +556,12 @@ class DocumentosController extends Controller
         }
 
         $path = $doc['path'] ?? '';
-        abort_if($path === '' || !Storage::disk('public')->exists($path), 404);
+        $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+        abort_if(!$disk, 404);
 
-        return Storage::disk('public')->download($path, $doc['original_name'] ?? basename($path));
+        return $disk->download($path, $doc['original_name'] ?? basename($path), [
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function preview(string $id)
@@ -567,15 +571,24 @@ class DocumentosController extends Controller
         abort_if(($doc['storage'] ?? 'local') !== 'local', 404);
 
         $path = (string) ($doc['path'] ?? '');
-        abort_if($path === '' || !Storage::disk('public')->exists($path), 404);
+        $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+        abort_if(!$disk, 404);
 
-        $absolutePath = Storage::disk('public')->path($path);
+        $absolutePath = $disk->path($path);
         $mime = (string) ($doc['mime'] ?? mime_content_type($absolutePath) ?: 'application/octet-stream');
+
+        if (!DocumentStorage::isInlineSafe($mime)) {
+            return $disk->download($path, $doc['original_name'] ?? basename($path), [
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
 
         return response()->file($absolutePath, [
             'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="'.addslashes((string) ($doc['original_name'] ?? basename($path))).'"',
             'Cache-Control' => str_starts_with($mime, 'image/') ? 'private, max-age=86400' : 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
         ]);
     }
 
@@ -584,14 +597,16 @@ class DocumentosController extends Controller
         $doc = $this->documents->find($id);
         abort_if(!$doc || ($doc['storage'] ?? 'local') !== 'local', 404);
         $path = (string) ($doc['path'] ?? '');
-        abort_if($path === '' || !Storage::disk('public')->exists($path), 404);
-        $mime = (string) (($doc['mime'] ?? '') ?: mime_content_type(Storage::disk('public')->path($path)) ?: '');
+        $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+        abort_if(!$disk, 404);
+        $mime = (string) (($doc['mime'] ?? '') ?: mime_content_type($disk->path($path)) ?: '');
         abort_unless(str_starts_with($mime, 'image/'), 404);
 
         $thumbnail = (new DocumentThumbnail())->path($id, $path);
-        return response()->file($thumbnail ?: Storage::disk('public')->path($path), [
+        return response()->file($thumbnail ?: $disk->path($path), [
             'Content-Type' => $thumbnail ? 'image/webp' : $mime,
             'Cache-Control' => 'private, max-age=86400',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -636,8 +651,9 @@ class DocumentosController extends Controller
             $display = (string) ($doc['original_name'] ?? ($doc['name'] ?? 'archivo'));
             if (($doc['storage'] ?? 'local') === 'local') {
                 $path = (string) ($doc['path'] ?? '');
-                if ($path !== '' && Storage::disk('public')->exists($path)) {
-                    $zip->addFile(Storage::disk('public')->path($path), $display);
+                $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+                if ($disk) {
+                    $zip->addFile($disk->path($path), $display);
                 }
             }
 
@@ -801,9 +817,7 @@ class DocumentosController extends Controller
         foreach ($toDelete as $doc) {
             if (($doc['storage'] ?? 'local') === 'local') {
                 $path = $doc['path'] ?? '';
-                if ($path !== '' && Storage::disk('public')->exists($path)) {
-                    Storage::disk('public')->delete($path);
-                }
+                if ($path !== '') DocumentStorage::delete($path);
             }
         }
 
@@ -825,9 +839,7 @@ class DocumentosController extends Controller
 
         if (($doc['storage'] ?? 'local') === 'local') {
             $path = $doc['path'] ?? '';
-            if ($path !== '' && Storage::disk('public')->exists($path)) {
-                Storage::disk('public')->delete($path);
-            }
+            if ($path !== '') DocumentStorage::delete($path);
             if ($path !== '') (new DocumentThumbnail())->delete($id, (string) $path);
         }
 

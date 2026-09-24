@@ -53,6 +53,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/api/ia/chats', [AiController::class, 'index'])->name('api.ai.chats.index');
     Route::get('/api/ia/chats/{id}', [AiController::class, 'show'])->name('api.ai.chats.show');
     Route::get('/api/ia/chats/{id}/images/{imageId}', [AiController::class, 'image'])->name('api.ai.chats.image');
+    Route::get('/api/ia/support-history', [AiController::class, 'supportHistory'])->name('api.ai.support-history');
     Route::post('/api/ia/chat', [AiController::class, 'chat'])->name('api.ai.chat');
     Route::post('/api/ia/actions/execute', [AiController::class, 'executeAction'])->name('api.ai.actions.execute');
     Route::post('/api/ia/actions/undo', [AiController::class, 'undoAction'])->name('api.ai.actions.undo');

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
 use App\Support\Ai\NoteClient;
+use App\Support\SafeRichText;
+use App\Support\RoleAccess;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -21,7 +24,12 @@ class MisNotasController extends Controller
     public function index(Request $request)
     {
         $key = $this->resolveUserKey($request);
-        $all = collect($this->store->all());
+        $records = $this->store->all();
+        $sanitized = array_map(fn ($item) => $this->sanitizeRecord($item), $records);
+        if ($sanitized !== $records) {
+            $this->store->save($sanitized);
+        }
+        $all = collect($sanitized);
         $notes = $all
             ->filter(fn ($item) => $this->canSee($item, $key))
             ->map(function ($item) use ($key) {
@@ -38,9 +46,9 @@ class MisNotasController extends Controller
         $data = $request->validate([
             'notes' => 'required|array',
             'notes.*.id' => 'required|string',
-            'notes.*.title' => 'nullable|string',
-            'notes.*.html' => 'nullable|string',
-            'notes.*.plainText' => 'nullable|string',
+            'notes.*.title' => 'nullable|string|max:500',
+            'notes.*.html' => 'nullable|string|max:5242880',
+            'notes.*.plainText' => 'nullable|string|max:1048576',
             'notes.*.color' => 'nullable|string',
             'notes.*.linkedClient' => 'nullable|string',
             'notes.*.clientId' => 'nullable|string',
@@ -67,16 +75,19 @@ class MisNotasController extends Controller
 
             $record = $existing->get($noteId);
             if (!$record) {
+                $this->authorizePermission($request, 'mis-notas.create');
                 $existing->put($noteId, $this->buildNewRecord($payload, $key, $name));
                 continue;
             }
 
             if ($this->isOwner($record, $key)) {
+                $this->authorizePermission($request, 'mis-notas.update');
                 $existing->put($noteId, $this->mergeOwnerUpdate($record, $payload, $key, $name));
                 continue;
             }
 
             if ($this->canEdit($record, $key)) {
+                $this->authorizePermission($request, 'mis-notas.update');
                 $existing->put($noteId, $this->mergeCollaboratorUpdate($record, $payload));
             }
         }
@@ -89,6 +100,7 @@ class MisNotasController extends Controller
             if ($incoming->has($noteId)) {
                 continue;
             }
+            $this->authorizePermission($request, 'mis-notas.delete');
             $existing->forget($noteId);
         }
 
@@ -130,7 +142,7 @@ class MisNotasController extends Controller
             'ownerKey' => $key,
             'ownerName' => $name,
             'title' => (string) ($payload['title'] ?? 'Nota sin titulo'),
-            'html' => (string) ($payload['html'] ?? ''),
+            'html' => SafeRichText::sanitize((string) ($payload['html'] ?? '')),
             'plainText' => (string) ($payload['plainText'] ?? ''),
             'color' => (string) ($payload['color'] ?? 'yellow'),
             'linkedClient' => isset($payload['linkedClient']) ? (string) $payload['linkedClient'] : '',
@@ -148,7 +160,7 @@ class MisNotasController extends Controller
             'ownerKey' => $key,
             'ownerName' => $name,
             'title' => (string) ($payload['title'] ?? ($record['title'] ?? 'Nota sin titulo')),
-            'html' => (string) ($payload['html'] ?? ($record['html'] ?? '')),
+            'html' => SafeRichText::sanitize((string) ($payload['html'] ?? ($record['html'] ?? ''))),
             'plainText' => (string) ($payload['plainText'] ?? ($record['plainText'] ?? '')),
             'color' => (string) ($payload['color'] ?? ($record['color'] ?? 'yellow')),
             'linkedClient' => isset($payload['linkedClient']) ? (string) $payload['linkedClient'] : (string) ($record['linkedClient'] ?? ''),
@@ -164,7 +176,7 @@ class MisNotasController extends Controller
         return [
             ...$record,
             'title' => (string) ($payload['title'] ?? ($record['title'] ?? 'Nota sin titulo')),
-            'html' => (string) ($payload['html'] ?? ($record['html'] ?? '')),
+            'html' => SafeRichText::sanitize((string) ($payload['html'] ?? ($record['html'] ?? ''))),
             'plainText' => (string) ($payload['plainText'] ?? ($record['plainText'] ?? '')),
             'color' => (string) ($payload['color'] ?? ($record['color'] ?? 'yellow')),
             'linkedClient' => isset($payload['linkedClient']) ? (string) $payload['linkedClient'] : (string) ($record['linkedClient'] ?? ''),
@@ -191,6 +203,22 @@ class MisNotasController extends Controller
             ->unique('userKey')
             ->values()
             ->all();
+    }
+
+    private function sanitizeRecord(array $record): array
+    {
+        $record['html'] = SafeRichText::sanitize((string) ($record['html'] ?? ''));
+        return $record;
+    }
+
+    private function authorizePermission(Request $request, string $permission): void
+    {
+        if (Auth::check()) {
+            abort_unless(RoleAccess::can(Auth::user(), $permission), 403);
+            return;
+        }
+
+        abort_unless(in_array((string) $request->session()->get('user.role'), ['admin', 'super_admin'], true), 403);
     }
 
     protected function toClientNote(array $record, string $currentKey): array

@@ -91,14 +91,60 @@ class ProjectAiContext
         ));
         $lines[] = 'Proyectos anteriores de este mismo cliente:';
         foreach (array_slice($related, 0, 6) as $item) {
-            $taskTitles = array_map(fn ($task) => $this->text($task['texto'] ?? '', 100),
+            $taskSummaries = array_map(fn ($task) => $this->text($task['texto'] ?? '', 100)
+                . ' [' . $this->taskDetails($task, 320) . ']',
                 array_slice(array_filter((array) ($item['tareas'] ?? []), 'is_array'), 0, 5));
             $lines[] = '- ' . $this->text($item['titulo'] ?? 'Proyecto', 180)
                 . ' | Descripción: ' . $this->text($item['descripcion'] ?? '', 650)
-                . ($taskTitles ? ' | Tarjetas: ' . implode('; ', $taskTitles) : '');
+                . ($taskSummaries ? ' | Tarjetas: ' . implode('; ', $taskSummaries) : '');
         }
 
         return mb_substr(implode("\n", $lines), 0, 6500);
+    }
+
+    public function clientNotesContext(array $project, array $notes, string $userKey): string
+    {
+        $clientId = trim((string) ($project['cliente_id'] ?? ''));
+        if ($clientId === '' || $userKey === '') {
+            return '';
+        }
+
+        $noteClient = new NoteClient();
+        $visible = array_values(array_filter($notes, function ($note) use ($clientId, $userKey, $noteClient) {
+            if (!is_array($note) || !$noteClient->belongsTo($note, $clientId)) {
+                return false;
+            }
+
+            return (string) ($note['ownerKey'] ?? '') === $userKey
+                || collect($note['collaborators'] ?? [])->contains(
+                    fn ($collaborator) => (string) ($collaborator['userKey'] ?? '') === $userKey
+                );
+        }));
+
+        usort($visible, function ($a, $b) {
+            $timestamp = static function (array $note): int {
+                $value = $note['updatedAt'] ?? $note['createdAt'] ?? 0;
+                if (is_numeric($value)) return (int) $value;
+                return strtotime((string) $value) ?: 0;
+            };
+            return $timestamp($b) <=> $timestamp($a);
+        });
+
+        if ($visible === []) {
+            return '';
+        }
+
+        $lines = ['Notas visibles de Mis Notas vinculadas a este cliente:'];
+        foreach (array_slice($visible, 0, 6) as $note) {
+            $content = trim((string) ($note['plainText'] ?? ''));
+            if ($content === '') {
+                $content = (string) ($note['html'] ?? '');
+            }
+            $lines[] = '- ' . $this->text($note['title'] ?? 'Nota sin título', 180)
+                . ' | ' . $this->text($content, 700);
+        }
+
+        return mb_substr(implode("\n", $lines), 0, 5000);
     }
 
     private function taskDetails(array $task, int $descriptionLimit): string

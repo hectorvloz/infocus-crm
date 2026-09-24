@@ -1,5 +1,6 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule ^storage/(documentos|document-thumbnails)(/|$) - [F,L,NC]
     RewriteRule ^index\.php$ - [L]
     RewriteRule ^core(/|$) - [F,L]
     RewriteCond %{REQUEST_FILENAME} !-f

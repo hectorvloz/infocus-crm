@@ -117,4 +117,22 @@ class AiChatImagesTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), 'api.openai.com')
             && str_starts_with((string) data_get($request->data(), 'messages.0.content.1.image_url.url'), 'data:image/png;base64,'));
     }
+
+    public function test_chat_composer_supports_drop_paste_and_professional_markdown_rendering(): void
+    {
+        $view = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+        $this->assertStringContainsString("shell?.addEventListener('drop'", $view);
+        $this->assertStringContainsString("shell?.addEventListener('paste'", $view);
+        $this->assertStringContainsString('function renderAiMarkdownTable(', $view);
+        $this->assertStringContainsString('data-copy-ai-code', $view);
+
+        $sendStart = strpos($view, 'async function sendMessage(text)');
+        $sendEnd = strpos($view, 'async function executeConfirmedAction(', $sendStart);
+        $sendFunction = substr($view, $sendStart, $sendEnd - $sendStart);
+        $this->assertLessThan(
+            strpos($sendFunction, 'const thinking = appendThinkingMessage();'),
+            strpos($sendFunction, 'pendingImages = [];')
+        );
+    }
 }

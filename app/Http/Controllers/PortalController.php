@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Crypt;
 use App\Mail\GenericMail;
 use Illuminate\Support\Facades\Mail;
 use App\Support\TemplateMail;
+use App\Support\DocumentStorage;
 use App\Models\User;
 
 class PortalController extends Controller
@@ -530,8 +531,9 @@ class PortalController extends Controller
         }
 
         $path = $doc['path'] ?? '';
-        abort_if($path === '' || !Storage::disk('public')->exists($path), 404);
-        return Storage::disk('public')->download($path, $doc['original_name'] ?? basename($path));
+        $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+        abort_if(!$disk, 404);
+        return $disk->download($path, $doc['original_name'] ?? basename($path), ['X-Content-Type-Options' => 'nosniff']);
     }
 
     public function downloadDocumentAuth($docId)
@@ -549,8 +551,9 @@ class PortalController extends Controller
         }
 
         $path = $doc['path'] ?? '';
-        abort_if($path === '' || !Storage::disk('public')->exists($path), 404);
-        return Storage::disk('public')->download($path, $doc['original_name'] ?? basename($path));
+        $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+        abort_if(!$disk, 404);
+        return $disk->download($path, $doc['original_name'] ?? basename($path), ['X-Content-Type-Options' => 'nosniff']);
     }
 
     // -------------------------------------------------------------------------

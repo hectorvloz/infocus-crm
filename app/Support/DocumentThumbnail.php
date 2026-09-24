@@ -8,7 +8,10 @@ class DocumentThumbnail
 {
     public function path(string $documentId, string $sourcePath): ?string
     {
-        $disk = Storage::disk('public');
+        $disk = DocumentStorage::disk($sourcePath);
+        if (!$disk) {
+            return null;
+        }
         if (!$disk->exists($sourcePath) || !function_exists('imagewebp') || !function_exists('imagecreatefromstring')) {
             return null;
         }
@@ -71,6 +74,8 @@ class DocumentThumbnail
 
     public function delete(string $documentId, string $sourcePath): void
     {
-        Storage::disk('public')->delete('document-thumbnails/' . hash('sha256', $documentId . '|' . $sourcePath) . '.webp');
+        $thumbnail = 'document-thumbnails/' . hash('sha256', $documentId . '|' . $sourcePath) . '.webp';
+        Storage::disk(DocumentStorage::DISK)->delete($thumbnail);
+        Storage::disk(DocumentStorage::LEGACY_DISK)->delete($thumbnail);
     }
 }

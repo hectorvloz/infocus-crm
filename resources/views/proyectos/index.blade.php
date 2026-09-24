@@ -824,6 +824,7 @@
     }
 
     .project-preview-shell {
+      position: relative;
       height: min(62vh, 620px);
       overflow: auto;
       overscroll-behavior: contain;
@@ -832,12 +833,47 @@
     }
 
     .project-file-preview-modal {
-      z-index: 2147483620;
+      z-index: 2147483647 !important;
+      isolation: isolate;
     }
 
     .project-file-preview-dialog {
+      position: relative;
       width: min(78vw, 880px);
     }
+
+    .project-gallery-nav {
+      position: absolute;
+      top: 50%;
+      z-index: 2;
+      width: 2.75rem;
+      height: 2.75rem;
+      transform: translateY(-50%);
+      border: 1px solid rgba(255,255,255,.7);
+      border-radius: 999px;
+      background: rgba(15,23,42,.78);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(15,23,42,.22);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color .15s ease, transform .15s ease;
+    }
+
+    .project-gallery-nav:hover {
+      background: rgba(15,23,42,.94);
+      transform: translateY(-50%) scale(1.04);
+    }
+
+    .project-gallery-nav:focus-visible {
+      outline: 3px solid #d9ff66;
+      outline-offset: 2px;
+    }
+
+    .project-gallery-nav.previous { left: .85rem; }
+    .project-gallery-nav.next { right: .85rem; }
+
+    .project-gallery-nav.hidden { display: none !important; }
 
     @media (max-width: 768px) {
       .project-file-preview-dialog {
@@ -2197,22 +2233,28 @@
     </div>
   </div>
 
-  <div id="projectFilePreviewModal" class="project-file-preview-modal fixed inset-0 hidden items-center justify-center bg-black/50 p-3 sm:p-5" aria-modal="true" role="dialog">
+  <div id="projectFilePreviewModal" class="project-file-preview-modal fixed inset-0 hidden items-center justify-center bg-black/50 p-3 sm:p-5" aria-modal="true" aria-labelledby="projectFilePreviewTitle" aria-describedby="projectFilePreviewSubtitle" role="dialog">
     <div class="project-file-preview-dialog max-h-[92vh] overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col">
       <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
         <div class="min-w-0">
           <div id="projectFilePreviewTitle" class="text-lg font-black text-slate-900 truncate">Vista previa</div>
-          <div id="projectFilePreviewSubtitle" class="mt-1 text-xs font-semibold text-slate-500">Usa trackpad o rueda sobre la vista para acercar y alejar.</div>
+          <div id="projectFilePreviewSubtitle" class="mt-1 text-xs font-semibold text-slate-500" aria-live="polite">Usa trackpad o rueda sobre la vista para acercar y alejar.</div>
         </div>
         <div class="flex items-center gap-2">
           <a id="projectFilePreviewDownload" href="#" target="_blank" class="w-10 h-10 rounded-full border border-emerald-200 bg-white flex items-center justify-center text-emerald-600 hover:bg-emerald-50" title="Descargar">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
           </a>
-          <button type="button" onclick="event.stopPropagation();closeProjectFilePreview()" class="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-50" title="Cerrar">
+          <button id="projectFilePreviewClose" type="button" onclick="event.stopPropagation();closeProjectFilePreview()" class="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-50" title="Cerrar" aria-label="Cerrar vista previa">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
+      <button id="projectFilePreviewPrevious" type="button" class="project-gallery-nav previous hidden" aria-label="Ver imagen anterior" title="Imagen anterior" onclick="event.stopPropagation();showProjectFileGalleryItem(-1)">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button id="projectFilePreviewNext" type="button" class="project-gallery-nav next hidden" aria-label="Ver imagen siguiente" title="Imagen siguiente" onclick="event.stopPropagation();showProjectFileGalleryItem(1)">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M9 6l6 6-6 6"/></svg>
+      </button>
       <div id="projectFilePreviewShell" class="project-preview-shell p-3 sm:p-4">
         <div id="projectFilePreviewContent" class="project-preview-content">
           <iframe id="projectFilePreviewFrame" class="project-preview-frame hidden rounded-xl bg-white shadow" title="Vista previa del archivo"></iframe>
@@ -2302,7 +2344,7 @@
                              </span>
                              <div class="min-w-0">
                                <div class="truncate text-sm font-black text-slate-900">Apoyo de IA</div>
-                               <div class="truncate text-[10px] font-semibold text-slate-400">Solo descripción del proyecto</div>
+                               <div class="truncate text-[10px] font-semibold text-slate-400">Descripción con contexto del proyecto y cliente</div>
                              </div>
                            </div>
                            <button type="button" onclick="toggleProjectAiSupport(false)" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar apoyo de IA">
@@ -2310,7 +2352,7 @@
                            </button>
                          </div>
                          <div id="projectAiSupportMessages" class="max-h-40 space-y-2 overflow-y-auto bg-slate-50 px-2.5 py-2.5 text-sm">
-                           <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Pídeme redactar, mejorar, resumir u organizar la descripción del proyecto.</div>
+                           <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Tengo en cuenta las tarjetas, tareas, notas y antecedentes de este cliente. Pídeme redactar, mejorar o resumir la descripción.</div>
                          </div>
                          <div class="flex gap-2 border-t border-slate-100 bg-white p-2">
                            <input id="projectAiSupportInput" class="min-w-0 flex-1 rounded-lg border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 focus:border-fuchsia-300 focus:ring-fuchsia-200" placeholder="Ej. mejora esta descripción..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); sendProjectAiSupport(); }">
@@ -2857,7 +2899,7 @@
                         </span>
                         <div class="min-w-0">
                           <div class="truncate text-sm font-black text-slate-900">Apoyo de IA</div>
-                          <div class="truncate text-[10px] font-semibold text-slate-400">Descripción, checklist y subtareas</div>
+                          <div class="truncate text-[10px] font-semibold text-slate-400">Tarjeta con contexto del proyecto y cliente</div>
                         </div>
                       </div>
                       <button type="button" onclick="toggleTaskAiSupport(false)" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar apoyo de IA">
@@ -2865,7 +2907,7 @@
                       </button>
                     </div>
                     <div id="taskAiSupportMessages" class="max-h-40 space-y-2 overflow-y-auto bg-slate-50 px-2.5 py-2.5 text-sm">
-                      <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Dime si quieres mejorar la descripción o crear tareas/subtareas.</div>
+                      <div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Tengo en cuenta el proyecto, sus otras tarjetas, notas y antecedentes del cliente. Dime qué quieres mejorar o crear.</div>
                     </div>
                     <div class="flex gap-2 border-t border-slate-100 bg-white p-2">
                       <input id="taskAiSupportInput" class="min-w-0 flex-1 rounded-lg border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 focus:border-fuchsia-300 focus:ring-fuchsia-200" placeholder="Ej. divide esto en pasos..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); sendTaskAiSupport(); }">
@@ -11257,6 +11299,7 @@
       const shouldShow = forceState === null ? panel.classList.contains('hidden') : !!forceState;
       panel.classList.toggle('hidden', !shouldShow);
       if (shouldShow) {
+        loadTaskAiSupportHistory();
         requestAnimationFrame(positionTaskAiSupportPanel);
         setTimeout(() => document.getElementById('taskAiSupportInput')?.focus(), 0);
       }
@@ -11269,7 +11312,7 @@
       if (panel) panel.classList.add('hidden');
       if (input) input.value = '';
       if (messages) {
-        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Dime si quieres mejorar la descripción o crear tareas/subtareas.</div>';
+        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Tengo en cuenta el proyecto, sus otras tarjetas, notas y antecedentes del cliente. Dime qué quieres mejorar o crear.</div>';
       }
     }
 
@@ -11282,6 +11325,32 @@
       node.textContent = text;
       box.appendChild(node);
       box.scrollTop = box.scrollHeight;
+      return node;
+    }
+
+    async function loadTaskAiSupportHistory() {
+      const box = document.getElementById('taskAiSupportMessages');
+      const projectId = String(currentProjectId || '');
+      const taskId = String(currentTaskId || '');
+      if (!box || !projectId || !taskId) return;
+      const requestedKey = `${projectId}:${taskId}`;
+      box.dataset.historyKey = requestedKey;
+      box.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold text-slate-500 shadow-sm">Cargando conversación...</div>';
+      try {
+        const params = new URLSearchParams({scope: 'task', entity_id: taskId, project_id: projectId});
+        const response = await fetch(`/api/ia/support-history?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || box.dataset.historyKey !== requestedKey) return;
+        box.innerHTML = '';
+        const messages = Array.isArray(data.messages) ? data.messages : [];
+        if (!messages.length) {
+          box.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Tengo en cuenta el proyecto, sus otras tarjetas, notas y antecedentes del cliente. Dime qué quieres mejorar o crear.</div>';
+          return;
+        }
+        messages.forEach((item) => appendTaskAiSupportMessage(item.role, item.content));
+      } catch (_) {
+        if (box.dataset.historyKey === requestedKey) box.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold text-slate-500 shadow-sm">No pude recuperar la conversación anterior.</div>';
+      }
     }
 
     function getSubtaskAnimationId(subtask) {
@@ -11353,6 +11422,7 @@
       const shouldShow = forceState === null ? panel.classList.contains('hidden') : !!forceState;
       panel.classList.toggle('hidden', !shouldShow);
       if (shouldShow) {
+        loadProjectAiSupportHistory();
         requestAnimationFrame(positionProjectAiSupportPanel);
         setTimeout(() => document.getElementById('projectAiSupportInput')?.focus(), 0);
       }
@@ -11365,7 +11435,7 @@
       if (panel) panel.classList.add('hidden');
       if (input) input.value = '';
       if (messages) {
-        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Pídeme redactar, mejorar, resumir u organizar la descripción del proyecto.</div>';
+        messages.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Tengo en cuenta las tarjetas, tareas, notas y antecedentes de este cliente. Pídeme redactar, mejorar o resumir la descripción.</div>';
       }
     }
 
@@ -11378,6 +11448,30 @@
       node.textContent = text;
       box.appendChild(node);
       box.scrollTop = box.scrollHeight;
+      return node;
+    }
+
+    async function loadProjectAiSupportHistory() {
+      const box = document.getElementById('projectAiSupportMessages');
+      const projectId = String(currentProjectId || '');
+      if (!box || !projectId) return;
+      box.dataset.historyKey = projectId;
+      box.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold text-slate-500 shadow-sm">Cargando conversación...</div>';
+      try {
+        const params = new URLSearchParams({scope: 'project', entity_id: projectId});
+        const response = await fetch(`/api/ia/support-history?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || box.dataset.historyKey !== projectId) return;
+        box.innerHTML = '';
+        const messages = Array.isArray(data.messages) ? data.messages : [];
+        if (!messages.length) {
+          box.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold leading-snug text-slate-500 shadow-sm">Tengo en cuenta las tarjetas, tareas, notas y antecedentes de este cliente. Pídeme redactar, mejorar o resumir la descripción.</div>';
+          return;
+        }
+        messages.forEach((item) => appendProjectAiSupportMessage(item.role, item.content));
+      } catch (_) {
+        if (box.dataset.historyKey === projectId) box.innerHTML = '<div class="rounded-xl bg-white px-3 py-2 text-[11px] font-semibold text-slate-500 shadow-sm">No pude recuperar la conversación anterior.</div>';
+      }
     }
 
     function setProjectAiDescriptionWorking(working = false) {
@@ -11426,7 +11520,7 @@
         button.disabled = true;
         button.textContent = 'Pensando...';
       }
-      appendProjectAiSupportMessage('assistant', 'Estoy trabajando la descripción del proyecto...');
+      const thinkingMessage = appendProjectAiSupportMessage('assistant', 'Estoy trabajando la descripción del proyecto...');
       setProjectAiDescriptionWorking(true);
 
       try {
@@ -11445,6 +11539,7 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) {
+          thinkingMessage?.remove();
           appendProjectAiSupportMessage('assistant', data.message || 'No pude aplicar la descripción con IA.');
           if (hadPendingDescription) {
             setDescriptionAutosaveStatus('saving');
@@ -11467,10 +11562,12 @@
         if (String(currentBoardProjectId || '') === projectId) {
           renderProjectBoard(projectId);
         }
+        thinkingMessage?.remove();
         appendProjectAiSupportMessage('assistant', data.message || 'Listo, actualicé la descripción.');
         setTimeout(() => setProjectAiDescriptionWorking(false), 950);
       } catch (error) {
         console.error(error);
+        thinkingMessage?.remove();
         appendProjectAiSupportMessage('assistant', 'No pude conectar con el apoyo de IA.');
         if (currentProjectId) {
           const projectId = String(currentProjectId);
@@ -11517,7 +11614,7 @@
         button.disabled = true;
         button.textContent = 'Pensando...';
       }
-      appendTaskAiSupportMessage('assistant', inferredTarget === 'description' ? 'Estoy trabajando la descripción...' : 'Estoy preparando los cambios...');
+      const thinkingMessage = appendTaskAiSupportMessage('assistant', inferredTarget === 'description' ? 'Estoy trabajando la descripción...' : 'Estoy preparando los cambios...');
       if (inferredTarget !== 'description') setTaskAiChecklistWorking(true);
       if (inferredTarget !== 'checklist') setTaskAiDescriptionWorking(true);
 
@@ -11534,6 +11631,7 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.ok) {
+          thinkingMessage?.remove();
           appendTaskAiSupportMessage('assistant', data.message || 'No pude aplicar cambios con IA.');
           setTaskAiChecklistWorking(false);
           setTaskAiDescriptionWorking(false);
@@ -11564,6 +11662,7 @@
         if (String(currentBoardProjectId || '') === String(currentProjectId || '')) {
           renderProjectBoard(currentBoardProjectId);
         }
+        thinkingMessage?.remove();
         appendTaskAiSupportMessage('assistant', data.message || 'Listo, apliqué los cambios.');
         setTimeout(() => {
           setTaskAiChecklistWorking(false);
@@ -11572,6 +11671,7 @@
         }, 950);
       } catch (error) {
         console.error(error);
+        thinkingMessage?.remove();
         appendTaskAiSupportMessage('assistant', 'No pude conectar con el apoyo de IA.');
         setTaskAiChecklistWorking(false);
         setTaskAiDescriptionWorking(false);
@@ -12668,6 +12768,9 @@
     }
 
     let projectFilePreviewScale = 1;
+    let projectFilePreviewGallery = [];
+    let projectFilePreviewGalleryIndex = -1;
+    let projectFilePreviewReturnFocus = null;
 
     function setProjectFilePreviewScale(value) {
       projectFilePreviewScale = Math.max(0.55, Math.min(2.6, value));
@@ -12679,19 +12782,45 @@
       setProjectFilePreviewScale(1);
     }
 
-    function openProjectFilePreviewFromCard(card) {
-      if (!card) return;
-      openProjectFilePreview({
-        title: card.dataset.previewTitle || 'Documento',
-        url: card.dataset.previewUrl || '',
-        type: card.dataset.previewType || 'unsupported',
-        downloadUrl: card.dataset.downloadUrl || '',
-        extLabel: card.dataset.extLabel || 'FILE',
-        extColor: card.dataset.extColor || '#475569',
-      });
+    function projectFilePreviewDataFromCard(card) {
+      return {
+        title: card?.dataset?.previewTitle || 'Documento',
+        url: card?.dataset?.previewUrl || '',
+        type: card?.dataset?.previewType || 'unsupported',
+        downloadUrl: card?.dataset?.downloadUrl || '',
+        extLabel: card?.dataset?.extLabel || 'FILE',
+        extColor: card?.dataset?.extColor || '#475569',
+      };
     }
 
-    function openProjectFilePreview({title, url, type, downloadUrl, extLabel, extColor}) {
+    function openProjectFilePreviewFromCard(card) {
+      if (!card) return;
+      const selected = projectFilePreviewDataFromCard(card);
+      const galleryCards = selected.type === 'image'
+        ? Array.from(card.parentElement?.querySelectorAll('.project-file-card[data-preview-type="image"]') || [])
+        : [];
+      const gallery = galleryCards.map(projectFilePreviewDataFromCard);
+      const galleryIndex = galleryCards.indexOf(card);
+      openProjectFilePreview({...selected, gallery, galleryIndex});
+    }
+
+    function openProjectFilePreview({title, url, type, downloadUrl, extLabel, extColor, gallery = [], galleryIndex = -1}) {
+      const modal = document.getElementById('projectFilePreviewModal');
+      if (!modal) return;
+      projectFilePreviewGallery = type === 'image' ? gallery.filter(item => item?.type === 'image' && item?.url) : [];
+      projectFilePreviewGalleryIndex = projectFilePreviewGallery.length
+        ? Math.max(0, Math.min(projectFilePreviewGallery.length - 1, galleryIndex))
+        : -1;
+      projectFilePreviewReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+      // Reinsert it as the last body child on every open so it wins against
+      // detail modals and any other top-level stacking context.
+      document.body.appendChild(modal);
+      renderProjectFilePreview({title, url, type, downloadUrl, extLabel, extColor});
+      requestAnimationFrame(() => document.getElementById('projectFilePreviewClose')?.focus({preventScroll: true}));
+    }
+
+    function renderProjectFilePreview({title, url, type, downloadUrl, extLabel, extColor}) {
       const modal = document.getElementById('projectFilePreviewModal');
       const titleEl = document.getElementById('projectFilePreviewTitle');
       const subtitleEl = document.getElementById('projectFilePreviewSubtitle');
@@ -12703,13 +12832,21 @@
       const download = document.getElementById('projectFilePreviewDownload');
       const unsupportedDownload = document.getElementById('projectFilePreviewUnsupportedDownload');
       const unsupportedExt = document.getElementById('projectFilePreviewExt');
+      const previous = document.getElementById('projectFilePreviewPrevious');
+      const next = document.getElementById('projectFilePreviewNext');
       if (!modal || !frame || !imageWrap || !image || !unsupported) return;
-      if (modal.parentElement !== document.body) {
-        document.body.appendChild(modal);
-      }
 
-      if (titleEl) titleEl.textContent = type === 'unsupported' ? 'Vista previa no disponible' : 'Vista previa del documento';
-      if (subtitleEl) subtitleEl.textContent = type === 'unsupported' ? 'Formato no compatible con vista previa nativa.' : 'Usa trackpad o rueda sobre la vista para acercar y alejar.';
+      const galleryEnabled = type === 'image' && projectFilePreviewGallery.length > 1;
+      if (titleEl) titleEl.textContent = type === 'unsupported' ? 'Vista previa no disponible' : (type === 'image' ? 'Galería de imágenes' : 'Vista previa del documento');
+      if (subtitleEl) {
+        subtitleEl.textContent = type === 'unsupported'
+          ? 'Formato no compatible con vista previa nativa.'
+          : (type === 'image' && projectFilePreviewGallery.length
+            ? `Imagen ${projectFilePreviewGalleryIndex + 1} de ${projectFilePreviewGallery.length} · Usa las flechas para navegar.`
+            : 'Usa trackpad o rueda sobre la vista para acercar y alejar.');
+      }
+      previous?.classList.toggle('hidden', !galleryEnabled);
+      next?.classList.toggle('hidden', !galleryEnabled);
       if (footerEl) footerEl.textContent = title || 'Documento';
       frame.classList.add('hidden');
       imageWrap.classList.add('hidden');
@@ -12739,6 +12876,25 @@
 
       modal.classList.remove('hidden');
       modal.classList.add('flex');
+
+      if (galleryEnabled) {
+        [-1, 1].forEach((offset) => {
+          const index = (projectFilePreviewGalleryIndex + offset + projectFilePreviewGallery.length) % projectFilePreviewGallery.length;
+          const neighborUrl = projectFilePreviewGallery[index]?.url;
+          if (neighborUrl) {
+            const preload = new Image();
+            preload.src = neighborUrl;
+          }
+        });
+      }
+    }
+
+    function showProjectFileGalleryItem(direction) {
+      if (projectFilePreviewGallery.length < 2) return;
+      projectFilePreviewGalleryIndex = (
+        projectFilePreviewGalleryIndex + direction + projectFilePreviewGallery.length
+      ) % projectFilePreviewGallery.length;
+      renderProjectFilePreview(projectFilePreviewGallery[projectFilePreviewGalleryIndex]);
     }
 
     function closeProjectFilePreview() {
@@ -12750,7 +12906,13 @@
       modal.classList.remove('flex');
       if (frame) frame.removeAttribute('src');
       if (image) image.removeAttribute('src');
+      projectFilePreviewGallery = [];
+      projectFilePreviewGalleryIndex = -1;
       resetProjectFilePreviewScale();
+      if (projectFilePreviewReturnFocus?.isConnected) {
+        projectFilePreviewReturnFocus.focus({preventScroll: true});
+      }
+      projectFilePreviewReturnFocus = null;
     }
 
     function getTaskCoverFile(task) {
@@ -12941,7 +13103,7 @@
           const folderUrl = `/documentos?space=${encodeURIComponent(folderSpace)}${clientId ? `&cliente_id=${encodeURIComponent(clientId)}` : ''}&folder=${encodeURIComponent(folderPath)}`;
           const metaLabel = `Añadido: ${projectFileDate(f?.date || f?.uploaded_at || f?.created_at)}${isImage ? ' · Imagen' : ''}`;
           const figure = isImage
-            ? `<img src="${escapeHtml(projectFileThumbnailUrl(file))}" class="project-file-thumb" alt="${safeName}" loading="lazy" decoding="async"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
+            ? `<img src="${escapeHtml(projectFileThumbnailUrl(f))}" class="project-file-thumb" alt="${safeName}" loading="lazy" decoding="async"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
             : `<div class="project-file-figure"><div class="project-file-ext" style="background:${tone.color}">${tone.label}</div><div class="project-file-lines" aria-hidden="true"><span></span><span></span></div></div>`;
 
           return `
@@ -13505,6 +13667,7 @@
     const projectPreviewShell = document.getElementById('projectFilePreviewShell');
     if (projectPreviewShell) {
       let projectPreviewTouchDistance = null;
+      let projectPreviewSwipeStart = null;
       projectPreviewShell.addEventListener('wheel', function(event) {
         if (!document.getElementById('projectFilePreviewModal')?.classList.contains('flex')) return;
         if (event.ctrlKey || event.metaKey) {
@@ -13514,7 +13677,14 @@
         }
       }, { passive: false });
       projectPreviewShell.addEventListener('touchstart', function(event) {
+        if (event.touches.length === 1) {
+          projectPreviewSwipeStart = {
+            x: event.touches[0].clientX,
+            y: event.touches[0].clientY,
+          };
+        }
         if (event.touches.length === 2) {
+          projectPreviewSwipeStart = null;
           const dx = event.touches[0].clientX - event.touches[1].clientX;
           const dy = event.touches[0].clientY - event.touches[1].clientY;
           projectPreviewTouchDistance = Math.hypot(dx, dy);
@@ -13532,12 +13702,31 @@
       }, { passive: false });
       projectPreviewShell.addEventListener('touchend', function(event) {
         if (event.touches.length < 2) projectPreviewTouchDistance = null;
+        if (projectPreviewSwipeStart && event.changedTouches.length === 1) {
+          const dx = event.changedTouches[0].clientX - projectPreviewSwipeStart.x;
+          const dy = event.changedTouches[0].clientY - projectPreviewSwipeStart.y;
+          if (Math.abs(dx) >= 55 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+            showProjectFileGalleryItem(dx < 0 ? 1 : -1);
+          }
+        }
+        projectPreviewSwipeStart = null;
       }, { passive: true });
     }
 
     document.addEventListener('keydown', function(event) {
-      if (event.key !== 'Escape') return;
-      if (document.getElementById('projectFilePreviewModal')?.classList.contains('flex')) {
+      const previewOpen = document.getElementById('projectFilePreviewModal')?.classList.contains('flex');
+      if (!previewOpen) return;
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        showProjectFileGalleryItem(-1);
+        return;
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        showProjectFileGalleryItem(1);
+        return;
+      }
+      if (event.key === 'Escape') {
         event.preventDefault();
         event.stopImmediatePropagation();
         closeProjectFilePreview();

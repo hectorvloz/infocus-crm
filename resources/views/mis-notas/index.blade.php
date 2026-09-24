@@ -290,6 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const shareCollaboratorsList = document.getElementById('share-collaborators-list');
   const NOTE_AI_CHAT_URL = @json(route('api.ai.chat'));
   const NOTE_AI_EXECUTE_URL = @json(route('api.ai.actions.execute'));
+  const NOTE_AI_SUPPORT_HISTORY_URL = @json(route('api.ai.support-history'));
 
   let allNotes = [];
   let clients = [];
@@ -327,7 +328,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function saveNotes() {
-    localStorage.setItem(NOTES_KEY, JSON.stringify(allNotes));
     broadcastNotesUpdated();
     queueServerSync();
   }
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (isSavingToServer) return;
     isSavingToServer = true;
     try {
-      await fetch('/api/mis-notas', {
+      const response = await fetch('/api/mis-notas', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -350,8 +350,10 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         body: JSON.stringify({ notes: allNotes }),
       });
+      if (!response.ok) throw new Error('No se pudieron guardar las notas');
+      localStorage.removeItem(NOTES_KEY);
     } catch (_) {
-      // Silencioso: mantenemos respaldo local y reintentamos en siguiente cambio.
+      // Se reintenta con el próximo cambio sin exponer el contenido en almacenamiento persistente.
     } finally {
       isSavingToServer = false;
     }
@@ -361,6 +363,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const legacyLocal = loadNotes();
     const normalizeLocalNote = (note) => ({
       ...note,
+      html: normalizeHtml(note?.html || ''),
       ownerKey: note?.ownerKey || NOTES_USER_KEY,
       ownerName: note?.ownerName || CURRENT_USER_NAME,
       collaborators: Array.isArray(note?.collaborators) ? note.collaborators : [],
@@ -373,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const remote = Array.isArray(json?.data) ? json.data : [];
       if (remote.length > 0) {
         allNotes = remote;
-        localStorage.setItem(NOTES_KEY, JSON.stringify(remote));
+        localStorage.removeItem(NOTES_KEY);
         broadcastNotesUpdated('mis-notas-hydrate');
         return;
       }
@@ -439,6 +442,14 @@ document.addEventListener('DOMContentLoaded', function () {
           el.setAttribute('rel', 'noopener noreferrer');
         }
       }
+      if (tag === 'img') {
+        const src = String(el.getAttribute('src') || '').trim();
+        if (!isSafeNoteImageSrc(src)) {
+          el.remove();
+          return;
+        }
+        el.setAttribute('loading', 'lazy');
+      }
       if (tag === 'input' && !el.classList.contains('note-checkbox')) {
         el.remove();
       }
@@ -463,7 +474,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function isSafeNoteHref(href) {
     if (!href) return false;
-    return /^(https?:|mailto:|tel:|#|\/)/i.test(href);
+    return /^(https?:|mailto:|tel:|#)/i.test(href) || /^\/(?!\/)/.test(href);
+  }
+
+  function isSafeNoteImageSrc(src) {
+    if (!src) return false;
+    return /^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(src)
+      || /^\/(?!\/)[a-z0-9/_?&=%.-]+$/i.test(src);
   }
 
   function normalizeNoteAutolinkHref(raw = '') {
@@ -868,6 +885,7 @@ document.addEventListener('DOMContentLoaded', function () {
     actionAiSupport.setAttribute('aria-expanded', shouldShow ? 'true' : 'false');
     if (shouldShow) {
       updateInfocusAiCurrentNoteContext();
+      loadNoteAiSupportHistory();
       requestAnimationFrame(positionNoteAiSupportPanel);
       setTimeout(() => noteAiSupportInput?.focus(), 0);
     }
@@ -881,6 +899,32 @@ document.addEventListener('DOMContentLoaded', function () {
     node.textContent = text;
     box.appendChild(node);
     box.scrollTop = box.scrollHeight;
+    return node;
+  }
+
+  async function loadNoteAiSupportHistory() {
+    const box = document.getElementById('note-ai-support-messages');
+    const noteId = String(window.__infocusAiCurrentNote?.id || '');
+    if (!box || !noteId) return;
+    box.dataset.historyKey = noteId;
+    box.innerHTML = '<div class="note-ai-support-message assistant">Cargando conversación...</div>';
+    try {
+      const params = new URLSearchParams({scope: 'note', entity_id: noteId});
+      const response = await fetch(`${NOTE_AI_SUPPORT_HISTORY_URL}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || box.dataset.historyKey !== noteId) return;
+      box.innerHTML = '';
+      const messages = Array.isArray(data.messages) ? data.messages : [];
+      if (!messages.length) {
+        appendNoteAiSupportMessage('assistant', 'Dime qué quieres hacer con esta nota o elige un tono rápido.');
+        return;
+      }
+      messages.forEach((item) => appendNoteAiSupportMessage(item.role, item.content));
+    } catch (_) {
+      if (box.dataset.historyKey === noteId) {
+        box.innerHTML = '<div class="note-ai-support-message assistant">No pude recuperar la conversación anterior.</div>';
+      }
+    }
   }
 
   function noteAiQuickPrompt(kind) {
@@ -957,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', function () {
       noteAiSupportSend.disabled = true;
       noteAiSupportSend.textContent = 'Pensando...';
     }
-    appendNoteAiSupportMessage('assistant', 'Estoy preparando una versión enriquecida de la nota...');
+    const thinkingMessage = appendNoteAiSupportMessage('assistant', 'Estoy preparando una versión enriquecida de la nota...');
     setAiNoteWorking(true);
 
     try {
@@ -969,6 +1013,8 @@ document.addEventListener('DOMContentLoaded', function () {
           chat_id: null,
           message: instruction,
           context: noteAiContext(userMessage),
+          support_scope: 'note',
+          support_entity_id: String(window.__infocusAiCurrentNote?.id || ''),
         }),
       });
       const chatData = await chatResponse.json().catch(() => ({}));
@@ -991,9 +1037,11 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       await window.__infocusAiApplyNoteUpdate(executeData.note_update);
+      thinkingMessage?.remove();
       appendNoteAiSupportMessage('assistant', 'Listo, actualicé la nota con formato enriquecido.');
     } catch (error) {
       console.error(error);
+      thinkingMessage?.remove();
       appendNoteAiSupportMessage('assistant', 'No pude aplicar el cambio con IA. Intenta con una instrucción más concreta.');
       setAiNoteWorking(false);
     } finally {
@@ -1402,7 +1450,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!note) return;
     notesListView.classList.add('hidden');
     noteEditView.classList.remove('hidden');
-    noteEditor.innerHTML = note.html || '';
+    noteEditor.innerHTML = normalizeHtml(note.html || '');
     if (!note.html) noteEditor.innerHTML = getTitlePlaceholderHtml() + '<p><br></p>';
     ensureHeadingStructure();
     renumberNumberLines();
@@ -1796,6 +1844,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function buildNotePreviewHtml(noteHtml, query = '') {
     const holder = document.createElement('div');
     holder.innerHTML = String(noteHtml || '');
+    scrubNoteHtml(holder);
     holder.querySelector('h1,h2,h3')?.remove();
     holder.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
     holder.querySelectorAll('.note-checkline').forEach((line) => {

@@ -10,6 +10,9 @@
 
     RewriteEngine On
 
+    # Los documentos se sirven únicamente mediante controladores autorizados.
+    RewriteRule ^storage/(documentos|document-thumbnails)(/|$) - [F,L,NC]
+
     # Redirigir www → sin www (opcional, ajusta tu dominio)
     # RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
     # RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
