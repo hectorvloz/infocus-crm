@@ -4959,6 +4959,8 @@
 
     const projectBoardsGrid = document.getElementById('projectBoardsGrid');
     const projectBoardContextMenu = document.getElementById('projectBoardContextMenu');
+    // Keep viewport coordinates independent of the board's animated transform.
+    if (projectBoardContextMenu) document.body.appendChild(projectBoardContextMenu);
     let contextProjectId = '';
     let contextProjectCard = null;
 
@@ -4977,11 +4979,12 @@
       projectBoardContextMenu.hidden = false;
       const rect = projectBoardContextMenu.getBoundingClientRect();
       const cardRect = card.getBoundingClientRect();
-      const x = event.clientX || cardRect.left;
-      const y = event.clientY || cardRect.bottom;
+      const keyboardTriggered = event.clientX === 0 && event.clientY === 0;
+      const x = keyboardTriggered ? cardRect.left : event.clientX;
+      const y = keyboardTriggered ? cardRect.bottom : event.clientY;
       projectBoardContextMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
       projectBoardContextMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
-      projectBoardContextMenu.querySelector('button')?.focus();
+      projectBoardContextMenu.querySelector('button')?.focus({ preventScroll: true });
     });
 
     projectBoardContextMenu?.addEventListener('click', (event) => {
@@ -5004,6 +5007,7 @@
       }
     });
     window.addEventListener('scroll', closeProjectBoardContextMenu, true);
+    window.addEventListener('resize', closeProjectBoardContextMenu);
 
     function getProjectBoardStages(project) {
       const stored = Array.isArray(project?.task_stages) ? project.task_stages : [];
