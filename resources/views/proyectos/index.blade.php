@@ -832,7 +832,7 @@
     }
 
     .project-file-preview-modal {
-      z-index: 2400;
+      z-index: 2147483620;
     }
 
     .project-file-preview-dialog {
@@ -919,6 +919,41 @@
       border-color: #d9ff66;
       box-shadow: 0 18px 42px rgba(15, 23, 42, .14);
     }
+
+    .project-board-context-menu {
+      position: fixed;
+      z-index: 1100;
+      min-width: 180px;
+      padding: .35rem;
+      border: 1px solid #dbe5f2;
+      border-radius: .75rem;
+      background: #fff;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, .18);
+    }
+
+    .project-board-context-menu[hidden] { display: none; }
+
+    .project-board-context-menu button {
+      display: block;
+      width: 100%;
+      padding: .6rem .75rem;
+      border-radius: .5rem;
+      color: #172236;
+      font-size: .875rem;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .project-board-context-menu button:hover,
+    .project-board-context-menu button:focus-visible { background: #ecfe88; outline: none; }
+
+    .project-board-context-menu button[data-action="archive"] { color: #be123c; }
+
+    html[data-color-mode="dark"] .project-board-context-menu { background: #111827; border-color: #334155; }
+    html[data-color-mode="dark"] .project-board-context-menu button { color: #f8fafc; }
+    html[data-color-mode="dark"] .project-board-context-menu button[data-action="archive"] { color: #fda4af; }
+    html[data-color-mode="dark"] .project-board-context-menu button:hover,
+    html[data-color-mode="dark"] .project-board-context-menu button:focus-visible { background: #334155; }
 
     .project-board-cover {
       position: relative;
@@ -2125,6 +2160,10 @@
     <div id="projectBoardsView" class="project-board-anim is-visible">
       <div id="projectBoardsCount" class="hidden">0 tableros</div>
       <div id="projectBoardsGrid" class="project-board-grid"></div>
+      <div id="projectBoardContextMenu" class="project-board-context-menu" role="menu" aria-label="Acciones del proyecto" hidden>
+        <button type="button" role="menuitem" data-action="configure">Configurar</button>
+        <button type="button" role="menuitem" data-action="archive">Archivar</button>
+      </div>
     </div>
 
     <div id="projectBoardDetailView" class="project-board-detail project-board-anim hidden">
@@ -3437,38 +3476,38 @@
       ['#9f1239', '#fb7185'],
     ];
     const PROJECT_COVER_PRESETS = [
-      { name: 'Neon suave', url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Prisma', url: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Vidrio azul', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Luz líquida', url: 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Aurora digital', url: 'https://images.unsplash.com/photo-1635776062360-af423602aff3?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Cromo', url: 'https://images.unsplash.com/photo-1604076913837-52ab5629fba9?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Bruma violeta', url: 'https://images.unsplash.com/photo-1579547621706-1a9c79d5c9f1?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Ondas', url: 'https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Malla azul', url: 'https://images.unsplash.com/photo-1614851099362-9adf73ccebe9?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Tinta', url: 'https://images.unsplash.com/photo-1574169208507-84376144848b?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Pulso', url: 'https://images.unsplash.com/photo-1620121684840-edffcfc4b878?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Líneas', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Escritorio foco', url: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Código nocturno', url: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Tablero creativo', url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Oficina cálida', url: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Mesa productiva', url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Laptop limpia', url: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Estrategia', url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Notas y café', url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Arquitectura', url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Ciudad azul', url: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Montañas', url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Bosque', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Océano', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Arena', url: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Niebla verde', url: 'https://images.unsplash.com/photo-1473773508845-188df298d2d1?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Minimal blanco', url: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Luces ciudad', url: 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Gradiente solar', url: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80&sat=-20' },
-      { name: 'Textura papel', url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=1200&q=80' },
-      { name: 'Trabajo en equipo', url: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80' },
+      { name: 'Neon suave', url: '/images/project-covers/photo-1550745165-9bc0b252726f.webp', legacyId: 'photo-1550745165-9bc0b252726f' },
+      { name: 'Prisma', url: '/images/project-covers/photo-1557683316-973673baf926.webp', legacyId: 'photo-1557683316-973673baf926' },
+      { name: 'Vidrio azul', url: '/images/project-covers/photo-1618005182384-a83a8bd57fbe.webp', legacyId: 'photo-1618005182384-a83a8bd57fbe' },
+      { name: 'Luz líquida', url: '/images/project-covers/photo-1557672172-298e090bd0f1.webp', legacyId: 'photo-1557672172-298e090bd0f1' },
+      { name: 'Aurora digital', url: '/images/project-covers/photo-1635776062360-af423602aff3.webp', legacyId: 'photo-1635776062360-af423602aff3' },
+      { name: 'Cromo', url: '/images/project-covers/photo-1604076913837-52ab5629fba9.webp', legacyId: 'photo-1604076913837-52ab5629fba9' },
+      { name: 'Bruma violeta', url: '/images/project-covers/photo-1579547621706-1a9c79d5c9f1.webp', legacyId: 'photo-1579547621706-1a9c79d5c9f1' },
+      { name: 'Ondas', url: '/images/project-covers/photo-1558591710-4b4a1ae0f04d.webp', legacyId: 'photo-1558591710-4b4a1ae0f04d' },
+      { name: 'Malla azul', url: '/images/project-covers/photo-1614851099362-9adf73ccebe9.webp', legacyId: 'photo-1614851099362-9adf73ccebe9' },
+      { name: 'Tinta', url: '/images/project-covers/photo-1574169208507-84376144848b.webp', legacyId: 'photo-1574169208507-84376144848b' },
+      { name: 'Pulso', url: '/images/project-covers/photo-1620121684840-edffcfc4b878.webp', legacyId: 'photo-1620121684840-edffcfc4b878' },
+      { name: 'Líneas', url: '/images/project-covers/photo-1541701494587-cb58502866ab.webp', legacyId: 'photo-1541701494587-cb58502866ab' },
+      { name: 'Escritorio foco', url: '/images/project-covers/photo-1497366754035-f200968a6e72.webp', legacyId: 'photo-1497366754035-f200968a6e72' },
+      { name: 'Código nocturno', url: '/images/project-covers/photo-1515879218367-8466d910aaa4.webp', legacyId: 'photo-1515879218367-8466d910aaa4' },
+      { name: 'Tablero creativo', url: '/images/project-covers/photo-1516321318423-f06f85e504b3.webp', legacyId: 'photo-1516321318423-f06f85e504b3' },
+      { name: 'Oficina cálida', url: '/images/project-covers/photo-1497366811353-6870744d04b2.webp', legacyId: 'photo-1497366811353-6870744d04b2' },
+      { name: 'Mesa productiva', url: '/images/project-covers/photo-1519389950473-47ba0277781c.webp', legacyId: 'photo-1519389950473-47ba0277781c' },
+      { name: 'Laptop limpia', url: '/images/project-covers/photo-1498050108023-c5249f4df085.webp', legacyId: 'photo-1498050108023-c5249f4df085' },
+      { name: 'Estrategia', url: '/images/project-covers/photo-1552664730-d307ca884978.webp', legacyId: 'photo-1552664730-d307ca884978' },
+      { name: 'Notas y café', url: '/images/project-covers/photo-1517245386807-bb43f82c33c4.webp', legacyId: 'photo-1517245386807-bb43f82c33c4' },
+      { name: 'Arquitectura', url: '/images/project-covers/photo-1486406146926-c627a92ad1ab.webp', legacyId: 'photo-1486406146926-c627a92ad1ab' },
+      { name: 'Ciudad azul', url: '/images/project-covers/photo-1494526585095-c41746248156.webp', legacyId: 'photo-1494526585095-c41746248156' },
+      { name: 'Montañas', url: '/images/project-covers/photo-1500530855697-b586d89ba3ee.webp', legacyId: 'photo-1500530855697-b586d89ba3ee' },
+      { name: 'Bosque', url: '/images/project-covers/photo-1448375240586-882707db888b.webp', legacyId: 'photo-1448375240586-882707db888b' },
+      { name: 'Océano', url: '/images/project-covers/photo-1507525428034-b723cf961d3e.webp', legacyId: 'photo-1507525428034-b723cf961d3e' },
+      { name: 'Arena', url: '/images/project-covers/photo-1500534314209-a25ddb2bd429.webp', legacyId: 'photo-1500534314209-a25ddb2bd429' },
+      { name: 'Niebla verde', url: '/images/project-covers/photo-1473773508845-188df298d2d1.webp', legacyId: 'photo-1473773508845-188df298d2d1' },
+      { name: 'Minimal blanco', url: '/images/project-covers/photo-1494438639946-1ebd1d20bf85.webp', legacyId: 'photo-1494438639946-1ebd1d20bf85' },
+      { name: 'Luces ciudad', url: '/images/project-covers/photo-1519608487953-e999c86e7455.webp', legacyId: 'photo-1519608487953-e999c86e7455' },
+      { name: 'Gradiente solar', url: '/images/project-covers/photo-1500534314209-a25ddb2bd429-solar.webp', legacyId: 'photo-1500534314209-a25ddb2bd429' },
+      { name: 'Textura papel', url: '/images/project-covers/photo-1506784983877-45594efa4cbe.webp', legacyId: 'photo-1506784983877-45594efa4cbe' },
+      { name: 'Trabajo en equipo', url: '/images/project-covers/photo-1521737604893-d14cc237f11d.webp', legacyId: 'photo-1521737604893-d14cc237f11d' },
     ];
     let modalDescAutosaveTimer = null;
     let taskDescAutosaveTimer = null;
@@ -4899,7 +4938,7 @@
         const taskCount = Array.isArray(project.tareas) ? project.tareas.length : 0;
         const client = escapeHtml(project.cliente || 'Sin cliente');
         const due = formatBoardDate(project.vencimiento);
-        return `<button type="button" onclick="openProjectBoard('${safeId}')" class="project-board-card text-left" style="--board-from:${from};--board-to:${to};">
+        return `<button type="button" onclick="openProjectBoard('${safeId}')" data-project-id="${escapeHtml(project.id || '')}" class="project-board-card text-left" style="--board-from:${from};--board-to:${to};">
           <div class="${coverClass}">${coverMarkup}</div>
           <div class="project-board-footer">
             <div class="flex items-start justify-between gap-2">
@@ -4917,6 +4956,54 @@
         </button>`;
       }).join('');
     }
+
+    const projectBoardsGrid = document.getElementById('projectBoardsGrid');
+    const projectBoardContextMenu = document.getElementById('projectBoardContextMenu');
+    let contextProjectId = '';
+    let contextProjectCard = null;
+
+    function closeProjectBoardContextMenu() {
+      if (projectBoardContextMenu) projectBoardContextMenu.hidden = true;
+      contextProjectId = '';
+      contextProjectCard = null;
+    }
+
+    projectBoardsGrid?.addEventListener('contextmenu', (event) => {
+      const card = event.target.closest('.project-board-card[data-project-id]');
+      if (!card || !projectBoardContextMenu) return;
+      event.preventDefault();
+      contextProjectId = card.dataset.projectId;
+      contextProjectCard = card;
+      projectBoardContextMenu.hidden = false;
+      const rect = projectBoardContextMenu.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const x = event.clientX || cardRect.left;
+      const y = event.clientY || cardRect.bottom;
+      projectBoardContextMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+      projectBoardContextMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+      projectBoardContextMenu.querySelector('button')?.focus();
+    });
+
+    projectBoardContextMenu?.addEventListener('click', (event) => {
+      const action = event.target.closest('[data-action]')?.dataset.action;
+      const projectId = contextProjectId;
+      closeProjectBoardContextMenu();
+      if (!projectId) return;
+      if (action === 'configure') openProject(projectId);
+      if (action === 'archive') archiveProjectById(projectId);
+    });
+
+    document.addEventListener('pointerdown', (event) => {
+      if (!projectBoardContextMenu?.hidden && !projectBoardContextMenu.contains(event.target)) closeProjectBoardContextMenu();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !projectBoardContextMenu?.hidden) {
+        const card = contextProjectCard;
+        closeProjectBoardContextMenu();
+        card?.focus();
+      }
+    });
+    window.addEventListener('scroll', closeProjectBoardContextMenu, true);
 
     function getProjectBoardStages(project) {
       const stored = Array.isArray(project?.task_stages) ? project.task_stages : [];
@@ -5034,6 +5121,8 @@
     function closeProjectBoard(options = {}) {
       currentBoardProjectId = '';
       pendingBoardSlug = '';
+      window.__infocusAiCurrentProject = null;
+      window.__infocusAiCurrentTask = null;
       transitionBoardViews(false);
       if (!options.skipUrl) {
         setBoardRoute('', options.replaceUrl ? 'replace' : 'push');
@@ -5355,7 +5444,7 @@
       const owners = getTaskOwnerSources(task, project);
       const files = Array.isArray(task.files) ? task.files : [];
       const cover = getTaskCoverFile(task);
-      const coverUrl = cover?.preview_url || cover?.url || '';
+      const coverUrl = cover ? projectFileThumbnailUrl(cover) : '';
       const taskAccumulatedSeconds = getTaskCardAccumulatedSeconds(project, task);
       const taskTime = formatTimer(taskAccumulatedSeconds);
       const ownersHtml = renderResponsibleBadges(owners.names, owners.ids, {
@@ -5365,7 +5454,7 @@
         emptyHtml: '<span class="whitespace-nowrap text-[10px] font-semibold text-slate-400">Sin responsable</span>',
       });
       return `<div class="project-task-card ${done ? 'is-done' : ''} ${coverUrl ? 'has-cover' : ''} ${isPending ? 'is-pending' : ''} ${isEntering ? 'is-entering' : ''} ${!isProgressTask ? 'is-card-type' : ''}" draggable="${isPending ? 'false' : 'true'}" data-board-task-id="${escapeHtml(task.id || '')}" onclick="${isPending ? '' : `openProjectTask('${safeProjectId}', '${safeTaskId}')`}">
-        ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="project-task-cover" alt="">` : ''}
+        ${coverUrl ? `<img src="${escapeHtml(coverUrl)}" class="project-task-cover" width="640" height="400" decoding="async" alt="">` : ''}
         ${isPending ? '' : projectBoardTaskMenu(project, task, taskType)}
         <div class="project-task-card-body">
           ${isProgressTask ? `<button type="button" onclick="event.stopPropagation(); toggleTask('${safeTaskId}', '${safeProjectId}')" class="project-task-toggle h-5 w-5 shrink-0 rounded-full border-2 ${done ? 'border-lime-300 bg-lime-200 text-slate-950' : 'border-slate-300 bg-white'} flex items-center justify-center" title="Completar tarea" aria-label="Completar tarea">
@@ -7500,6 +7589,7 @@
         client_id: String(p.cliente_id || ''),
         client_name: String(p.cliente || ''),
       };
+      window.__infocusAiCurrentTask = null;
 
       setProjectModalReadOnly(!!options?.readOnly);
 
@@ -7578,7 +7668,14 @@
       }
         document.getElementById('projectModal')?.classList.add('hidden');
       document.body.classList.remove('project-modal-open');
-      window.__infocusAiCurrentProject = null;
+      const boardProject = projects.find((item) => String(item.id) === String(currentBoardProjectId || ''));
+      window.__infocusAiCurrentProject = boardProject ? {
+        id: String(boardProject.id),
+        title: String(boardProject.titulo || 'Tablero'),
+        client_id: String(boardProject.cliente_id || ''),
+        client_name: String(boardProject.cliente || ''),
+      } : null;
+      window.__infocusAiCurrentTask = null;
       resetProjectAiSupport();
       if (typeof hideProjectDropOverlay === 'function') hideProjectDropOverlay();
       closeTaskModal();
@@ -7667,6 +7764,17 @@
       try {
         const parsed = new URL(raw, window.location.origin);
         if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+
+        if (parsed.hostname === 'images.unsplash.com') {
+          const legacyId = parsed.pathname.split('/').pop();
+          if (legacyId === 'photo-1500534314209-a25ddb2bd429' && parsed.searchParams.get('sat') === '-20') {
+            return new URL(PROJECT_COVER_PRESETS.find((item) => item.name === 'Gradiente solar').url, window.location.origin).href;
+          }
+          const preset = PROJECT_COVER_PRESETS.find((item) =>
+            item.legacyId === legacyId
+          );
+          if (preset) return new URL(preset.url, window.location.origin).href;
+        }
 
         const currentHost = window.location.hostname;
         if (isLoopbackHost(parsed.hostname) && !isLoopbackHost(currentHost)) {
@@ -10746,6 +10854,11 @@
       if (!p) return;
       const task = (p.tareas || []).find(t => t.id === taskId);
       if (!task) return;
+      window.__infocusAiCurrentProject = {
+        id: String(p.id), title: String(p.titulo || 'Proyecto'),
+        client_id: String(p.cliente_id || ''), client_name: String(p.cliente || ''),
+      };
+      window.__infocusAiCurrentTask = { id: String(task.id), title: String(task.texto || 'Tarjeta') };
       renderTaskDetail(task);
       resetTaskModalScrollPositions();
       const taskModal = document.getElementById('taskDetailModal');
@@ -10787,6 +10900,7 @@
         }
       }
       currentTaskId = null;
+      window.__infocusAiCurrentTask = null;
       currentTaskModalEditing = true;
       currentTaskEditingNoteId = null;
       currentEditingSubtaskId = null;
@@ -12644,6 +12758,15 @@
       return files.find((file) => String(file?.mime || '').startsWith('image/')) || null;
     }
 
+    function projectFileThumbnailUrl(file) {
+      const id = String(file?.id || '').trim();
+      const previewUrl = String(file?.preview_url || file?.url || '');
+      if (file?.thumbnail_url) return file.thumbnail_url;
+      return id && /\/documentos\/[^/]+\/preview(?:[?#]|$)/.test(previewUrl)
+        ? `/documentos/${encodeURIComponent(id)}/thumbnail`
+        : previewUrl;
+    }
+
     function renderTaskFiles(files) {
       const container = document.getElementById('taskFilesList');
       if (!container) return;
@@ -12671,7 +12794,7 @@
         const folderUrl = `/documentos?space=${encodeURIComponent(folderSpace)}${clientId ? `&cliente_id=${encodeURIComponent(clientId)}` : ''}&folder=${encodeURIComponent(folderPath)}`;
         const metaLabel = `Añadido: ${projectFileDate(file?.date || file?.uploaded_at || file?.created_at)}${isImage ? ' · Portada' : ''}`;
         const figure = isImage
-          ? `<img src="${previewUrl}" class="project-file-thumb" alt="${safeName}"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
+          ? `<img src="${escapeHtml(projectFileThumbnailUrl(file))}" class="project-file-thumb" alt="${safeName}" loading="lazy" decoding="async"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
           : `<div class="project-file-figure"><div class="project-file-ext" style="background:${tone.color}">${tone.label}</div><div class="project-file-lines" aria-hidden="true"><span></span><span></span></div></div>`;
 
         return `
@@ -12814,7 +12937,7 @@
           const folderUrl = `/documentos?space=${encodeURIComponent(folderSpace)}${clientId ? `&cliente_id=${encodeURIComponent(clientId)}` : ''}&folder=${encodeURIComponent(folderPath)}`;
           const metaLabel = `Añadido: ${projectFileDate(f?.date || f?.uploaded_at || f?.created_at)}${isImage ? ' · Imagen' : ''}`;
           const figure = isImage
-            ? `<img src="${previewUrl}" class="project-file-thumb" alt="${safeName}"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
+            ? `<img src="${escapeHtml(projectFileThumbnailUrl(file))}" class="project-file-thumb" alt="${safeName}" loading="lazy" decoding="async"><div class="project-file-image-ext" style="background:${tone.color}">${tone.label}</div>`
             : `<div class="project-file-figure"><div class="project-file-ext" style="background:${tone.color}">${tone.label}</div><div class="project-file-lines" aria-hidden="true"><span></span><span></span></div></div>`;
 
           return `

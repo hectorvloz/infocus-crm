@@ -7,7 +7,7 @@
       @csrf
       <div class="md:col-span-2">
         <label class="text-sm font-medium">Empresa</label>
-        <input name="empresa" value="{{ $cliente['empresa'] }}" class="form-input" required>
+        <input name="empresa" value="{{ $cliente['empresa'] ?? '' }}" class="form-input" required>
       </div>
       <div>
         <label class="text-sm font-medium">Propietario</label>

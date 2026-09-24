@@ -23,14 +23,21 @@
       ],
       'deepseek' => [
         ['value' => 'auto', 'label' => 'Automático recomendado'],
-        ['value' => 'deepseek-chat', 'label' => 'DeepSeek Chat'],
-        ['value' => 'deepseek-reasoner', 'label' => 'DeepSeek Reasoner'],
+        ['value' => 'deepseek-flash', 'label' => 'DeepSeek V4.1 Flash'],
+        ['value' => 'deepseek-flash-thinking', 'label' => 'DeepSeek V4.1 Flash · Razonamiento'],
       ],
     ];
     $selectedProvider = old('ai_provider', $settings['ai_provider'] ?? 'gemini');
     $selectedProvider = array_key_exists($selectedProvider, $providerLabels) ? $selectedProvider : 'gemini';
     $selectedModel = old('ai_model', $settings['ai_model'] ?? 'auto');
     $selectedModel = in_array($selectedModel, ['gemini-1.5-flash', 'gemini-1.5-pro'], true) ? 'auto' : $selectedModel;
+    if ($selectedProvider === 'deepseek') {
+      $selectedModel = match ($selectedModel) {
+        'deepseek-chat' => 'deepseek-flash',
+        'deepseek-reasoner' => 'deepseek-flash-thinking',
+        default => $selectedModel,
+      };
+    }
     $providerModelValues = collect($modelOptions[$selectedProvider])->pluck('value')->all();
     $selectedModel = in_array($selectedModel, $providerModelValues, true) ? $selectedModel : 'auto';
   @endphp
@@ -43,6 +50,7 @@
   @php
     $activeAiTab = request('tab') === 'memoria' ? 'memoria' : 'conexion';
     $memoryGroups = [
+      'project' => ['label' => 'Proyectos', 'empty' => 'Todavía no hay memorias vinculadas a proyectos.'],
       'client' => ['label' => 'Clientes', 'empty' => 'Todavía no hay memorias vinculadas a clientes.'],
       'user' => ['label' => 'De mí', 'empty' => 'Todavía no hay memorias personales.'],
       'company' => ['label' => 'Mi empresa', 'empty' => 'Todavía no hay memorias de empresa.'],
@@ -131,7 +139,7 @@
   <section data-ai-settings-panel="memoria" class="{{ $activeAiTab === 'memoria' ? '' : 'hidden' }} space-y-5">
     <div class="rounded-3xl border border-fuchsia-100 bg-fuchsia-50 px-5 py-4 text-sm leading-relaxed text-fuchsia-900">
       <div class="font-black text-slate-900">Cómo funciona la memoria</div>
-      <p class="mt-1">La IA guarda preferencias cuando dices cosas como “recuerda”, “ten en cuenta”, “este cliente prefiere...” o “mi empresa usa...”. Si hay cliente activo en factura, proyecto o nota, se vincula a ese cliente. Puedes editar o borrar cualquier memoria aquí.</p>
+      <p class="mt-1">La IA guarda preferencias cuando dices “recuerda” o “ten en cuenta”. En un proyecto, las reglas de ese proyecto quedan vinculadas a él; las preferencias del cliente se vinculan al cliente y se pueden usar en sus otros proyectos. Puedes editar o borrar cualquier memoria aquí.</p>
     </div>
 
     @foreach($memoryGroups as $scope => $group)

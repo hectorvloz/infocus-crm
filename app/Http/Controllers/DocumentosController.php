@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
+use App\Support\DocumentThumbnail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -574,6 +575,23 @@ class DocumentosController extends Controller
         return response()->file($absolutePath, [
             'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="'.addslashes((string) ($doc['original_name'] ?? basename($path))).'"',
+            'Cache-Control' => str_starts_with($mime, 'image/') ? 'private, max-age=86400' : 'private, max-age=3600',
+        ]);
+    }
+
+    public function thumbnail(string $id)
+    {
+        $doc = $this->documents->find($id);
+        abort_if(!$doc || ($doc['storage'] ?? 'local') !== 'local', 404);
+        $path = (string) ($doc['path'] ?? '');
+        abort_if($path === '' || !Storage::disk('public')->exists($path), 404);
+        $mime = (string) (($doc['mime'] ?? '') ?: mime_content_type(Storage::disk('public')->path($path)) ?: '');
+        abort_unless(str_starts_with($mime, 'image/'), 404);
+
+        $thumbnail = (new DocumentThumbnail())->path($id, $path);
+        return response()->file($thumbnail ?: Storage::disk('public')->path($path), [
+            'Content-Type' => $thumbnail ? 'image/webp' : $mime,
+            'Cache-Control' => 'private, max-age=86400',
         ]);
     }
 
@@ -810,6 +828,7 @@ class DocumentosController extends Controller
             if ($path !== '' && Storage::disk('public')->exists($path)) {
                 Storage::disk('public')->delete($path);
             }
+            if ($path !== '') (new DocumentThumbnail())->delete($id, (string) $path);
         }
 
         $this->documents->delete($id);

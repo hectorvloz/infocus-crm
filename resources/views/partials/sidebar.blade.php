@@ -181,11 +181,14 @@
       </nav>
     </div>
 
-    @if($canAccessSettings)
+    @if($can('social-media.read'))
       <div class="p-3 border-t border-white/10 shrink-0">
-        <a href="{{ route('settings.edit') }}" class="menu-link group flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-white/10 text-white/70 transition-all {{ request()->routeIs('settings.*') ? 'is-active text-slate-900' : '' }}">
-          <svg class="h-6 w-6 shrink-0 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-          <span data-label class="text-sm font-medium">Ajustes</span>
+        <a href="{{ route('social-media.index') }}" target="_blank" rel="noopener" class="menu-link group flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-white/10 text-white/70 transition-all">
+          <svg class="h-6 w-6 shrink-0 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm10-4a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm0 10a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="m10.5 9.5 3.8-2M10.5 14.5l3.8 2"/>
+          </svg>
+          <span data-label class="text-sm font-medium">Social Manager</span>
         </a>
         <div class="appearance-toolbar hidden" style="display:none!important" role="toolbar" aria-label="Modo de apariencia" aria-hidden="true">
           <button type="button" class="appearance-mode-btn" data-appearance-mode="light" aria-label="Modo claro" title="Modo claro">

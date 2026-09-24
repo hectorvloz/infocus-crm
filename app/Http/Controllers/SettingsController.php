@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use App\Mail\GenericMail;
 use App\Support\Ai\AiMemoryService;
+use App\Support\SocialMediaCredentials;
 
 class SettingsController extends Controller
 {
@@ -42,6 +43,12 @@ class SettingsController extends Controller
         'documentos.json',
         'document_folders.json',
         'document_spaces.json',
+        'social_accounts.json',
+        'social_insights.json',
+        'social_ads.json',
+        'social_leads.json',
+        'social_content_calendar.json',
+        'social_sync_logs.json',
         'mensajes.json',
         'notification_states.json',
         'scheduler_state.json',
@@ -953,6 +960,50 @@ class SettingsController extends Controller
         $timezones = \DateTimeZone::listIdentifiers();
 
         return view('settings.integrations', compact('settings', 'googleCalendars', 'googleCalendarListError', 'timezones'));
+    }
+
+    public function socialMedia()
+    {
+        $settings = $this->store->find('settings') ?: [];
+        $credentialStatus = SocialMediaCredentials::status();
+        $syncLogs = collect((new FileStore('social_sync_logs.json'))->all())
+            ->sortByDesc('created_at')
+            ->take(15)
+            ->values()
+            ->all();
+
+        return view('settings.social-media', compact('settings', 'credentialStatus', 'syncLogs'));
+    }
+
+    public function updateSocialMedia(Request $request)
+    {
+        $data = $request->validate([
+            'meta_app_id' => 'nullable|string|max:255',
+            'meta_app_secret' => 'nullable|string|max:1000',
+            'meta_redirect_uri' => 'nullable|url|max:1000',
+            'meta_graph_version' => 'nullable|string|max:40',
+            'tiktok_client_key' => 'nullable|string|max:255',
+            'tiktok_client_secret' => 'nullable|string|max:1000',
+            'tiktok_redirect_uri' => 'nullable|url|max:1000',
+        ]);
+
+        $current = $this->store->find('settings') ?: [];
+        foreach (['meta_app_secret', 'tiktok_client_secret'] as $field) {
+            if (filled($data[$field] ?? null)) {
+                $data[$field] = 'ENC:' . Crypt::encryptString((string) $data[$field]);
+            } else {
+                unset($data[$field]);
+            }
+        }
+
+        foreach (['meta_app_id', 'meta_redirect_uri', 'meta_graph_version', 'tiktok_client_key', 'tiktok_redirect_uri'] as $field) {
+            $data[$field] = trim((string) ($data[$field] ?? ''));
+        }
+
+        $payload = array_merge($current, array_filter($data, fn ($value) => $value !== null));
+        $this->saveSettings($payload);
+
+        return redirect()->route('settings.social_media')->with('success', 'Configuración de Social Media actualizada.');
     }
 
     public function updateIntegrations(Request $request)

@@ -10,9 +10,9 @@
               @if(!empty($cliente['avatar']))
                 <img src="{{ $cliente['avatar'] }}" class="h-12 w-12 rounded-full object-cover border">
               @else
-                <div class="h-12 w-12 rounded-full bg-slate-900 text-white grid place-content-center">{{ strtoupper(substr($cliente['empresa'],0,1)) }}</div>
+                <div class="h-12 w-12 rounded-full bg-slate-900 text-white grid place-content-center">{{ strtoupper(substr($cliente['empresa'] ?? 'C',0,1)) }}</div>
               @endif
-              <div class="text-2xl font-extrabold">{{ $cliente['empresa'] }}</div>
+              <div class="text-2xl font-extrabold">{{ $cliente['empresa'] ?? 'Sin Nombre' }}</div>
             </div>
             <div class="text-slate-500">Propietario: {{ $cliente['propietario'] ?? '—' }}</div>
             <div class="text-slate-500">Estado: <span class="px-2 py-0.5 rounded-full text-xs {{ ($cliente['estado'] ?? '')==='Activo' ? 'bg-blue-100 text-blue-800' : 'bg-neutral-100 text-slate-600' }}">{{ $cliente['estado'] ?? 'Activo' }}</span></div>
@@ -139,7 +139,7 @@
       <div class="bg-white rounded-2xl shadow border p-6">
         <div class="text-lg font-bold mb-3">Acciones rápidas</div>
         <div class="grid gap-2">
-          <a href="{{ route('facturas.create',['cliente'=>$cliente['empresa']]) }}" class="inline-flex items-center justify-center gap-2 rounded-full bg-lime-300 text-slate-900 font-semibold px-4 py-2">
+          <a href="{{ route('facturas.create',['cliente'=>$cliente['empresa'] ?? 'Sin Nombre']) }}" class="inline-flex items-center justify-center gap-2 rounded-full bg-lime-300 text-slate-900 font-semibold px-4 py-2">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/>
             </svg>
@@ -151,20 +151,7 @@
       <div class="bg-white rounded-2xl shadow border p-6">
         <div class="text-lg font-bold mb-3">Proyectos recientes</div>
         <div class="space-y-2">
-          @php
-            $projs = collect((new \App\Repositories\FileStore('proyectos.json'))->all())
-              ->where('cliente_id', $cliente['id'] ?? '')
-              ->reject(function ($p) {
-                $archived = (bool) ($p['archived'] ?? false);
-                $deleted = (bool) ($p['deleted'] ?? false);
-                $hasDeletedAt = !empty($p['deleted_at'] ?? null);
-                $etapa = strtolower((string) ($p['etapa'] ?? ''));
-                $esInactivoPorEtapa = in_array($etapa, ['archivado', 'archivado(s)', 'eliminado', 'eliminada'], true);
-
-                return $archived || $deleted || $hasDeletedAt || $esInactivoPorEtapa;
-              });
-          @endphp
-          @forelse($projs->sortByDesc('updated_at')->take(6) as $p)
+          @forelse($projs as $p)
             <div class="flex items-center justify-between rounded-xl border px-3 py-2">
               <div>
                 <div class="text-sm font-semibold">{{ $p['titulo'] ?? 'Proyecto' }}</div>

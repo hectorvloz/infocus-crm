@@ -56,9 +56,9 @@
                 @if(!empty($c['avatar_thumb']))
                   <img src="{{ $c['avatar_thumb'] }}" class="h-8 w-8 rounded-full object-cover border flex-shrink-0">
                 @else
-                  <div class="h-8 w-8 rounded-full bg-slate-900 text-white text-xs font-semibold grid place-content-center flex-shrink-0">{{ strtoupper(substr($c['empresa'],0,1)) }}</div>
+                  <div class="h-8 w-8 rounded-full bg-slate-900 text-white text-xs font-semibold grid place-content-center flex-shrink-0">{{ strtoupper(substr($c['empresa'] ?? 'C',0,1)) }}</div>
                 @endif
-                <a class="no-underline whitespace-nowrap text-base font-normal text-lime-600 hover:text-lime-700" href="{{ route('clientes.show',$c['id']) }}">{{ $c['empresa'] }}</a>
+                <a class="no-underline whitespace-nowrap text-base font-normal text-lime-600 hover:text-lime-700" href="{{ route('clientes.show',$c['id']) }}">{{ $c['empresa'] ?? 'Sin Nombre' }}</a>
               </div>
             </td>
             <td class="py-3 px-4 min-w-[12rem] whitespace-nowrap">{{ $c['nit'] ?? '—' }}</td>
@@ -97,10 +97,10 @@
             @if(!empty($c['avatar_thumb']))
               <img src="{{ $c['avatar_thumb'] }}" class="h-9 w-9 rounded-full object-cover border flex-shrink-0">
             @else
-              <div class="h-9 w-9 rounded-full bg-slate-900 text-white text-sm font-bold grid place-content-center flex-shrink-0">{{ strtoupper(substr($c['empresa'],0,1)) }}</div>
+              <div class="h-9 w-9 rounded-full bg-slate-900 text-white text-sm font-bold grid place-content-center flex-shrink-0">{{ strtoupper(substr($c['empresa'] ?? 'C',0,1)) }}</div>
             @endif
             <div class="min-w-0 flex-1">
-              <div class="font-semibold text-sm leading-tight truncate">{{ $c['empresa'] }}</div>
+              <div class="font-semibold text-sm leading-tight truncate">{{ $c['empresa'] ?? 'Sin Nombre' }}</div>
               <div class="text-xs text-slate-400 truncate">{{ $c['propietario'] ?? '—' }}</div>
             </div>
             <span class="flex-shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full {{ ($c['estado'] ?? '')==='Activo' ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-slate-500' }}">{{ $c['estado'] ?? 'Activo' }}</span>
@@ -132,10 +132,10 @@
           <div id="content-{{ $c['id'] }}" class="hidden">
             <div class="flex items-center gap-3 mb-3">
               @if(!empty($c['avatar_thumb']))<img src="{{ $c['avatar_thumb'] }}" class="h-12 w-12 rounded-full object-cover border">@else
-              <div class="h-12 w-12 rounded-full bg-slate-900 text-white grid place-content-center">{{ strtoupper(substr($c['empresa'],0,1)) }}</div>
+              <div class="h-12 w-12 rounded-full bg-slate-900 text-white grid place-content-center">{{ strtoupper(substr($c['empresa'] ?? 'C',0,1)) }}</div>
               @endif
               <div>
-                <div class="text-lg font-extrabold">{{ $c['empresa'] }}</div>
+                <div class="text-lg font-extrabold">{{ $c['empresa'] ?? 'Sin Nombre' }}</div>
                 <div class="text-sm text-slate-500">NIT: {{ $c['nit'] ?? '—' }} • Propietario: {{ $c['propietario'] ?? '—' }}</div>
               </div>
             </div>

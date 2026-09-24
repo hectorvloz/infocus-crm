@@ -278,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const noteClientOptions = document.getElementById('note-client-options');
   const noteClientSearch = document.getElementById('note-client-search');
   let activeNoteLinkedClient = '';
+  let activeNoteClientId = '';
 
   const noteToolbarButtons = Array.from(document.querySelectorAll('#note-edit-view [data-note-cmd]'));
   const noteColorButtons = Array.from(document.querySelectorAll('#note-edit-view [data-note-color]'));
@@ -692,13 +693,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function resolveNoteClientName(note) {
     const raw = String(note?.linkedClient || '').trim();
-    if (!raw) return '';
+    const explicitId = String(note?.clientId || '').trim();
+    if (!raw && !explicitId) return '';
     const match = clients.find((client) => {
+      const id = String(client.id ?? client.uuid ?? '').trim();
+      const name = String(client.empresa || client.nombre || client.name || '').trim();
+      return (explicitId && explicitId === id) || raw === id || normalizeSearchText(raw) === normalizeSearchText(name);
+    });
+    return String(match?.empresa || match?.nombre || match?.name || raw).trim();
+  }
+
+  function resolveNoteClientId(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const matches = clients.filter((client) => {
       const id = String(client.id ?? client.uuid ?? '').trim();
       const name = String(client.empresa || client.nombre || client.name || '').trim();
       return raw === id || normalizeSearchText(raw) === normalizeSearchText(name);
     });
-    return String(match?.empresa || match?.nombre || match?.name || raw).trim();
+    return matches.length === 1 ? String(matches[0].id ?? matches[0].uuid ?? '') : '';
   }
 
   function noteMatchesSearch(note, query) {
@@ -768,6 +781,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html,
       plainText: htmlToPlainText(html || note.plainText || '').slice(0, 2600),
       client_name: resolveNoteClientName(note) || activeNoteLinkedClient || '',
+      client_id: activeNoteClientId || note.clientId || '',
       permission: note.permission || 'owner',
     };
   }
@@ -1298,6 +1312,7 @@ document.addEventListener('DOMContentLoaded', function () {
       plainText: plain,
       color: activeNoteColor,
       linkedClient: activeNoteLinkedClient,
+      clientId: activeNoteClientId,
       updatedAt: now,
       createdAt: allNotes[editingNoteIndex].createdAt || now,
     };
@@ -1323,30 +1338,30 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function syncNoteClientLabel() {
-    if (noteClientSelectedLabel) noteClientSelectedLabel.textContent = activeNoteLinkedClient || 'Sin cliente';
+    if (noteClientSelectedLabel) noteClientSelectedLabel.textContent = resolveNoteClientName({ linkedClient: activeNoteLinkedClient, clientId: activeNoteClientId }) || activeNoteLinkedClient || 'Sin cliente';
   }
 
   function renderNoteClientOptions(search) {
     if (!noteClientOptions) return;
     const needle = String(search || '').trim().toLowerCase();
-    const names = [...new Map(
-      clients.map((c) => {
-        const v = String(c.empresa || c.nombre || c.name || '').trim();
-        return [v.toLocaleLowerCase('es'), v];
-      }).filter(([k]) => k)
-    ).values()].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-    const filtered = names.filter((n) => !needle || n.toLowerCase().includes(needle));
-    if (activeNoteLinkedClient && !filtered.includes(activeNoteLinkedClient)) filtered.unshift(activeNoteLinkedClient);
-    const all = [{ value: '', label: 'Sin cliente' }, ...filtered.map((n) => ({ value: n, label: n }))];
+    const options = clients.map((c) => ({
+      id: String(c.id ?? c.uuid ?? ''),
+      label: String(c.empresa || c.nombre || c.name || '').trim(),
+    })).filter((item) => item.id && item.label)
+      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+    const filtered = options.filter((item) => !needle || item.label.toLowerCase().includes(needle));
+    const all = [{ id: '', label: 'Sin cliente' }, ...filtered];
     noteClientOptions.innerHTML = all.map((item) => {
-      const active = item.value === activeNoteLinkedClient;
-      return '<button type="button" data-nc-value="' + escapeNoteHtml(item.value) + '" class="w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold transition-colors ' + (active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50') + '">'
+      const active = item.id === activeNoteClientId && (item.id !== '' || !activeNoteLinkedClient);
+      return '<button type="button" data-nc-value="' + escapeNoteHtml(item.label) + '" data-nc-id="' + escapeNoteHtml(item.id) + '" class="w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold transition-colors ' + (active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50') + '">'
         + '<span class="inline-flex w-full items-center justify-between gap-2"><span class="truncate">' + escapeNoteHtml(item.label) + '</span>' + (active ? '<span>\u2713</span>' : '') + '</span>'
         + '</button>';
     }).join('');
     noteClientOptions.querySelectorAll('[data-nc-value]').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeNoteLinkedClient = btn.dataset.ncValue || '';
+        activeNoteClientId = btn.dataset.ncId || '';
+        if (!activeNoteClientId) activeNoteLinkedClient = '';
         syncNoteClientLabel();
         renderNoteClientOptions(noteClientSearch ? noteClientSearch.value : '');
         closeNoteClientDropdown();
@@ -1376,8 +1391,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function populateClientSelector(selectedValue) {
+  function populateClientSelector(selectedValue, selectedId = '') {
     activeNoteLinkedClient = String(selectedValue || '').trim();
+    activeNoteClientId = String(selectedId || '').trim() || resolveNoteClientId(activeNoteLinkedClient);
     syncNoteClientLabel();
     renderNoteClientOptions('');
   }
@@ -1393,7 +1409,7 @@ document.addEventListener('DOMContentLoaded', function () {
     syncChecklistVisualState();
     applyEditorColor(note.color || 'yellow');
     closeNoteColorPopover();
-    populateClientSelector(note.linkedClient || '');
+    populateClientSelector(note.linkedClient || '', note.clientId || '');
     applyNotePermissionState(note);
     syncHeaderBackButton();
     updateInfocusAiCurrentNoteContext();
@@ -1436,6 +1452,7 @@ document.addEventListener('DOMContentLoaded', function () {
       plainText: '',
       color: 'yellow',
       linkedClient: defaultLinkedClient,
+      clientId: resolveNoteClientId(defaultLinkedClient),
       ownerKey: NOTES_USER_KEY,
       ownerName: CURRENT_USER_NAME,
       collaborators: [],
@@ -2264,6 +2281,9 @@ document.addEventListener('DOMContentLoaded', function () {
   (async () => {
     await hydrateNotes();
     selectClient('todos', 'Todos');
+    const requestedNoteId = new URLSearchParams(window.location.search).get('note');
+    const requestedIndex = allNotes.findIndex((note) => String(note.id || '') === requestedNoteId);
+    if (requestedNoteId && requestedIndex >= 0) openNoteEditor(requestedIndex);
   })();
 });
 </script>

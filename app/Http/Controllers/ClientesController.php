@@ -7,6 +7,7 @@ use App\Repositories\TimelineStore;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File as Fs;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,7 @@ class ClientesController extends Controller
     protected FileStore $store;
     protected FileStore $facturas;
     protected FileStore $gastos;
+    protected FileStore $projects;
     protected TimelineStore $timeline;
 
     public function __construct()
@@ -24,6 +26,7 @@ class ClientesController extends Controller
         $this->store = new FileStore('clientes.json');
         $this->facturas = new FileStore('facturas.json');
         $this->gastos = new FileStore('gastos.json');
+        $this->projects = new FileStore('proyectos.json');
         $this->timeline = new TimelineStore();
     }
 
@@ -150,12 +153,42 @@ class ClientesController extends Controller
         ]);
     }
 
-    protected function withAggregates(array $clientes): array
+    protected function linkedProjectsByClient(array $clientes): array
+    {
+        $clientIds = collect($clientes)->pluck('id')->mapWithKeys(fn ($id) => [(string) $id => true])->all();
+        $uniqueNames = collect($clientes)
+            ->filter(fn ($client) => !empty($client['id']) && trim((string) ($client['empresa'] ?? '')) !== '')
+            ->groupBy(fn ($client) => Str::lower(trim((string) $client['empresa'])))
+            ->filter(fn ($group) => $group->count() === 1)
+            ->map(fn ($group) => (string) $group->first()['id'])
+            ->all();
+
+        $linked = [];
+        foreach ($this->projects->all() as $project) {
+            $stage = Str::lower(trim((string) ($project['etapa'] ?? '')));
+            if (!empty($project['archived']) || !empty($project['deleted']) || !empty($project['deleted_at'])
+                || in_array($stage, ['archivado', 'archivado(s)', 'eliminado', 'eliminada'], true)) {
+                continue;
+            }
+
+            $clientId = trim((string) ($project['cliente_id'] ?? ''));
+            if ($clientId === '') {
+                $name = Str::lower(trim((string) ($project['cliente'] ?? '')));
+                $clientId = $uniqueNames[$name] ?? '';
+            }
+            if ($clientId !== '' && isset($clientIds[$clientId])) {
+                $linked[$clientId][] = $project;
+            }
+        }
+        return $linked;
+    }
+
+    protected function withAggregates(array $clientes, array $linkedProjects): array
     {
         $facturas = collect($this->facturas->all());
         $settings = (new FileStore('settings.json'))->find('settings') ?: [];
         $baseCurrency = $settings['base_currency'] ?? 'USD';
-        return collect($clientes)->map(function ($c) use ($facturas, $baseCurrency) {
+        return collect($clientes)->map(function ($c) use ($facturas, $baseCurrency, $linkedProjects) {
             $cFacturas = $facturas->where('cliente', $c['empresa'] ?? '');
             $c['facturas_total_base'] = round($cFacturas->sum(fn($f) => (float)($f['total_base'] ?? $f['total'] ?? 0)), 2);
             $c['facturas_total'] = $c['facturas_total_base'];
@@ -165,7 +198,7 @@ class ClientesController extends Controller
                 ->map(fn($g) => round($g->sum('total'), 2))
                 ->filter(fn($v) => $v > 0)
                 ->all();
-            $c['proyectos'] = $c['proyectos'] ?? 0;
+            $c['proyectos'] = count($linkedProjects[(string) ($c['id'] ?? '')] ?? []);
             return $c;
         })->all();
     }
@@ -183,7 +216,7 @@ class ClientesController extends Controller
             ->reject(fn ($cliente) => $this->isPlaceholderClient($cliente))
             ->values()
             ->all();
-        $clientes = $this->withAggregates($clientes);
+        $clientes = $this->withAggregates($clientes, $this->linkedProjectsByClient($clientes));
         // enrich with recent invoices
         $facturas = collect($this->facturas->all());
         $clientes = collect($clientes)->map(function($c) use ($facturas) {
@@ -223,6 +256,8 @@ class ClientesController extends Controller
     {
         $cliente = $this->store->find($id);
         abort_if(!$cliente, 404);
+        $linkedProjects = $this->linkedProjectsByClient($this->store->all());
+        $projs = collect($linkedProjects[$id] ?? [])->sortByDesc('updated_at')->take(6);
 
         $settings = (new FileStore('settings.json'))->find('settings') ?: [];
         $baseCurrency = $settings['base_currency'] ?? 'USD';
@@ -246,7 +281,7 @@ class ClientesController extends Controller
         $gastos = collect($this->gastos->all())->where('cliente_id', $id);
         $totalGastos = round($gastos->sum('monto'), 2);
         $timeline = $this->timeline->for($id);
-        return view('clientes.show', compact('cliente', 'total', 'totalesPorMoneda', 'baseCurrency', 'pagadas', 'pendientes', 'gastos', 'totalGastos', 'facturas', 'timeline'));
+        return view('clientes.show', compact('cliente', 'total', 'totalesPorMoneda', 'baseCurrency', 'pagadas', 'pendientes', 'gastos', 'totalGastos', 'facturas', 'timeline', 'projs'));
     }
 
     public function addNota(Request $request, string $id)
@@ -455,6 +490,7 @@ class ClientesController extends Controller
     {
         $data = $request->validate([
             'empresa' => 'required|string|max:255',
+            'request_id' => 'nullable|uuid',
             'contacto_nombre' => 'nullable|string|max:255',
             'contacto_email' => 'nullable|email|max:255',
             'contacto_telefono' => 'nullable|string|max:255',
@@ -472,12 +508,44 @@ class ClientesController extends Controller
             'estado' => 'Activo',
             'categoria' => 'Default',
             'proyectos' => 0,
+            'contacto_nombre' => (string) ($data['contacto_nombre'] ?? ''),
             'moneda' => strtoupper((string) ($data['moneda'] ?? $baseCurrency)),
             'invoice_fields' => ['nit' => true, 'direccion' => true, 'telefono' => true, 'email' => true],
         ]);
 
-        $created = $this->store->create($payload);
-        $this->syncPortalUserForClient($created);
+        $requestId = $data['request_id'] ?? null;
+        unset($payload['request_id']);
+
+        $create = function () use ($payload, $requestId, $data) {
+            if ($requestId) {
+                $existing = collect($this->store->all())->first(fn ($client) =>
+                    ($client['quick_create_request_id'] ?? null) === $requestId
+                    && (string) ($client['quick_create_user_id'] ?? '') === (string) auth()->id()
+                );
+                if ($existing) return $existing;
+            }
+
+            if (!empty($data['contacto_email']) && !empty($data['nit'])
+                && User::where('email', strtolower(trim($data['contacto_email'])))->exists()) {
+                throw ValidationException::withMessages([
+                    'contacto_email' => 'El correo ya está en uso por otro usuario del sistema.',
+                ]);
+            }
+
+            $created = $this->store->create(array_merge($payload, $requestId ? [
+                'quick_create_request_id' => $requestId,
+                'quick_create_user_id' => (string) auth()->id(),
+            ] : []));
+            // El correo es opcional; sin NIT no se habilita acceso al portal.
+            if (trim((string) ($created['nit'] ?? '')) !== '') {
+                $this->syncPortalUserForClient($created);
+            }
+            return $created;
+        };
+
+        $created = $requestId
+            ? Cache::lock('quick-client:' . auth()->id() . ':' . $requestId, 15)->block(5, $create)
+            : $create();
 
         return response()->json([
             'ok' => true,

@@ -22,6 +22,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MisNotasController;
 use App\Http\Controllers\CorreoController;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\SocialMediaController;
 
 use App\Http\Controllers\SettingsController;
 
@@ -51,6 +52,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/api/mis-notas/colaboradores', [MisNotasController::class, 'collaborators'])->name('api.mis-notas.collaborators');
     Route::get('/api/ia/chats', [AiController::class, 'index'])->name('api.ai.chats.index');
     Route::get('/api/ia/chats/{id}', [AiController::class, 'show'])->name('api.ai.chats.show');
+    Route::get('/api/ia/chats/{id}/images/{imageId}', [AiController::class, 'image'])->name('api.ai.chats.image');
     Route::post('/api/ia/chat', [AiController::class, 'chat'])->name('api.ai.chat');
     Route::post('/api/ia/actions/execute', [AiController::class, 'executeAction'])->name('api.ai.actions.execute');
     Route::post('/api/ia/actions/undo', [AiController::class, 'undoAction'])->name('api.ai.actions.undo');
@@ -79,8 +81,24 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/documentos/mover', [DocumentosController::class, 'move'])->name('documentos.move');
     Route::put('/documentos/{id}', [DocumentosController::class, 'update'])->name('documentos.update');
     Route::get('/documentos/{id}/preview', [DocumentosController::class, 'preview'])->name('documentos.preview');
+    Route::get('/documentos/{id}/thumbnail', [DocumentosController::class, 'thumbnail'])->name('documentos.thumbnail');
     Route::get('/documentos/{id}/download', [DocumentosController::class, 'download'])->name('documentos.download');
     Route::delete('/documentos/{id}', [DocumentosController::class, 'destroy'])->name('documentos.destroy');
+    Route::get('/social-media', [SocialMediaController::class, 'index'])->name('social-media.index');
+    Route::post('/social-media/clients', [SocialMediaController::class, 'updateClients'])->name('social-media.clients.update');
+    Route::get('/social-media/meta/connect', [SocialMediaController::class, 'metaConnect'])->name('social-media.meta.connect');
+    Route::get('/social-media/meta/callback', [SocialMediaController::class, 'metaCallback'])->name('social-media.meta.callback');
+    Route::post('/social-media/meta/disconnect', [SocialMediaController::class, 'metaDisconnect'])->name('social-media.meta.disconnect');
+    Route::get('/social-media/tiktok/connect', [SocialMediaController::class, 'tiktokConnect'])->name('social-media.tiktok.connect');
+    Route::get('/social-media/tiktok/callback', [SocialMediaController::class, 'tiktokCallback'])->name('social-media.tiktok.callback');
+    Route::post('/social-media/cuentas', [SocialMediaController::class, 'storeAccount'])->name('social-media.accounts.store');
+    Route::post('/social-media/calendario', [SocialMediaController::class, 'storeCalendar'])->name('social-media.calendar.store');
+    Route::put('/social-media/calendario/{id}', [SocialMediaController::class, 'updateCalendar'])->name('social-media.calendar.update');
+    Route::delete('/social-media/calendario/{id}', [SocialMediaController::class, 'deleteCalendar'])->name('social-media.calendar.delete');
+    Route::put('/social-media/cuentas/{id}', [SocialMediaController::class, 'updateAccount'])->name('social-media.accounts.update');
+    Route::post('/api/social-media/sync', [SocialMediaController::class, 'sync'])->name('api.social-media.sync');
+    Route::post('/api/social-media/leads/{id}/convertir', [SocialMediaController::class, 'convertLead'])->name('api.social-media.leads.convert');
+    Route::post('/api/social-media/calendario/{id}/publish-now', [SocialMediaController::class, 'publishNow'])->name('api.social-media.calendar.publish-now');
     Route::get('/api/clientes', [ClientesController::class, 'apiIndex'])->name('api.clientes.index');
     Route::post('/api/clientes/quick', [ClientesController::class, 'apiQuickStore'])->name('api.clientes.quick.store');
     Route::get('/api/proyectos', [ProyectosController::class, 'index'])->name('api.proyectos.index');
@@ -233,6 +251,8 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/ajustes/integraciones/google-calendar/conectar', [SettingsController::class, 'googleCalendarConnect'])->name('settings.integrations.google.connect');
     Route::get('/ajustes/integraciones/google-calendar/callback', [SettingsController::class, 'googleCalendarCallback'])->name('settings.integrations.google.callback');
     Route::post('/ajustes/integraciones/google-calendar/desconectar', [SettingsController::class, 'googleCalendarDisconnect'])->name('settings.integrations.google.disconnect');
+    Route::get('/ajustes/social-media', [SettingsController::class, 'socialMedia'])->name('settings.social_media');
+    Route::put('/ajustes/social-media', [SettingsController::class, 'updateSocialMedia'])->name('settings.social_media.update');
     Route::get('/ajustes/ia', [SettingsController::class, 'ai'])->name('settings.ai');
     Route::put('/ajustes/ia', [SettingsController::class, 'updateAi'])->name('settings.ai.update');
     Route::put('/ajustes/ia/memoria/{id}', [SettingsController::class, 'updateAiMemory'])->name('settings.ai.memory.update');

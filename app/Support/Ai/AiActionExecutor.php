@@ -51,6 +51,9 @@ class AiActionExecutor
         }
 
         $normalized = Str::lower(Str::ascii($text));
+        if (($context['structured_action']['type'] ?? '') === 'create_invoice_draft') {
+            return $this->withActionLog($this->createInvoiceDraft((array) ($context['structured_action']['fields'] ?? []), $text), 'factura');
+        }
         $intent = $this->resolveProposalIntent($text, $normalized);
 
         if ($intent === 'note_update') {
@@ -273,7 +276,7 @@ class AiActionExecutor
         $hasNote = preg_match('/\bnota(s)?\b/u', $directive) === 1;
         $hasProject = preg_match('/\b(proyecto(s)?|tablero(s)?|kanban)\b/u', $directive) === 1;
         $hasColumn = preg_match('/\b(columna(s)?|lista(s)?)\b/u', $directive) === 1;
-        $hasTask = preg_match('/\btarea(s)?\b/u', $directive) === 1;
+        $hasTask = preg_match('/\b(tarea(s)?|tarjeta(s)?)\b/u', $directive) === 1;
         $hasReminder = preg_match('/\b(recordatorio(s)?|recordar|recuerdame|recu[eé]rdame|reminder)\b/u', $directive) === 1;
         $hasEmail = preg_match('/\b(correo|email|e-mail)\b/u', $directive) === 1;
         $hasInvoice = preg_match('/\b(factura|facturas|invoice)\b/u', $directive) === 1;
@@ -309,8 +312,13 @@ class AiActionExecutor
         $taskPos = $firstPosition(['tarea', 'tareas', 'subtarea', 'subtareas']);
         $meetingPos = $firstPosition(['reunion', 'reuniones', 'meeting']);
 
-        if ($hasCurrentNote && $hasCurrentNoteReference && $hasProject && ($hasCreate || str_contains($directive, 'proyecto'))) {
+        $explicitConversion = preg_match('/\b(basad[oa]|a partir de|desde|con (?:el )?contenido de|convierte|convertir|transforma|transformar)\b/u', $directive) === 1
+            || preg_match('/\b(?:de|con)\s+(?:esta|la)\s+nota\s+(?:crea|crear|haz|hacer|genera|generar|prepara|preparar)\b/u', $directive) === 1;
+        if ($hasCurrentNote && $hasCurrentNoteReference && $hasProject && ($hasCreate || str_contains($directive, 'proyecto')) && !$explicitConversion) {
             return 'clarify_note_project';
+        }
+        if ($hasCurrentNote && $hasCurrentNoteReference && $hasProject && $hasCreate && $explicitConversion) {
+            return 'project_create';
         }
 
         if ($hasRecurringInvoice && ($hasSend || str_contains($directive, 'adelant') || str_contains($directive, 'antes de tiempo') || str_contains($directive, 'hoy'))) {
@@ -329,7 +337,8 @@ class AiActionExecutor
             return 'reminder';
         }
 
-        if ($hasProject && $hasCreate && ! $hasProjectNotePhrase && ($notePos === null || ($projectPos !== null && $projectPos < $notePos))) {
+        $explicitNewProject = preg_match('/\b(nuevo|nueva|crear|crea|creame)\s+(un\s+|una\s+)?(proyecto|tablero)\b/u', $directive) === 1;
+        if ($hasProject && $hasCreate && ($explicitNewProject || ! (($hasTask || $hasColumn) && $hasCurrentProject)) && ! $hasProjectNotePhrase && ($notePos === null || ($projectPos !== null && $projectPos < $notePos))) {
             return 'project_create';
         }
 
@@ -1099,6 +1108,7 @@ class AiActionExecutor
             'plainText' => $plain,
             'color' => $color,
             'linkedClient' => ($client['id'] ?? 'general') !== 'general' ? (string) $client['id'] : '',
+            'clientId' => ($client['id'] ?? 'general') !== 'general' ? (string) $client['id'] : '',
             'collaborators' => [],
             'createdAt' => $nowMs,
             'updatedAt' => $nowMs,
@@ -1457,6 +1467,39 @@ class AiActionExecutor
         }
 
         return strtoupper($prefix) . '-' . str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
+    }
+
+    private function createInvoiceDraft(array $fields, string $proposal): array
+    {
+        if (!RoleAccess::can(Auth::user(), 'facturas.create')) {
+            return $this->failure('Tu usuario no tiene permiso para crear facturas.');
+        }
+        try {
+            $draft = (new InvoiceDraft())->prepare($fields);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->failure($exception->getMessage());
+        }
+
+        $store = new FileStore('facturas.json');
+        $sourceKey = hash('sha256', (string) Auth::id() . '|' . (string) ($this->context['chat_id'] ?? '') . '|' . $proposal);
+        $all = $store->all();
+        $existing = collect($all)->first(fn ($invoice) => (string) ($invoice['ai_source_key'] ?? '') === $sourceKey);
+        if ($existing) {
+            return [
+                'ok' => true,
+                'content' => 'Este borrador ya fue creado. [Abrir factura](/facturas/' . rawurlencode((string) $existing['id']) . ')',
+                'url' => '/facturas/' . rawurlencode((string) $existing['id']),
+            ];
+        }
+        $draft['numero'] = $this->nextInvoiceNumber($all);
+        $draft['ai_source_key'] = $sourceKey;
+        $invoice = $store->create($draft);
+        $url = '/facturas/' . rawurlencode((string) $invoice['id']);
+        return [
+            'ok' => true,
+            'content' => '✅ **Borrador de factura creado**' . "\n\n- **Número:** {$invoice['numero']}\n- **Cliente:** {$invoice['cliente']}\n- **Total:** {$invoice['moneda']} {$invoice['total']}\n- **Estado:** En borrador\n\n[Abrir factura]({$url})",
+            'url' => $url,
+        ];
     }
 
     private function createMeeting(string $proposal): array
@@ -2391,6 +2434,13 @@ class AiActionExecutor
 
     private function projectFromProposalOrContext(string $proposal, array $labels = ['Proyecto', 'Tablero']): ?array
     {
+        $userMessage = trim((string) data_get($this->context, 'last_user_message', ''));
+        if ($userMessage !== '') {
+            $available = array_values(array_filter($this->projects->all(), fn ($project) => is_array($project) && $this->canUseProject($project)));
+            $explicit = (new ProjectAiContext())->findMentionedProject($available, $userMessage);
+            if ($explicit) return $explicit;
+        }
+
         $name = $this->field($proposal, $labels);
         if ($name !== '') {
             return $this->matchProject($name);

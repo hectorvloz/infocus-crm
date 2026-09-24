@@ -33,6 +33,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/fontawesome.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/solid.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/regular.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/brands.min.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
   <!-- Spanish Locale -->
@@ -1215,7 +1217,7 @@
 
       // --- Global Custom Select Replacement ---
       (function() {
-        const layoutClassPrefixes = ['w-', 'min-w-', 'max-w-', 'flex-', 'basis-', 'grow', 'shrink', 'mt-', 'mb-', 'ml-', 'mr-', 'mx-', 'my-', 'self-', 'justify-self-', 'col-span-'];
+        const layoutClassPrefixes = ['w-', '!w-', 'min-w-', '!min-w-', 'max-w-', '!max-w-', 'flex-', 'basis-', 'grow', 'shrink', 'mt-', 'mb-', 'ml-', 'mr-', 'mx-', 'my-', 'self-', 'justify-self-', 'col-span-'];
 
         function escapeHtml(text) {
           return String(text ?? '')
@@ -1230,6 +1232,7 @@
           if (!select) return false;
           if (select.dataset.appSelectEnhanced === '1') return false;
           if (select.dataset.nativeSelect === '1') return false;
+          if ((select.closest('.sm-shell') || select.closest('[data-social-media-header]')) && select.dataset.nativeSelect === '1') return false;
           if (select.closest('.flatpickr-calendar')) return false;
           if (select.multiple || Number(select.size || 1) > 1) return false;
           if (select.classList.contains('hidden') || select.hidden) return false;
@@ -1289,7 +1292,7 @@
             return;
           }
 
-          optionsHost.innerHTML = options.map((option) => {
+          const optionHtml = options.map((option) => {
             const isSelected = option.value === selectedValue;
             const disabledClass = option.disabled ? ' opacity-50 cursor-not-allowed' : '';
             const optionContent = typeof select._appSelectOptionHtml === 'function'
@@ -1297,6 +1300,10 @@
               : `<span>${escapeHtml(option.label)}</span>`;
             return `<button type="button" data-index="${option.index}" class="app-select-option ${isSelected ? 'is-selected' : ''}${disabledClass}">${optionContent}${isSelected ? '<svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' : ''}</button>`;
           }).join('');
+          const actionHtml = select.dataset.addClientsAction === '1'
+            ? '<button type="button" data-app-select-action="add-clients" class="app-select-option border-t border-slate-100 mt-1 pt-3 text-lime-700"><span class="inline-flex items-center gap-2"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 5v14M5 12h14"/></svg>Añadir clientes</span></button>'
+            : '';
+          optionsHost.innerHTML = optionHtml + actionHtml;
         }
 
         function syncEnhancedLabel(select) {
@@ -1374,6 +1381,15 @@
           search.addEventListener('input', () => renderEnhancedOptions(select));
 
           optionsHost.addEventListener('click', (event) => {
+            const actionButton = event.target.closest('[data-app-select-action="add-clients"]');
+            if (actionButton) {
+              menu.classList.add('hidden');
+              trigger.classList.remove('is-open');
+              const modal = document.getElementById('addSocialClientsModal');
+              modal?.classList.remove('hidden');
+              modal?.classList.add('flex');
+              return;
+            }
             const optionButton = event.target.closest('.app-select-option');
             if (!optionButton) return;
             const optionIndex = Number(optionButton.dataset.index || -1);
@@ -1857,8 +1873,10 @@
 </head>
 <body class="bg-neutral-50 text-slate-800 antialiased overflow-hidden" data-theme="{{ $uiTheme }}" data-decimals="{{ $decimals }}">
   @php
+    $isSocialMediaStandalone = request()->routeIs('social-media.*');
     $showGlobalBackButton = (
       !request()->routeIs('settings.*')
+      && !$isSocialMediaStandalone
       && !request()->routeIs('dashboard')
       && !request()->routeIs('*.index')
     ) || request()->routeIs('mis-notas.index');
@@ -1875,6 +1893,7 @@
     $headerUserName = trim((string) ($headerUser->name ?? session('user.name', 'Usuario')));
     $headerUserEmail = trim((string) ($headerUser->email ?? session('user.email', '')));
     $headerUserInitials = strtoupper(substr($headerUserName !== '' ? $headerUserName : 'US', 0, 2));
+    $headerCanAccessSettings = \App\Support\RoleAccess::can($headerUser, 'ajustes.read');
     // Resolver permisos de timer desde roles.json
     $headerUserRole = strtolower((string) ($headerUser->role ?? session('user.role', '')));
     $headerTimerPerms = ['proyectos' => true, 'leads' => true]; // Admin tiene todo
@@ -1897,37 +1916,43 @@
     }
   @endphp
   <div class="flex h-full">
-    @include('partials.sidebar')
+    @unless($isSocialMediaStandalone)
+      @include('partials.sidebar')
+    @endunless
     <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-      <header class="flex-shrink-0 flex items-center justify-between gap-2 px-3 md:px-8 py-3 md:py-5 bg-neutral-50/90 backdrop-blur z-[120] sticky top-0">
-        <div class="flex items-center gap-3">
-          <button
-            id="mobileSidebarOpenBtn"
-            type="button"
-            class="md:hidden inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-sm border border-slate-200"
-            title="Abrir menú"
-            aria-label="Abrir menú"
-          >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
-              <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/>
-            </svg>
-          </button>
-          @if($showGlobalBackButton)
+      <header class="flex-shrink-0 flex items-center justify-between gap-2 px-3 md:px-8 py-3 {{ $isSocialMediaStandalone ? 'md:py-3' : 'md:py-5' }} bg-neutral-50/90 backdrop-blur z-[120] sticky top-0">
+        <div class="flex flex-1 min-w-0 items-center gap-3">
+          @if($isSocialMediaStandalone)
+            @include('social-media.partials.header')
+          @else
             <button
-              id="global-header-back-btn"
+              id="mobileSidebarOpenBtn"
               type="button"
-              onclick="@if($forceBackToFallback) window.location.href='{{ $fallbackBackUrl }}'; @else if (window.history.length > 1) { window.history.back(); } else { window.location.href='{{ $fallbackBackUrl }}'; } @endif"
-              class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-bold shadow-sm transition-all hover:brightness-90"
-              style="background:#f0fe97;color:#1e293b"
-              title="Volver"
-              aria-label="Volver"
+              class="md:hidden inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-sm border border-slate-200"
+              title="Abrir menú"
+              aria-label="Abrir menú"
             >
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/>
               </svg>
             </button>
+            @if($showGlobalBackButton)
+              <button
+                id="global-header-back-btn"
+                type="button"
+                onclick="@if($forceBackToFallback) window.location.href='{{ $fallbackBackUrl }}'; @else if (window.history.length > 1) { window.history.back(); } else { window.location.href='{{ $fallbackBackUrl }}'; } @endif"
+                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-bold shadow-sm transition-all hover:brightness-90"
+                style="background:#f0fe97;color:#1e293b"
+                title="Volver"
+                aria-label="Volver"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 18l-6-6 6-6" />
+                </svg>
+              </button>
+            @endif
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center"></h1>
           @endif
-          <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center"></h1>
         </div>
         <div class="flex items-center gap-2 md:gap-3 min-w-0">
           <div id="headerTaskTimerHost" class="hidden min-w-[250px] max-w-[430px] flex-1"></div>
@@ -1969,7 +1994,22 @@
                 </div>
               </div>
               <div class="border-t border-slate-100 pt-1">
-                <a href="{{ route('profile.show') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50">Mi cuenta</a>
+                <a href="{{ route('profile.show') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="8" r="4"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 20a8 8 0 0 1 16 0"/>
+                  </svg>
+                  <span>Mi cuenta</span>
+                </a>
+                @if($headerCanAccessSettings)
+                  <a href="{{ route('settings.edit') }}" class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+                    </svg>
+                    <span>Ajustes</span>
+                  </a>
+                @endif
                 <button type="button" id="logoutFromProfileMenu" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50">Cerrar sesión</button>
               </div>
             </div>
@@ -2071,7 +2111,7 @@
           </div>
         </div>
       </aside>
-      <main class="flex-1 overflow-y-auto px-4 md:px-8 py-2 custom-scroll pb-24 md:pb-6">
+      <main class="flex-1 overflow-y-auto custom-scroll {{ $isSocialMediaStandalone ? 'px-4 md:px-8 py-3 md:py-4 pb-8' : 'px-4 md:px-8 py-2 pb-24 md:pb-6' }}">
         @yield('content')
       </main>
     </div>
@@ -6865,6 +6905,12 @@
       line-height: 1;
       transition: transform .14s ease, background .14s ease;
     }
+    .infocus-ai-confirm-actions__label {
+      flex-basis: 100%;
+      color: #475569;
+      font-size: .72rem;
+      font-weight: 800;
+    }
     .infocus-ai-confirm-actions button:hover {
       transform: translateY(-1px);
     }
@@ -6977,6 +7023,14 @@
       background: #ebe7ff;
       border-bottom-right-radius: .35rem;
     }
+    .infocus-ai-message-images, .infocus-ai-image-preview { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .45rem; }
+    .infocus-ai-message-images img, .infocus-ai-image-preview img { width: 4.5rem; height: 4.5rem; border-radius: .65rem; object-fit: cover; border: 1px solid #dbe4f0; }
+    .infocus-ai-image-preview { margin: 0 0 .48rem; }
+    .infocus-ai-image-preview-item { position: relative; }
+    .infocus-ai-image-preview-item button { position: absolute; top: -.3rem; right: -.3rem; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: #0f172a; color: #fff; font-size: .7rem; }
+    .infocus-ai-attach { width: 2rem; height: 2rem; flex: none; border-radius: 50%; color: #64748b; display: grid; place-items: center; }
+    .infocus-ai-attach:hover { color: #1e293b; background: #f1f5f9; }
+    .infocus-ai-attach:disabled { opacity: .5; }
     .infocus-ai-message.assistant {
       margin-right: auto;
       background: rgba(255, 255, 255, .7);
@@ -7204,8 +7258,11 @@
     </main>
 
     <form id="infocusAiForm" class="infocus-ai-composer">
+      <div id="infocusAiImagePreview" class="infocus-ai-image-preview" aria-live="polite"></div>
       <div class="infocus-ai-input-shell">
         <div class="infocus-ai-input-inner">
+          <input id="infocusAiImages" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="hidden">
+          <button id="infocusAiAttach" type="button" class="infocus-ai-attach" aria-label="Adjuntar imágenes" title="Adjuntar imágenes (hasta 3)"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
           <textarea id="infocusAiInput" class="infocus-ai-input" rows="1" placeholder="Pregúntale algo a Infocus AI"></textarea>
           <button id="infocusAiSend" type="submit" class="infocus-ai-send" aria-label="Enviar">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7227,6 +7284,9 @@
       const form = document.getElementById('infocusAiForm');
       const input = document.getElementById('infocusAiInput');
       const sendBtn = document.getElementById('infocusAiSend');
+      const imageInput = document.getElementById('infocusAiImages');
+      const imagePreview = document.getElementById('infocusAiImagePreview');
+      const attachBtn = document.getElementById('infocusAiAttach');
       const menu = document.getElementById('infocusAiMenu');
       const menuToggle = document.getElementById('infocusAiMenuToggle');
       const historyEl = document.getElementById('infocusAiHistory');
@@ -7242,6 +7302,8 @@
 
       let currentChatId = null;
       let sending = false;
+      let pendingImages = [];
+      const liveImageUrls = new Set();
       const aiScrollStoragePrefix = 'infocusAiScrollTop:';
 
       function scrollAiToBottom(behavior = 'smooth') {
@@ -7388,7 +7450,8 @@
           rows = [
             ['Cliente', aiExtractField(text, ['Cliente', 'Empresa']) || 'Pendiente'],
             ['Para', aiExtractField(text, ['Para', 'Destinatario', 'Correo']) || 'Pendiente'],
-            ['Total', aiExtractField(text, ['Total', 'Monto', 'Valor']) || 'Por calcular'],
+            ['Total', 'Se calcula al crear'],
+            ['Impuesto', aiExtractField(text, ['Impuesto', 'IVA', 'Tax']) || 'Por confirmar'],
             ['Vence', aiExtractField(text, ['Vencimiento', 'Vence']) || 'Sin vencimiento'],
           ];
           listTitle = 'Items';
@@ -7582,6 +7645,7 @@
           'create_contract',
           'send_email',
           'send_recurring_invoice_early',
+          'create_invoice_draft',
         ]);
         const items = Array.isArray(actions) ? actions : [];
         return items.map((action) => {
@@ -7707,6 +7771,7 @@
           create_contract: ['Crear contrato', 'No crear', 'Creando contrato...'],
           send_email: ['Enviar ahora', 'No enviar', 'Enviando...'],
           send_recurring_invoice_early: ['Enviar ahora', 'No enviar', 'Enviando...'],
+          create_invoice_draft: ['Crear borrador', 'No crear', 'Creando borrador...'],
         }[action?.type];
         if (labels) return { accept: labels[0], reject: labels[1], busy: labels[2] };
         return aiConfirmLabels(content);
@@ -7756,30 +7821,89 @@
       }
 
       function appendCreateActions(node, content, aiActions = []) {
-        const structuredActions = normalizeAiActions(aiActions);
+        const structuredActions = normalizeAiActions(aiActions).slice(0, 5);
         if (!node || !shouldShowCreateActions(content, structuredActions)) return;
-        const structuredAction = structuredActions[0] || null;
-        const labels = structuredAction ? aiActionLabels(structuredAction, content) : aiConfirmLabels(content);
+        if (structuredActions.length > 1) node.querySelector('.infocus-ai-preview-card')?.remove();
+        for (const structuredAction of structuredActions.length ? structuredActions : [null]) {
+        const actionProposal = structuredAction ? proposalFromStructuredAiAction(structuredAction, content) : content;
+        const labels = structuredAction ? aiActionLabels(structuredAction, actionProposal) : aiConfirmLabels(content);
+        if (structuredActions.length > 1 && structuredAction?.type !== 'create_invoice_draft') {
+          const previewHtml = buildAiPreviewCard(actionProposal);
+          if (previewHtml) {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = previewHtml;
+            node.appendChild(wrap.firstElementChild);
+          }
+        }
+        if (structuredAction?.type === 'create_invoice_draft') {
+          if (structuredActions.length === 1) node.querySelector('.infocus-ai-preview-card')?.remove();
+          const fields = structuredAction.fields || {};
+          const items = Array.isArray(fields.items) ? fields.items : [];
+          const taxRate = fields.tax_rate === null || fields.tax_rate === undefined || fields.tax_rate === ''
+            ? NaN : Number(fields.tax_rate);
+          const currency = String(fields.currency || '').toUpperCase();
+          const validItems = items.length > 0 && items.every((item) => item && typeof item === 'object'
+            && String(item.description || item.descripcion || '').trim()
+            && Number(item.quantity ?? item.cantidad) > 0 && Number(item.price ?? item.precio) >= 0);
+          const subtotalCents = validItems ? items.reduce((sum, item) => {
+            const priceCents = Math.round(Number(item.price ?? item.precio) * 100);
+            return sum + Math.round(Number(item.quantity ?? item.cantidad) * priceCents);
+          }, 0) : 0;
+          const taxCents = Number.isInteger(taxRate) && taxRate >= 0 && taxRate <= 100
+            ? Math.round(subtotalCents * taxRate / 100) : 0;
+          const amount = (cents) => `${currency} ${(cents / 100).toFixed(2)}`;
+          const rows = [
+            ['Cliente', fields.client || fields.client_id || 'Por confirmar'],
+            ['Vencimiento', fields.due_date || 'Por confirmar'],
+            ['Impuesto', Number.isInteger(taxRate) ? `${taxRate}%` : 'Por confirmar'],
+            ['Subtotal', validItems ? amount(subtotalCents) : 'Por confirmar'],
+            ['Total', validItems && Number.isInteger(taxRate) ? amount(subtotalCents + taxCents) : 'Por confirmar'],
+          ];
+          const preview = document.createElement('section');
+          preview.className = 'infocus-ai-preview-card';
+          preview.setAttribute('aria-label', 'Vista previa del borrador de factura');
+          preview.innerHTML = `<div class="infocus-ai-preview-card__head"><span class="infocus-ai-preview-card__icon"><i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i></span><div class="infocus-ai-preview-card__title"><span class="infocus-ai-preview-card__type">Factura</span>Borrador sin enviar</div></div><div class="infocus-ai-preview-card__meta">${rows.map(([label, value]) => `<div class="infocus-ai-preview-row"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value)}</span></div>`).join('')}</div>${items.length ? `<div class="infocus-ai-preview-list"><strong>Conceptos</strong>${items.map((item) => `<div>${escapeHtml(item.description || item.descripcion || '')} · ${escapeHtml(item.quantity ?? item.cantidad ?? '')} × ${escapeHtml(item.price ?? item.precio ?? '')}</div>`).join('')}</div>` : ''}`;
+          node.appendChild(preview);
+        }
         const actionsNode = document.createElement('div');
         actionsNode.className = 'infocus-ai-confirm-actions';
-        actionsNode.dataset.aiProposal = content || '';
+        actionsNode.dataset.aiProposal = actionProposal || '';
         actionsNode.dataset.aiBusyLabel = labels.busy;
         if (structuredAction) {
           actionsNode.dataset.aiAction = JSON.stringify(structuredAction);
         }
         actionsNode.innerHTML = `
+          ${structuredActions.length > 1 ? `<span class="infocus-ai-confirm-actions__label">${escapeHtml(structuredAction?.label || 'Acción')} · ${escapeHtml(aiActionField(structuredAction, ['title', 'name', 'task', 'client'], ''))}</span>` : ''}
           <button type="button" class="infocus-ai-confirm-create" data-ai-confirm-create>${labels.accept}</button>
           <button type="button" class="infocus-ai-confirm-cancel" data-ai-confirm-cancel>${labels.reject}</button>
         `;
         node.appendChild(actionsNode);
+        }
         scrollAiToBottom('smooth');
       }
 
-      function appendMessage(role, content, extraClass = '', actions = []) {
+      function appendMessage(role, content, extraClass = '', actions = [], images = []) {
         if (welcome) welcome.style.display = 'none';
         const node = document.createElement('div');
         node.className = `infocus-ai-message ${role} ${extraClass}`.trim();
         node.innerHTML = role === 'assistant' ? renderAiMarkdown(cleanAiDisplayText(content)) : escapeHtml(content);
+        if (role === 'user' && images.length) {
+          const gallery = document.createElement('div');
+          gallery.className = 'infocus-ai-message-images';
+          images.forEach((image) => {
+            if (image.url) {
+              const thumbnail = document.createElement('img');
+              thumbnail.src = image.url;
+              thumbnail.alt = image.name || 'Imagen adjunta';
+              gallery.appendChild(thumbnail);
+            } else if (image.expired) {
+              const expired = document.createElement('span');
+              expired.textContent = 'Imagen temporal caducada';
+              gallery.appendChild(expired);
+            }
+          });
+          node.appendChild(gallery);
+        }
         if (role === 'assistant') {
           appendAiEnhancements(node, content);
           appendCreateActions(node, content, actions);
@@ -7801,6 +7925,8 @@
 
       function resetChat() {
         currentChatId = null;
+        clearPendingImages();
+        releaseLiveImageUrls();
         body.innerHTML = '';
         if (welcome) {
           welcome.style.display = '';
@@ -7810,6 +7936,62 @@
         input.value = '';
         autosizeInput();
         input.focus();
+      }
+
+      function releaseLiveImageUrls() {
+        liveImageUrls.forEach((url) => URL.revokeObjectURL(url));
+        liveImageUrls.clear();
+      }
+
+      function clearPendingImages() {
+        pendingImages.forEach((item) => {
+          URL.revokeObjectURL(item.url);
+          liveImageUrls.delete(item.url);
+        });
+        pendingImages = [];
+        if (imagePreview) imagePreview.innerHTML = '';
+        if (imageInput) imageInput.value = '';
+      }
+
+      function renderPendingImages() {
+        if (!imagePreview) return;
+        imagePreview.innerHTML = '';
+        pendingImages.forEach((item, index) => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'infocus-ai-image-preview-item';
+          const image = document.createElement('img');
+          image.src = item.url;
+          image.alt = item.file.name;
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.dataset.removeAiImage = String(index);
+          remove.setAttribute('aria-label', `Quitar ${item.file.name}`);
+          remove.textContent = '×';
+          wrapper.append(image, remove);
+          imagePreview.appendChild(wrapper);
+        });
+      }
+
+      async function prepareAiImage(file) {
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Usa imágenes JPG, PNG, WebP o GIF.');
+        if (file.size <= 2 * 1024 * 1024) return file;
+        if (file.type === 'image/gif' || !window.createImageBitmap) throw new Error('La imagen supera 2 MB. Elige una más pequeña.');
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', .85));
+        if (!blob || blob.size > 2 * 1024 * 1024) throw new Error('La imagen sigue superando 2 MB después de optimizarla.');
+        return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+      }
+
+      function appendAiFormValue(formData, key, value) {
+        if (Array.isArray(value)) return value.forEach((item, index) => appendAiFormValue(formData, `${key}[${index}]`, item));
+        if (value && typeof value === 'object') return Object.entries(value).forEach(([name, item]) => appendAiFormValue(formData, `${key}[${name}]`, item));
+        if (value !== null && value !== undefined) formData.append(key, String(value));
       }
 
       function autosizeInput() {
@@ -7973,8 +8155,10 @@
               : null
           ),
           current_note: currentNote,
-          current_client: (formClientId || formClientName) ? { id: formClientId, name: formClientName } : null,
-          task_id: params.get('open_task') || '',
+          current_client: currentProject?.client_id
+            ? { id: currentProject.client_id, name: currentProject.client_name || '' }
+            : ((formClientId || formClientName) ? { id: formClientId, name: formClientName } : null),
+          task_id: window.__infocusAiCurrentTask?.id || params.get('open_task') || '',
         };
 
         if (messageAsksForVisibleContext(messageText)) {
@@ -8209,6 +8393,17 @@
             parts.push(aiActionLine('Vencimiento original', aiActionField(action, ['due_date', 'original_due_date'])));
             parts.push('Acción: Enviar hoy');
             break;
+          case 'create_invoice_draft':
+            parts.push('Factura propuesta:');
+            parts.push(aiActionLine('Cliente', aiActionField(action, ['client'])));
+            parts.push(aiActionLine('Moneda', aiActionField(action, ['currency'])));
+            parts.push(aiActionLine('Vencimiento', aiActionField(action, ['due_date'])));
+            parts.push(aiActionLine('Impuesto', aiActionField(action, ['tax_rate'])));
+            parts.push(aiActionList('Items', f.items, (item) => {
+              if (!item || typeof item !== 'object') return '';
+              return `- ${String(item.description || item.descripcion || '').trim()} - ${item.quantity || item.cantidad || ''} x ${item.price || item.precio || ''}`;
+            }));
+            break;
           default:
             return fallbackProposal;
         }
@@ -8277,6 +8472,8 @@
 
       async function openChat(id) {
         try {
+          clearPendingImages();
+          releaseLiveImageUrls();
           const response = await fetch(`${endpoints.showBase}/${encodeURIComponent(id)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
           const json = await response.json();
           const item = json.item || {};
@@ -8287,7 +8484,8 @@
               message.role === 'user' ? 'user' : 'assistant',
               message.content || '',
               '',
-              message.role === 'assistant' ? (message.actions || []) : []
+              message.role === 'assistant' ? (message.actions || []) : [],
+              message.role === 'user' ? (message.images || []) : []
             );
           });
           if (!restoreAiScrollPosition()) {
@@ -8301,42 +8499,52 @@
       }
 
       async function sendMessage(text) {
-        if (sending || !text.trim()) return;
+        if (sending || (!text.trim() && !pendingImages.length)) return;
+        const messageText = text.trim() || 'Analiza estas imágenes y dime qué observas.';
+        const sentImages = pendingImages.slice();
         sending = true;
         sendBtn.disabled = true;
-        appendMessage('user', text.trim());
+        attachBtn.disabled = true;
+        const userBubble = appendMessage('user', messageText, '', [], sentImages.map((item) => ({ url: item.url, name: item.file.name })));
         input.value = '';
         autosizeInput();
         const thinking = appendThinkingMessage();
 
         try {
+          const formData = new FormData();
+          if (currentChatId) formData.append('chat_id', currentChatId);
+          formData.append('message', messageText);
+          appendAiFormValue(formData, 'context', pageContext(messageText));
+          sentImages.forEach((item) => formData.append('images[]', item.file));
           const response = await fetch(endpoints.chat, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
               'X-CSRF-TOKEN': window.csrfToken,
               'X-Requested-With': 'XMLHttpRequest',
             },
-            body: JSON.stringify({
-              chat_id: currentChatId,
-              message: text.trim(),
-              context: pageContext(text),
-            }),
+            body: formData,
           });
           const json = await response.json();
-          if (!response.ok) throw new Error(json.message || 'Error');
+          if (!response.ok) throw new Error(Object.values(json.errors || {})[0]?.[0] || json.message || 'Error');
           currentChatId = json.chat_id || currentChatId;
+          pendingImages = [];
+          renderPendingImages();
+          imageInput.value = '';
           await revealAssistantMessage(thinking, json.message?.content || 'No recibí respuesta.', {
             actions: json.message?.actions || [],
           });
           loadHistory();
         } catch (error) {
+          userBubble.remove();
+          input.value = text;
+          autosizeInput();
           thinking.classList.remove('thinking');
-          thinking.textContent = 'No pude enviar el mensaje. Revisa la configuración de IA o intenta otra vez.';
+          thinking.textContent = error.message || 'No pude enviar el mensaje. Intenta otra vez.';
           scrollAiToBottom('smooth');
         } finally {
           sending = false;
           sendBtn.disabled = false;
+          attachBtn.disabled = false;
           input.focus();
         }
       }
@@ -8390,6 +8598,9 @@
 
         const thinking = appendThinkingMessage();
         const actionContext = pageContext(proposal);
+        if (structuredAction?.type === 'create_invoice_draft') {
+          actionContext.structured_action = structuredAction;
+        }
         const confirmLabels = aiConfirmLabels(proposal);
         const isNoteAction = !!actionContext.current_note?.id && /nota personal|mis notas|actualizar nota|editar nota|reescribir nota/i.test(proposal);
         const projectWorkingTarget = parseProjectAiWorkingTarget(proposal, actionContext);
@@ -8499,6 +8710,43 @@
       form?.addEventListener('submit', (event) => {
         event.preventDefault();
         sendMessage(input.value);
+      });
+      attachBtn?.addEventListener('click', () => imageInput?.click());
+      async function addAiImages(files) {
+        for (const original of files) {
+          if (pendingImages.length >= 3) {
+            window.showNotification?.('Puedes adjuntar hasta 3 imágenes por mensaje.', 'error');
+            break;
+          }
+          try {
+            const file = await prepareAiImage(original);
+            const url = URL.createObjectURL(file);
+            liveImageUrls.add(url);
+            pendingImages.push({ file, url });
+          } catch (error) {
+            window.showNotification?.(error.message, 'error');
+          }
+        }
+        if (imageInput) imageInput.value = '';
+        renderPendingImages();
+      }
+      imageInput?.addEventListener('change', () => addAiImages(Array.from(imageInput.files || [])));
+      input?.addEventListener('paste', (event) => {
+        const images = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith('image/'));
+        if (!images.length) return;
+        event.preventDefault();
+        addAiImages(images);
+      });
+      imagePreview?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-remove-ai-image]');
+        if (!button || sending) return;
+        const index = Number(button.dataset.removeAiImage);
+        const removed = pendingImages.splice(index, 1)[0];
+        if (removed) {
+          URL.revokeObjectURL(removed.url);
+          liveImageUrls.delete(removed.url);
+        }
+        renderPendingImages();
       });
       input?.addEventListener('input', autosizeInput);
       input?.addEventListener('keydown', (event) => {

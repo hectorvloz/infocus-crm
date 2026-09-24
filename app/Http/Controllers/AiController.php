@@ -6,10 +6,14 @@ use App\Repositories\FileStore;
 use App\Support\Ai\AiActionExecutor;
 use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
+use App\Support\Ai\AiChatImageStore;
 use App\Support\Ai\SensitiveDataFilter;
+use App\Support\Ai\NoteClient;
+use App\Support\Ai\ProjectAiContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AiController extends Controller
@@ -54,7 +58,12 @@ class AiController extends Controller
             'item' => [
                 'id' => $chat['id'],
                 'title' => $chat['title'] ?? 'Nuevo chat',
-                'messages' => $chat['messages'] ?? [],
+                'messages' => collect($chat['messages'] ?? [])->map(function ($message) use ($chat) {
+                    $message['images'] = collect($message['images'] ?? [])
+                        ->map(fn ($image) => (new AiChatImageStore())->publicMetadata($image, (string) $chat['id']))
+                        ->all();
+                    return $message;
+                })->all(),
             ],
         ]);
     }
@@ -63,9 +72,17 @@ class AiController extends Controller
     {
         $data = $request->validate([
             'chat_id' => 'nullable|string',
-            'message' => 'required|string|max:6000',
+            'message' => 'nullable|string|max:6000',
             'context' => 'nullable|array',
+            'images' => 'nullable|array|max:3',
+            'images.*' => 'image|mimes:jpeg,png,webp,gif|max:2048',
         ]);
+
+        $message = trim((string) ($data['message'] ?? ''));
+        if ($message === '' && !$request->hasFile('images')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['message' => 'Escribe un mensaje o adjunta una imagen.']);
+        }
+        if ($message === '') $message = 'Analiza estas imágenes y dime qué observas.';
 
         $userId = (string) Auth::id();
         $chat = null;
@@ -74,31 +91,45 @@ class AiController extends Controller
             $chat = $this->ownedChat((string) $data['chat_id'], false);
         }
 
+        $scopeKey = $this->contextScopeKey($data['context'] ?? [], $message);
+        if ($chat && (string) ($chat['scope_key'] ?? '') !== $scopeKey) {
+            $chat = null;
+        }
+
         if (!$chat) {
             $chat = [
                 'id' => (string) Str::ulid(),
                 'user_id' => $userId,
-                'title' => $this->ai->makeTitle((string) $data['message']),
+                'title' => $this->ai->makeTitle($message),
                 'messages' => [],
+                'scope_key' => $scopeKey,
                 'created_at' => now()->toISOString(),
             ];
         }
 
         $history = is_array($chat['messages'] ?? null) ? $chat['messages'] : [];
+        $imageStore = new AiChatImageStore();
+        $images = [];
+        foreach ($request->file('images', []) as $file) {
+            $images[] = $imageStore->save($file, (string) $chat['id']);
+        }
         $userMessage = [
             'role' => 'user',
-            'content' => (string) $data['message'],
+            'content' => $message,
+            'images' => $images,
             'created_at' => now()->toISOString(),
         ];
 
-        $preflight = $this->preflightAssistantReply((string) $data['message'], $data['context'] ?? []);
+        $preflight = $images ? null : $this->preflightAssistantReply($message, $data['context'] ?? []);
         if ($preflight !== null) {
             $result = ['content' => $preflight, 'provider' => 'crm'];
         } else {
-            $result = $this->ai->reply((string) $data['message'], $history, $data['context'] ?? []);
+            $result = $this->ai->reply($message, $history, $data['context'] ?? [], $images);
+            $memoryContext = $data['context'] ?? [];
+            $memoryContext['last_user_message'] = $message;
             $this->memoryService->rememberAiCandidate(
-                $this->ai->extractMemoryCandidate((string) $data['message'], $data['context'] ?? []),
-                $data['context'] ?? []
+                $this->ai->extractMemoryCandidate($message, $memoryContext),
+                $memoryContext
             );
         }
 
@@ -120,6 +151,37 @@ class AiController extends Controller
             'title' => $chat['title'],
             'message' => $assistantMessage,
         ]);
+    }
+
+    private function contextScopeKey(array $context, string $message = ''): string
+    {
+        $mentioned = (new ProjectAiContext())->findMentionedProject((new FileStore('proyectos.json'))->all(), $message);
+        if ($mentioned) {
+            return 'project:' . (string) $mentioned['id'];
+        }
+        $namedClients = collect((new FileStore('clientes.json'))->all())->filter(function ($client) use ($message) {
+            $name = trim((string) ($client['empresa'] ?? ''));
+            return mb_strlen($name) >= 3 && preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/iu', $message) === 1;
+        });
+        if ($namedClients->count() === 1) {
+            return 'client:' . (string) ($namedClients->first()['id'] ?? '');
+        }
+        $projectId = trim((string) data_get($context, 'current_project.id', ''));
+        if ($projectId !== '' && (new FileStore('proyectos.json'))->find($projectId)) {
+            return 'project:' . $projectId;
+        }
+        $noteId = trim((string) data_get($context, 'current_note.id', ''));
+        if ($noteId !== '') {
+            $note = (new FileStore('mis_notas.json'))->find($noteId);
+            $userId = (string) (Auth::id() ?? Auth::user()?->email ?? '');
+            $canSee = $note && ((string) ($note['ownerKey'] ?? '') === $userId
+                || collect($note['collaborators'] ?? [])->contains(fn ($item) => (string) ($item['userKey'] ?? '') === $userId));
+            if ($canSee) {
+                $clientId = (string) ((new NoteClient())->resolve($note)['id'] ?? '');
+                return $clientId !== '' ? 'client:' . $clientId : 'note:' . $noteId;
+            }
+        }
+        return '';
     }
 
     private function normalizeResponseActions(mixed $actions): array
@@ -174,6 +236,7 @@ class AiController extends Controller
             'create_contract',
             'send_email',
             'send_recurring_invoice_early',
+            'create_invoice_draft',
         ];
     }
 
@@ -194,6 +257,7 @@ class AiController extends Controller
             'create_contract' => 'Crear contrato',
             'send_email' => 'Enviar correo',
             'send_recurring_invoice_early' => 'Enviar factura',
+            'create_invoice_draft' => 'Crear borrador',
             default => 'Ejecutar acción',
         };
     }
@@ -248,7 +312,9 @@ class AiController extends Controller
         $mentionsProject = preg_match('/\bproyecto(s)?\b/u', $text) === 1;
         $createProjectIntent = preg_match('/\b(crea|crear|creame|haz|hacer|genera|generar|prepara|preparar)\b/u', $text) === 1;
 
-        if ($mentionsCurrentNote && $mentionsProject && $createProjectIntent) {
+        $explicitConversion = preg_match('/\b(basad[oa]|a partir de|desde|con (?:el )?contenido de|convierte|convertir|transforma|transformar)\b/u', $text) === 1
+            || preg_match('/\b(?:de|con)\s+(?:esta|la)\s+nota\s+(?:crea|crear|haz|hacer|genera|generar|prepara|preparar)\b/u', $text) === 1;
+        if ($mentionsCurrentNote && $mentionsProject && $createProjectIntent && !$explicitConversion) {
             return 'Antes de continuar: ¿te refieres a actualizar la nota que tienes abierta o quieres crear un proyecto basado en esa nota?';
         }
 
@@ -257,10 +323,26 @@ class AiController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        $this->ownedChat($id);
+        $chat = $this->ownedChat($id);
+        (new AiChatImageStore())->deleteChatImages($chat);
         $this->chats->delete($id);
 
         return response()->json(['ok' => true]);
+    }
+
+    public function image(string $id, string $imageId): \Illuminate\Http\Response
+    {
+        $chat = $this->ownedChat($id);
+        $image = collect($chat['messages'] ?? [])
+            ->flatMap(fn ($message) => $message['images'] ?? [])
+            ->first(fn ($item) => (string) ($item['id'] ?? '') === $imageId);
+        abort_if(!$image || !(new AiChatImageStore())->available($image), 404);
+
+        return response(Storage::disk('local')->get($image['path']), 200, [
+            'Content-Type' => $image['mime'],
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function executeAction(Request $request): JsonResponse
@@ -276,17 +358,24 @@ class AiController extends Controller
             $chat = $this->ownedChat((string) $data['chat_id'], false);
         }
 
+        $lastMessage = $chat ? $this->lastUserMessage((array) ($chat['messages'] ?? [])) : '';
+        if ($chat && (string) ($chat['scope_key'] ?? '') !== $this->contextScopeKey($data['context'] ?? [], $lastMessage)) {
+            return response()->json(['ok' => false, 'message' => ['content' => 'Este chat pertenece a otro proyecto o cliente. Vuelve a pedir la acción desde el contexto actual.']], 409);
+        }
+
         if (!$chat) {
             $chat = [
                 'id' => (string) Str::ulid(),
                 'user_id' => (string) Auth::id(),
                 'title' => 'Acción IA',
                 'messages' => [],
+                'scope_key' => $this->contextScopeKey($data['context'] ?? []),
                 'created_at' => now()->toISOString(),
             ];
         }
 
         $context = $data['context'] ?? [];
+        $context['chat_id'] = $chat['id'];
         $history = is_array($chat['messages'] ?? null) ? $chat['messages'] : [];
         $lastUserMessage = $this->lastUserMessage($history);
         if ($lastUserMessage !== '') {

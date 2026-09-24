@@ -49,4 +49,27 @@ return [
         'calendar_id' => env('GOOGLE_CALENDAR_ID', 'primary'),
     ],
 
+    'meta' => [
+        'app_id' => env('META_APP_ID'),
+        'app_secret' => env('META_APP_SECRET'),
+        'redirect' => env('META_REDIRECT_URI'),
+        'graph_version' => env('META_GRAPH_VERSION', 'v20.0'),
+    ],
+
+    'tiktok' => [
+        'client_key'    => env('TIKTOK_CLIENT_KEY'),
+        'client_secret' => env('TIKTOK_CLIENT_SECRET'),
+        'redirect'      => env('TIKTOK_REDIRECT_URI'),
+    ],
+
+    // ── Cloudinary ─────────────────────────────────────────────────────────
+    // Set CLOUDINARY_CLOUD_NAME (and optionally API_KEY/SECRET) to enable
+    // automatic media URL resolution for Instagram Reels and Stories.
+    // See: https://cloudinary.com/documentation/how_to_integrate_cloudinary
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+        'api_key'    => env('CLOUDINARY_API_KEY'),
+        'api_secret' => env('CLOUDINARY_API_SECRET'),
+    ],
+
 ];

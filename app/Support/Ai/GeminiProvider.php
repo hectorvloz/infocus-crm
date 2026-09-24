@@ -13,10 +13,24 @@ class GeminiProvider implements AiProvider
 
         $contents = collect($messages)
             ->filter(fn ($message) => ($message['role'] ?? '') !== 'system')
-            ->map(fn ($message) => [
-                'role' => ($message['role'] ?? '') === 'assistant' ? 'model' : 'user',
-                'parts' => [['text' => (string) ($message['content'] ?? '')]],
-            ])
+            ->map(function ($message) {
+                $content = $message['content'] ?? '';
+                $parts = [];
+                foreach (is_array($content) ? $content : [['type' => 'text', 'text' => (string) $content]] as $part) {
+                    if (($part['type'] ?? '') === 'text') {
+                        $parts[] = ['text' => (string) ($part['text'] ?? '')];
+                    } elseif (($part['type'] ?? '') === 'image_url') {
+                        $url = (string) data_get($part, 'image_url.url', '');
+                        if (preg_match('/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s', $url, $match)) {
+                            $parts[] = ['inlineData' => ['mimeType' => $match[1], 'data' => $match[2]]];
+                        }
+                    }
+                }
+                return [
+                    'role' => ($message['role'] ?? '') === 'assistant' ? 'model' : 'user',
+                    'parts' => $parts,
+                ];
+            })
             ->values()
             ->all();
 

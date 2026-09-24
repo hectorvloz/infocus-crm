@@ -317,7 +317,7 @@
       <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="md:col-span-2">
           <label class="text-sm font-medium">Empresa</label>
-          <input id="qcEmpresa" class="form-input" placeholder="Nombre de la empresa">
+          <input id="qcEmpresa" class="form-input" placeholder="Nombre de la empresa" required>
         </div>
         <div>
           <label class="text-sm font-medium">Contacto</label>
@@ -334,6 +334,14 @@
         <div>
           <label class="text-sm font-medium">NIT</label>
           <input id="qcNit" class="form-input" placeholder="NIT">
+        </div>
+        <div class="md:col-span-2">
+          <label for="qcMoneda" class="text-sm font-medium">Divisa del cliente</label>
+          <select id="qcMoneda" class="form-select mt-1">
+            @foreach($allowedCurrencies as $m)
+              <option value="{{ $m }}" @selected($initialCurrency === $m)>{{ $m }}</option>
+            @endforeach
+          </select>
         </div>
       </div>
       <div id="quickClientError" class="px-5 pb-2 text-sm text-rose-600 hidden"></div>
@@ -414,12 +422,23 @@
     const cancelQuickClient = document.getElementById('cancelQuickClient');
     const saveQuickClient = document.getElementById('saveQuickClient');
     const quickClientError = document.getElementById('quickClientError');
+    let quickClientSaving = false;
+    let quickClientRequestId = null;
+
+    function newQuickClientRequestId() {
+      if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+        const value = Math.floor(Math.random() * 16);
+        return (char === 'x' ? value : (value & 3) | 8).toString(16);
+      });
+    }
 
     function toggleQuickClientModal(open) {
       if (!quickClientModal) return;
       quickClientModal.classList.toggle('hidden', !open);
       quickClientModal.classList.toggle('flex', open);
       if (!open) return;
+      document.getElementById('qcMoneda').value = document.getElementById('monedaField').value;
       setTimeout(() => document.getElementById('qcEmpresa')?.focus(), 0);
     }
 
@@ -430,6 +449,7 @@
       });
       quickClientError?.classList.add('hidden');
       if (quickClientError) quickClientError.textContent = '';
+      quickClientRequestId = null;
     }
 
     function buildClientMeta(cliente) {
@@ -469,7 +489,7 @@
     }
 
     async function saveQuickClientHandler() {
-      if (!saveQuickClient) return;
+      if (!saveQuickClient || quickClientSaving) return;
       const empresa = (document.getElementById('qcEmpresa')?.value || '').trim();
       if (!empresa) {
         quickClientError.textContent = 'La empresa es obligatoria.';
@@ -483,9 +503,11 @@
         contacto_email: (document.getElementById('qcEmail')?.value || '').trim(),
         contacto_telefono: (document.getElementById('qcTelefono')?.value || '').trim(),
         nit: (document.getElementById('qcNit')?.value || '').trim(),
-        moneda: (document.getElementById('monedaField')?.value || '').trim(),
+        moneda: (document.getElementById('qcMoneda')?.value || '').trim(),
+        request_id: quickClientRequestId ||= newQuickClientRequestId(),
       };
 
+      quickClientSaving = true;
       saveQuickClient.disabled = true;
       saveQuickClient.textContent = 'Guardando...';
       quickClientError.classList.add('hidden');
@@ -501,7 +523,7 @@
         });
         const data = await res.json();
         if (!res.ok || !data?.ok || !data?.cliente) {
-          throw new Error(data?.message || 'No se pudo crear el cliente');
+          throw new Error(Object.values(data?.errors || {})[0]?.[0] || data?.message || 'No se pudo crear el cliente');
         }
 
         const created = data.cliente;
@@ -521,6 +543,7 @@
         quickClientError.textContent = err?.message || 'Error al crear el cliente.';
         quickClientError.classList.remove('hidden');
       } finally {
+        quickClientSaving = false;
         saveQuickClient.disabled = false;
         saveQuickClient.textContent = 'Guardar cliente';
       }
@@ -534,17 +557,17 @@
       document.querySelector('#clienteDropdown .dropdown-menu')?.classList.remove('show');
       toggleQuickClientModal(true);
     });
-    closeQuickClientModal?.addEventListener('click', () => { toggleQuickClientModal(false); resetQuickClientForm(); });
-    cancelQuickClient?.addEventListener('click', () => { toggleQuickClientModal(false); resetQuickClientForm(); });
+    closeQuickClientModal?.addEventListener('click', () => { if (quickClientSaving) return; toggleQuickClientModal(false); resetQuickClientForm(); });
+    cancelQuickClient?.addEventListener('click', () => { if (quickClientSaving) return; toggleQuickClientModal(false); resetQuickClientForm(); });
     quickClientModal?.addEventListener('click', (e) => {
-      if (e.target === quickClientModal) {
+      if (e.target === quickClientModal && !quickClientSaving) {
         toggleQuickClientModal(false);
         resetQuickClientForm();
       }
     });
     saveQuickClient?.addEventListener('click', saveQuickClientHandler);
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && quickClientModal?.classList.contains('flex')) {
+      if (e.key === 'Escape' && !quickClientSaving && quickClientModal?.classList.contains('flex')) {
         toggleQuickClientModal(false);
         resetQuickClientForm();
       }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
+use App\Support\Ai\NoteClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -42,6 +43,7 @@ class MisNotasController extends Controller
             'notes.*.plainText' => 'nullable|string',
             'notes.*.color' => 'nullable|string',
             'notes.*.linkedClient' => 'nullable|string',
+            'notes.*.clientId' => 'nullable|string',
             'notes.*.createdAt' => 'nullable',
             'notes.*.updatedAt' => 'nullable',
             'notes.*.ownerKey' => 'nullable|string',
@@ -132,6 +134,7 @@ class MisNotasController extends Controller
             'plainText' => (string) ($payload['plainText'] ?? ''),
             'color' => (string) ($payload['color'] ?? 'yellow'),
             'linkedClient' => isset($payload['linkedClient']) ? (string) $payload['linkedClient'] : '',
+            'clientId' => $this->clientIdFor($payload),
             'collaborators' => $this->normalizeCollaborators($payload['collaborators'] ?? []),
             'createdAt' => $payload['createdAt'] ?? $now,
             'updatedAt' => $payload['updatedAt'] ?? $now,
@@ -149,6 +152,7 @@ class MisNotasController extends Controller
             'plainText' => (string) ($payload['plainText'] ?? ($record['plainText'] ?? '')),
             'color' => (string) ($payload['color'] ?? ($record['color'] ?? 'yellow')),
             'linkedClient' => isset($payload['linkedClient']) ? (string) $payload['linkedClient'] : (string) ($record['linkedClient'] ?? ''),
+            'clientId' => $this->clientIdFor($payload, $record),
             'collaborators' => $this->normalizeCollaborators($payload['collaborators'] ?? ($record['collaborators'] ?? [])),
             'createdAt' => $record['createdAt'] ?? ($payload['createdAt'] ?? now()->valueOf()),
             'updatedAt' => $payload['updatedAt'] ?? now()->valueOf(),
@@ -164,6 +168,7 @@ class MisNotasController extends Controller
             'plainText' => (string) ($payload['plainText'] ?? ($record['plainText'] ?? '')),
             'color' => (string) ($payload['color'] ?? ($record['color'] ?? 'yellow')),
             'linkedClient' => isset($payload['linkedClient']) ? (string) $payload['linkedClient'] : (string) ($record['linkedClient'] ?? ''),
+            'clientId' => $this->clientIdFor($payload, $record),
             'updatedAt' => now()->valueOf(),
         ];
     }
@@ -201,6 +206,7 @@ class MisNotasController extends Controller
             'plainText' => (string) ($record['plainText'] ?? ''),
             'color' => (string) ($record['color'] ?? 'yellow'),
             'linkedClient' => (string) ($record['linkedClient'] ?? ''),
+            'clientId' => (string) ((new NoteClient())->resolve($record)['id'] ?? ''),
             'createdAt' => $record['createdAt'] ?? now()->valueOf(),
             'updatedAt' => $record['updatedAt'] ?? now()->valueOf(),
             'ownerKey' => (string) ($record['ownerKey'] ?? ''),
@@ -215,6 +221,24 @@ class MisNotasController extends Controller
     {
         return $this->isOwner($record, $currentKey)
             || collect($record['collaborators'] ?? [])->contains(fn ($c) => (string) ($c['userKey'] ?? '') === $currentKey);
+    }
+
+    private function clientIdFor(array $payload, array $record = []): string
+    {
+        $candidate = [
+            'clientId' => $payload['clientId'] ?? $record['clientId'] ?? '',
+            'linkedClient' => $payload['linkedClient'] ?? $record['linkedClient'] ?? '',
+        ];
+        if (array_key_exists('linkedClient', $payload)
+            && trim((string) $payload['linkedClient']) !== trim((string) ($record['linkedClient'] ?? ''))) {
+            $selected = (new NoteClient())->resolve(['clientId' => $payload['clientId'] ?? '']);
+            $label = trim((string) ($payload['linkedClient'] ?? ''));
+            $candidate['clientId'] = $selected && ($label === (string) ($selected['empresa'] ?? '') || $label === (string) ($selected['id'] ?? ''))
+                ? (string) $selected['id']
+                : '';
+        }
+
+        return (string) ((new NoteClient())->resolve($candidate)['id'] ?? '');
     }
 
     protected function canEdit(array $record, string $currentKey): bool

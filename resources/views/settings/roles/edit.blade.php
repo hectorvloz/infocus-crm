@@ -9,6 +9,7 @@ $allModules = [
     ['key' => 'mis-notas',  'label' => 'Mis Notas',          'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar']],
     ['key' => 'clientes',   'label' => 'Clientes',           'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar']],
     ['key' => 'documentos', 'label' => 'Documentos',         'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar']],
+    ['key' => 'social-media', 'label' => 'Social Media',     'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar', 'sync' => 'Sincronizar']],
     ['key' => 'proyectos',  'label' => 'Proyectos',          'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar']],
     ['key' => 'reuniones',  'label' => 'Reuniones',          'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar']],
     ['key' => 'leads',      'label' => 'Leads',              'perms' => ['read' => 'Ver', 'create' => 'Crear', 'update' => 'Editar', 'delete' => 'Eliminar']],
