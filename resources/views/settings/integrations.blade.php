@@ -152,6 +152,11 @@
                         <input type="text" name="wompi_public_key" value="{{ $settings['wompi_public_key'] ?? '' }}" placeholder="pub_prod_..." class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-[#ecfe88] focus:border-[#ecfe88] sm:text-sm font-mono text-xs">
                     </div>
                     <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Private Key (verificación del pago)</label>
+                        <input type="password" name="wompi_private_key" autocomplete="new-password" placeholder="{{ !empty($settings['wompi_private_key']) ? 'Guardada — escribe solo para cambiar' : 'prv_prod_... / prv_test_...' }}" class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl text-xs">
+                        <p class="mt-2 text-xs text-slate-500">Permite confirmar el pago al regresar de Wompi. Sin ella, la confirmación depende del webhook.</p>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Integrity Secret</label>
                         <input type="password" name="wompi_integrity_secret" placeholder="{{ !empty($settings['wompi_integrity_secret']) ? '•••••••••• (guardado) - escribe solo para cambiar' : 'integrity_secret' }}" autocomplete="new-password" class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-[#ecfe88] focus:border-[#ecfe88] sm:text-sm font-mono text-xs">
                         @if(!empty($settings['wompi_integrity_secret']))

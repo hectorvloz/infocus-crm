@@ -49,6 +49,7 @@ class WompiSettingsTest extends TestCase
             ->put(route('settings.integrations.update'), [
                 'payment_gateway' => 'wompi',
                 'wompi_mode' => 'live',
+                'wompi_private_key' => 'prv_prod_example',
                 'wompi_public_key' => 'pub_prod_example',
                 'wompi_integrity_secret' => '',
                 'wompi_event_secret' => 'prod_events_example',
@@ -57,6 +58,7 @@ class WompiSettingsTest extends TestCase
             ->assertRedirect(route('settings.integrations'));
 
         $settings = (new FileStore('settings.json'))->find('settings');
+        $this->assertSame('prv_prod_example', Crypt::decryptString(substr($settings['wompi_private_key'], 4)));
         $this->assertSame($integritySecret, $settings['wompi_integrity_secret']);
         $this->assertStringStartsWith('ENC:', $settings['wompi_event_secret']);
         $this->assertSame(

@@ -746,6 +746,12 @@ class PortalController extends Controller
         $currency = strtoupper((string) ($invoice['moneda'] ?? $settings['wompi_currency'] ?? $settings['stripe_currency'] ?? 'COP'));
         $paypalPriorityCurrencies = ['USD', 'EUR'];
 
+        if ($currency === 'USD' && $this->hasWompiConfigured($settings)
+            && (($settings['payment_gateway'] ?? '') === 'wompi'
+                || (!$this->hasPaypalConfigured($settings) && !$this->hasStripeConfigured($settings)))) {
+            return 'wompi';
+        }
+
         if ($currency === 'COP') {
             if ($this->hasWompiConfigured($settings)) {
                 return 'wompi';
@@ -937,14 +943,46 @@ class PortalController extends Controller
             return back()->withErrors(['pago' => 'Los secretos de Wompi no corresponden al modo Live.']);
         }
 
-        $amount = (int) round((float) ($invoice['total'] ?? 0) * 100);
-        if ($amount <= 0) {
-            return back()->withErrors(['pago' => 'Monto invalido para pago.']);
+        $invoiceCurrency = strtoupper((string) ($invoice['moneda'] ?? 'COP'));
+        if (!in_array($invoiceCurrency, ['COP', 'USD'], true)) {
+            return back()->withErrors(['pago' => 'Esta moneda no está disponible para Wompi.']);
         }
-
+        $balanceCents = $this->wompiBalanceCents($invoice);
+        $rate = 1.0;
+        if ($invoiceCurrency === 'USD') {
+            // Invoice rates are expressed against the company's base currency.
+            $rate = strtoupper((string) ($settings['base_currency'] ?? 'USD')) === 'COP'
+                ? (float) ($invoice['tasa'] ?? 0) : 0;
+            if (!is_finite($rate) || $rate <= 0) {
+                try {
+                    $response = Http::acceptJson()->timeout(10)->get('https://open.er-api.com/v6/latest/USD');
+                    $rate = $response->successful() && $response->json('result') === 'success'
+                        ? (float) $response->json('rates.COP', 0) : 0;
+                } catch (\Throwable) {
+                    $rate = 0;
+                }
+            }
+            if (!is_finite($rate) || $rate <= 0) {
+                return back()->withErrors(['pago' => 'No pudimos consultar la tasa USD/COP. Intenta nuevamente en unos minutos.']);
+            }
+        }
+        $amount = (int) round($balanceCents * $rate);
+        if ($balanceCents <= 0 || $amount <= 0) {
+            return back()->withErrors(['pago' => 'Monto inválido para pago.']);
+        }
         $currency = 'COP';
-
         $reference = 'INV-'.$invoice['id'].'-'.Str::upper(Str::random(6));
+        $quote = [
+            'currency' => $invoiceCurrency,
+            'balance_cents' => $balanceCents,
+            'amount_in_cents' => $amount,
+            'rate' => $rate,
+            'expires_at' => $invoiceCurrency === 'USD' ? now()->addMinutes(30)->toISOString() : null,
+            'created_at' => now()->toISOString(),
+        ];
+        $quotes = $invoice['wompi_quotes'] ?? [];
+        $quotes[$reference] = $quote;
+        $this->facturas->update($invoice['id'], ['wompi_quotes' => $quotes]);
 
         if ($publicInvoiceId) {
             $redirectUrl = route('public.wompi.success', [
@@ -984,9 +1022,17 @@ class PortalController extends Controller
             $query['customer-data:email'] = $email;
         }
 
-        $query['signature:integrity'] = hash('sha256', $reference.$amount.$currency.$integritySecret);
+        if ($quote['expires_at']) {
+            $query['expiration-time'] = $quote['expires_at'];
+        }
+        $query['signature:integrity'] = hash('sha256', $reference.$amount.$currency.($quote['expires_at'] ?? '').$integritySecret);
 
-        return redirect()->away('https://checkout.wompi.co/p/?'.http_build_query($query));
+        $gatewayUrl = 'https://checkout.wompi.co/p/?'.http_build_query($query);
+        if ($invoiceCurrency === 'USD') {
+            return response()->view('portal.wompi_conversion', compact('invoice', 'quote', 'gatewayUrl'))
+                ->header('Cache-Control', 'no-store');
+        }
+        return redirect()->away($gatewayUrl);
     }
 
     private function isLocalUrl(string $url): bool
@@ -1380,10 +1426,14 @@ class PortalController extends Controller
         if (!$invoice || ($invoice['cliente_id'] ?? '') !== ($client['id'] ?? '')) return;
         if (($invoice['estado'] ?? '') === 'Pagada') return;
 
+        $quote = $invoice['wompi_quotes'][$reference ?? ''] ?? null;
         $pago = [
             'id' => (string) Str::ulid(),
             'fecha' => now()->toDateString(),
-            'monto' => $invoice['total'] ?? 0,
+            'monto' => $quote ? $quote['balance_cents'] / 100 : ($invoice['total'] ?? 0),
+            'moneda' => $invoice['moneda'] ?? 'COP',
+            'wompi_conversion' => $quote,
+            'wompi_transaction_id' => $transactionId,
             'metodo' => 'Wompi',
             'nota' => implode(' | ', array_filter([
                 $reference ? 'Referencia: '.$reference : null,
@@ -1659,8 +1709,8 @@ class PortalController extends Controller
         }
 
         $settings = $this->settings->find('settings') ?: [];
-        $publicKey = trim((string) ($settings['wompi_public_key'] ?? ''));
-        if ($publicKey === '') {
+        $privateKey = trim($this->decryptSetting($settings['wompi_private_key'] ?? ''));
+        if ($privateKey === '') {
             return null;
         }
 
@@ -1668,7 +1718,7 @@ class PortalController extends Controller
         $apiBase = $mode === 'live' ? 'https://production.wompi.co/v1' : 'https://sandbox.wompi.co/v1';
 
         try {
-            $response = Http::withToken($publicKey)
+            $response = Http::withToken($privateKey)
                 ->acceptJson()
                 ->timeout(10)
                 ->get($apiBase.'/transactions/'.rawurlencode($transactionId));
@@ -1693,6 +1743,18 @@ class PortalController extends Controller
         $expectedAmountInCents = (int) round((float) ($invoice['total'] ?? 0) * 100);
         $invoiceCurrency = strtoupper((string) ($invoice['moneda'] ?? 'COP'));
 
+        $quote = $invoice['wompi_quotes'][$transactionReference] ?? null;
+        if ($quote) {
+            if (($quote['currency'] ?? '') !== $invoiceCurrency
+                || ((int) ($quote['balance_cents'] ?? 0) !== $this->wompiBalanceCents($invoice)
+                    && !collect($invoice['pagos'] ?? [])->contains(fn ($payment) => ($payment['wompi_transaction_id'] ?? null) === $transactionId))) {
+                return false;
+            }
+            $expectedAmountInCents = (int) $quote['amount_in_cents'];
+        } elseif ($invoiceCurrency !== 'COP') {
+            return false;
+        }
+
         return $transactionId !== ''
             && $transactionStatus === 'APPROVED'
             && $transactionReference !== ''
@@ -1700,8 +1762,13 @@ class PortalController extends Controller
             && hash_equals((string) ($invoice['id'] ?? ''), $this->extractInvoiceIdFromWompiReference($transactionReference))
             && $amountInCents !== false
             && $amountInCents === $expectedAmountInCents
-            && $invoiceCurrency === 'COP'
             && $transactionCurrency === 'COP';
+    }
+
+    private function wompiBalanceCents(array $invoice): int
+    {
+        $paid = array_sum(array_map(fn ($payment) => (int) round((float) ($payment['monto'] ?? 0) * 100), $invoice['pagos'] ?? []));
+        return max(0, (int) round((float) ($invoice['total'] ?? 0) * 100) - $paid);
     }
 
     private function extractInvoiceIdFromWompiReference(string $reference): string

@@ -64,6 +64,7 @@ class WompiCheckoutTest extends TestCase
             'id' => 'settings',
             'payment_gateway' => 'wompi',
             'wompi_mode' => 'live',
+            'wompi_private_key' => 'ENC:'.Crypt::encryptString('prv_prod_example'),
             'wompi_public_key' => 'pub_prod_example',
             'wompi_currency' => 'COP',
         ]);
@@ -85,6 +86,7 @@ class WompiCheckoutTest extends TestCase
             'id' => 'settings',
             'payment_gateway' => 'wompi',
             'wompi_mode' => 'live',
+            'wompi_private_key' => 'ENC:'.Crypt::encryptString('prv_prod_example'),
             'wompi_public_key' => 'pub_prod_example',
             'wompi_integrity_secret' => 'ENC:'.Crypt::encryptString($integritySecret),
             'wompi_event_secret' => 'ENC:'.Crypt::encryptString('prod_events_example'),
@@ -110,6 +112,7 @@ class WompiCheckoutTest extends TestCase
             'id' => 'settings',
             'payment_gateway' => 'wompi',
             'wompi_mode' => 'live',
+            'wompi_private_key' => 'ENC:'.Crypt::encryptString('prv_prod_example'),
             'wompi_public_key' => 'pub_prod_example',
             'wompi_integrity_secret' => 'ENC:invalid-encrypted-value',
             'wompi_currency' => 'COP',
@@ -130,6 +133,7 @@ class WompiCheckoutTest extends TestCase
             'id' => 'settings',
             'payment_gateway' => 'wompi',
             'wompi_mode' => 'live',
+            'wompi_private_key' => 'ENC:'.Crypt::encryptString('prv_prod_example'),
             'wompi_public_key' => 'pub_prod_example',
             'wompi_integrity_secret' => 'ENC:'.Crypt::encryptString('prod_integrity_example'),
             'wompi_currency' => 'COP',
@@ -175,6 +179,7 @@ class WompiCheckoutTest extends TestCase
         (new FileStore('settings.json'))->create([
             'id' => 'settings',
             'wompi_mode' => 'live',
+            'wompi_private_key' => 'ENC:'.Crypt::encryptString('prv_prod_example'),
             'wompi_public_key' => 'pub_prod_example',
         ]);
 
@@ -275,7 +280,7 @@ class WompiCheckoutTest extends TestCase
         $invoice = (new FileStore('facturas.json'))->find('wompiinvoice1');
         $this->assertSame('Pagada', $invoice['estado']);
         $this->assertStringContainsString('transaction-1', $invoice['pagos'][0]['nota']);
-        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer pub_prod_example'));
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer prv_prod_example'));
     }
 
     public function test_repeated_valid_webhook_is_idempotent(): void
@@ -308,12 +313,53 @@ class WompiCheckoutTest extends TestCase
         $this->assertSame('Pagada', (new FileStore('facturas.json'))->find('invoice-1')['estado']);
     }
 
+    public function test_usd_checkout_converts_and_settles_in_original_currency(): void
+    {
+        $this->storeWompiSettings('prod_events_example');
+        $store = new FileStore('facturas.json');
+        $store->update('wompiinvoice1', ['moneda' => 'USD', 'total' => 100, 'pagos' => [['monto' => 20]]]);
+        Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'rates' => ['COP' => 4000]])]);
+        $response = $this->get(route('public.pay.checkout', 'wompiinvoice1'));
+        $response->assertOk()->assertSee('320,000.00')->assertSee('80.00');
+        parse_str(parse_url($response->viewData('gatewayUrl'), PHP_URL_QUERY), $query);
+        $this->assertSame('32000000', $query['amount-in-cents']);
+        $this->assertSame(hash('sha256', $query['reference'].'32000000COP'.$query['expiration-time'].'prod_integrity_example'), $query['signature:integrity']);
+        $payload = $this->signedWompiEvent('prod_events_example', ['reference' => $query['reference'], 'amount_in_cents' => 32000000]);
+        $wrongAmount = $this->signedWompiEvent('prod_events_example', ['reference' => $query['reference'], 'amount_in_cents' => 8000]);
+        $this->postJson(route('webhooks.wompi'), $wrongAmount)->assertStatus(422);
+        $this->assertSame('Pendiente', $store->find('wompiinvoice1')['estado']);
+        Http::fake(['open.er-api.com/*' => Http::response(['result' => 'success', 'rates' => ['COP' => 5000]])]);
+        $this->postJson(route('webhooks.wompi'), $payload)->assertOk();
+        $this->postJson(route('webhooks.wompi'), $payload)->assertOk();
+        $invoice = $store->find('wompiinvoice1');
+        $this->assertSame('Pagada', $invoice['estado']);
+        $this->assertSame('USD', $invoice['moneda']);
+        $this->assertCount(2, $invoice['pagos']);
+        $this->assertEquals(80, $invoice['pagos'][1]['monto']);
+    }
+
+    public function test_usd_checkout_fails_closed_without_exchange_rate(): void
+    {
+        $this->storeWompiSettings('prod_events_example');
+        (new FileStore('facturas.json'))->update('wompiinvoice1', ['moneda' => 'USD', 'total' => 100]);
+        Http::fake(['open.er-api.com/*' => Http::response([], 503)]);
+        $this->get(route('public.pay.checkout', 'wompiinvoice1'))->assertSessionHasErrors('pago');
+    }
+
+    public function test_usd_webhook_without_saved_quote_is_rejected(): void
+    {
+        $this->storeWompiSettings('prod_events_example');
+        (new FileStore('facturas.json'))->update('wompiinvoice1', ['moneda' => 'USD']);
+        $this->postJson(route('webhooks.wompi'), $this->signedWompiEvent('prod_events_example'))->assertStatus(422);
+    }
+
     private function storeWompiSettings(string $eventSecret): void
     {
         (new FileStore('settings.json'))->create([
             'id' => 'settings',
             'payment_gateway' => 'wompi',
             'wompi_mode' => 'live',
+            'wompi_private_key' => 'ENC:'.Crypt::encryptString('prv_prod_example'),
             'wompi_public_key' => 'pub_prod_example',
             'wompi_integrity_secret' => 'ENC:'.Crypt::encryptString('prod_integrity_example'),
             'wompi_event_secret' => 'ENC:'.Crypt::encryptString($eventSecret),

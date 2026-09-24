@@ -1015,6 +1015,7 @@ class SettingsController extends Controller
             'stripe_secret' => 'nullable|string',
             'stripe_currency' => 'nullable|string|size:3',
             'wompi_public_key' => 'nullable|string',
+            'wompi_private_key' => 'nullable|string|max:1000',
             'wompi_integrity_secret' => 'nullable|string',
             'wompi_event_secret' => 'nullable|string|max:1000',
             'wompi_mode' => 'nullable|in:test,live',
@@ -1056,6 +1057,11 @@ class SettingsController extends Controller
                     $errors[$field] = 'Este valor debe corresponder al ambiente '.($mode === 'live' ? 'Live' : 'Test').' y comenzar por '.$prefix;
                 }
             }
+            $privateKey = trim((string) ($data['wompi_private_key'] ?? ''));
+            if ($privateKey !== '' && $privateKey !== '••••••••'
+                && !str_starts_with($privateKey, $mode === 'live' ? 'prv_prod_' : 'prv_test_')) {
+                $errors['wompi_private_key'] = 'La llave privada debe corresponder al ambiente de Wompi seleccionado.';
+            }
             if (strtoupper((string) ($data['wompi_currency'] ?? $current['wompi_currency'] ?? 'COP')) !== 'COP') {
                 $errors['wompi_currency'] = 'Wompi Colombia solo permite pagos en COP.';
             }
@@ -1064,7 +1070,7 @@ class SettingsController extends Controller
             }
         }
 
-        $secretFields = ['stripe_secret', 'paypal_secret', 'wompi_integrity_secret', 'wompi_event_secret'];
+        $secretFields = ['wompi_private_key', 'stripe_secret', 'paypal_secret', 'wompi_integrity_secret', 'wompi_event_secret'];
         foreach ($secretFields as $field) {
             if (!empty($data[$field])) {
                 // Only re-encrypt if user typed something new (not the masked placeholder)
