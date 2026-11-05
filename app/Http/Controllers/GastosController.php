@@ -316,6 +316,22 @@ class GastosController extends Controller
         return redirect()->route("gastos.index")->with("success", "Gasto registrado correctamente.");
     }
 
+    /** Sirve el comprobante solo a usuarios con sesión; los archivos no son accesibles por URL pública. */
+    public function comprobante($id)
+    {
+        $gasto = $this->store->find($id);
+        $path = (string) ($gasto["comprobante_path"] ?? "");
+        abort_if($path === "" || !str_starts_with($path, "comprobantes/") || str_contains($path, ".."), 404);
+
+        $disk = Storage::disk("public");
+        abort_if(!$disk->exists($path), 404);
+
+        return response()->file($disk->path($path), [
+            "X-Content-Type-Options" => "nosniff",
+            "Cache-Control" => "private, no-store",
+        ]);
+    }
+
     public function edit($id)
     {
         $gasto = $this->store->find($id);

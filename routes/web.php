@@ -271,6 +271,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/gastos/crear', [GastosController::class, 'create'])->name('gastos.create');
     Route::post('/gastos', [GastosController::class, 'store'])->name('gastos.store');
     Route::get('/gastos/{id}/editar', [GastosController::class, 'edit'])->name('gastos.edit');
+    Route::get('/gastos/{id}/comprobante', [GastosController::class, 'comprobante'])->name('gastos.comprobante');
     Route::put('/gastos/{id}', [GastosController::class, 'update'])->name('gastos.update');
     Route::delete('/gastos/{id}', [GastosController::class, 'destroy'])->name('gastos.destroy');
     Route::get('/gastos/exportar/csv', [GastosController::class, 'export'])->name('gastos.export');
