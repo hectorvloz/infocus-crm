@@ -224,6 +224,7 @@ Infocus expone un servidor MCP en `https://proyecto.estudioindigo.com.co/mcp`. S
 Desde la Terminal de cPanel, en la carpeta del CRM:
 
 ```bash
+php artisan package:discover         # registra los paquetes nuevos (laravel/mcp, passport)
 php artisan migrate --force          # crea las tablas oauth_* de Passport
 php artisan passport:keys            # crea storage/oauth-private.key y oauth-public.key
 chmod 600 storage/oauth-*.key

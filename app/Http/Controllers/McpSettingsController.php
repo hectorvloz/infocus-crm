@@ -21,15 +21,23 @@ class McpSettingsController extends Controller
         $this->ensureAdmin();
         $user = Auth::user();
 
-        $oauth = Passport::token()->newQuery()
-            ->where('user_id', $user->getAuthIdentifier())
-            ->where('revoked', false)
-            ->where('expires_at', '>', now()->subDays(30))
-            ->with('client')
-            ->latest()
-            ->get()
-            ->groupBy('client_id')
-            ->map(fn ($tokens) => ['client' => $tokens->first()->client?->name ?? 'Aplicación', 'client_id' => $tokens->first()->client_id, 'last' => $tokens->first()->created_at]);
+        // Si aún no se corrieron las migraciones de Passport, la pantalla funciona y avisa en vez de fallar.
+        $oauthReady = true;
+        try {
+            $oauth = Passport::token()->newQuery()
+                ->where('user_id', $user->getAuthIdentifier())
+                ->where('revoked', false)
+                ->where('expires_at', '>', now()->subDays(30))
+                ->with('client')
+                ->latest()
+                ->get()
+                ->groupBy('client_id')
+                ->map(fn ($tokens) => ['client' => $tokens->first()->client?->name ?? 'Aplicación', 'client_id' => $tokens->first()->client_id, 'last' => $tokens->first()->created_at]);
+        } catch (\Throwable $e) {
+            report($e);
+            $oauthReady = false;
+            $oauth = collect();
+        }
 
         $activity = collect((new FileStore('mcp_activity.json'))->all())
             ->where('user_id', (string) $user->getAuthIdentifier())
@@ -43,6 +51,7 @@ class McpSettingsController extends Controller
             'activity' => $activity,
             'endpoint' => url('/mcp'),
             'newToken' => session('mcp_new_token'),
+            'oauthReady' => $oauthReady,
         ]);
     }
 

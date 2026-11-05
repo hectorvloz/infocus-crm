@@ -22,6 +22,12 @@
     <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{{ session('success') }}</div>
 @endif
 
+@if (!$oauthReady)
+    <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        La conexión por OAuth (claude.ai y ChatGPT) aún no está activada. En la Terminal de cPanel ejecuta: <code>php artisan migrate --force</code> y <code>php artisan passport:keys</code>. Las conexiones con token sí funcionan.
+    </div>
+@endif
+
 @if ($newToken)
     <div class="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6">
         <p class="font-semibold text-amber-900">Token de "{{ $newToken['name'] }}" — cópialo ahora, no se volverá a mostrar.</p>
