@@ -1,0 +1,251 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Mcp\Support\McpTokens;
+use App\Models\User;
+use App\Repositories\FileStore;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Passport\Passport;
+use Tests\TestCase;
+
+class McpServerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
+        foreach (['mcp_tokens.json', 'mcp_activity.json', 'mcp_pending_actions.json', 'clientes.json', 'leads.json', 'facturas.json',
+            'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json'] as $file) {
+            Storage::disk('local')->put($file, '[]');
+        }
+        Mail::fake();
+        $this->admin = User::factory()->create(['role' => 'admin', 'email' => 'hector@indigo.test']);
+        (new FileStore('clientes.json'))->create(['id' => 'c1', 'empresa' => 'Café Laurel', 'contacto_nombre' => 'Laura', 'contacto_email' => 'laura@laurel.test', 'estado' => 'Activo', 'moneda' => 'COP']);
+    }
+
+    private function token(string $access = 'completo', ?User $user = null): string
+    {
+        return (new McpTokens())->create(($user ?? $this->admin)->id, 'Pruebas', $access, 30)['token'];
+    }
+
+    private function rpc(string $method, array $params = [], ?string $token = null)
+    {
+        $headers = ['Accept' => 'application/json, text/event-stream'];
+        if ($token) {
+            $headers['Authorization'] = 'Bearer ' . $token;
+        }
+
+        return $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => $method, 'params' => $params], $headers);
+    }
+
+    private function tool(string $tool, array $args, string $token): array
+    {
+        $res = $this->rpc('tools/call', ['name' => $tool, 'arguments' => $args], $token)->assertOk()->json('result');
+
+        return ['error' => (bool) ($res['isError'] ?? false), 'text' => collect($res['content'] ?? [])->pluck('text')->implode("\n")];
+    }
+
+    public function test_requests_without_valid_token_are_rejected(): void
+    {
+        $this->rpc('tools/list')->assertStatus(401)->assertHeader('WWW-Authenticate');
+        $this->rpc('tools/list', [], 'ifc_inventado')->assertStatus(401);
+
+        $token = $this->token();
+        $record = (new McpTokens())->findValid($token);
+        (new McpTokens())->revoke($record['id'], $this->admin->id);
+        $this->rpc('tools/list', [], $token)->assertStatus(401);
+    }
+
+    public function test_expired_tokens_are_rejected(): void
+    {
+        $token = $this->token();
+        $store = new FileStore('mcp_tokens.json');
+        $record = collect($store->all())->first();
+        $store->update($record['id'], ['expires_at' => now()->subMinute()->toISOString()]);
+
+        $this->rpc('tools/list', [], $token)->assertStatus(401);
+    }
+
+    public function test_only_admins_can_use_the_server(): void
+    {
+        $member = User::factory()->create(['role' => 'ventas']);
+        $this->rpc('tools/list', [], $this->token('completo', $member))->assertStatus(403);
+    }
+
+    public function test_tokens_are_stored_hashed(): void
+    {
+        $token = $this->token();
+        $raw = Storage::disk('local')->get('mcp_tokens.json');
+        $this->assertStringNotContainsString($token, $raw);
+        $this->assertStringContainsString(hash('sha256', $token), $raw);
+    }
+
+    public function test_lists_tools_and_reads_data(): void
+    {
+        $token = $this->token();
+        $names = collect($this->rpc('tools/list', [], $token)->assertOk()->json('result.tools'))->pluck('name');
+        $this->assertTrue($names->contains('buscar_clientes'));
+        $this->assertTrue($names->contains('confirmar_accion'));
+        $this->assertFalse($names->contains(fn ($n) => str_contains($n, 'eliminar') || str_contains($n, 'borrar')));
+
+        $res = $this->tool('buscar_clientes', ['texto' => 'laurel'], $token);
+        $this->assertFalse($res['error']);
+        $this->assertStringContainsString('Café Laurel (id: c1)', $res['text']);
+    }
+
+    public function test_read_only_connection_cannot_write(): void
+    {
+        $res = $this->tool('crear_lead', ['nombre' => 'Pedro'], $this->token('lectura'));
+        $this->assertTrue($res['error']);
+        $this->assertStringContainsString('solo lectura', $res['text']);
+        $this->assertCount(0, (new FileStore('leads.json'))->all());
+    }
+
+    public function test_creates_lead_without_duplicates_and_logs_activity(): void
+    {
+        $token = $this->token();
+        $this->assertFalse($this->tool('crear_lead', ['nombre' => 'Pedro', 'email' => 'pedro@x.test'], $token)['error']);
+        $this->assertTrue($this->tool('crear_lead', ['nombre' => 'Pedro 2', 'email' => 'PEDRO@x.test'], $token)['error']);
+        $this->assertCount(1, (new FileStore('leads.json'))->all());
+
+        $log = collect((new FileStore('mcp_activity.json'))->all());
+        $this->assertTrue($log->contains(fn ($l) => $l['tool'] === 'crear_lead' && $l['connection'] === 'token:Pruebas'));
+    }
+
+    public function test_invoice_is_created_as_draft_with_next_number(): void
+    {
+        (new FileStore('settings.json'))->create(['id' => 'settings', 'base_currency' => 'COP']);
+        (new FileStore('facturas.json'))->create(['id' => 'f0', 'numero' => 'INV-0007', 'cliente_id' => 'c1', 'cliente' => 'Café Laurel', 'estado' => 'Pagada']);
+        $res = $this->tool('crear_factura_borrador', [
+            'cliente_id' => 'c1', 'moneda' => 'COP', 'vencimiento' => now()->addDays(15)->toDateString(), 'impuesto' => 19,
+            'items' => [['descripcion' => 'Landing', 'cantidad' => 1, 'precio' => 890000]],
+        ], $this->token());
+
+        $this->assertFalse($res['error'], $res['text']);
+        $invoice = collect((new FileStore('facturas.json'))->all())->firstWhere('numero', 'INV-0008');
+        $this->assertSame('En borrador', $invoice['estado']);
+        Mail::assertNothingSent();
+    }
+
+    public function test_email_is_not_sent_until_confirmed_and_code_works_once(): void
+    {
+        $token = $this->token();
+        $prep = $this->tool('preparar_correo', ['cliente_id' => 'c1', 'asunto' => 'Seguimiento', 'mensaje' => "<h1>Hola {cliente},</h1><p>Te escribo.</p><script>alert(1)</script>"], $token);
+        $this->assertFalse($prep['error'], $prep['text']);
+        $this->assertStringContainsString('Hola Laura', $prep['text']);
+        $this->assertStringNotContainsString('alert', $prep['text']);
+        Mail::assertNothingSent();
+
+        preg_match('/código ([A-Z0-9]{3}-[A-Z0-9]{3})/', $prep['text'], $m);
+        $this->assertFalse($this->tool('confirmar_accion', ['codigo' => $m[1]], $token)['error']);
+        Mail::assertSentCount(1);
+
+        $again = $this->tool('confirmar_accion', ['codigo' => $m[1]], $token);
+        $this->assertTrue($again['error']);
+        Mail::assertSentCount(1);
+    }
+
+    public function test_expired_or_foreign_codes_are_rejected(): void
+    {
+        $token = $this->token();
+        $prep = $this->tool('preparar_correo', ['para' => ['a@b.test'], 'asunto' => 'Hola', 'mensaje' => 'Texto'], $token);
+        preg_match('/código ([A-Z0-9]{3}-[A-Z0-9]{3})/', $prep['text'], $m);
+
+        $otherAdmin = User::factory()->create(['role' => 'admin']);
+        $this->assertTrue($this->tool('confirmar_accion', ['codigo' => $m[1]], $this->token('completo', $otherAdmin))['error']);
+
+        $prep = $this->tool('preparar_correo', ['para' => ['a@b.test'], 'asunto' => 'Hola', 'mensaje' => 'Texto'], $token);
+        preg_match('/código ([A-Z0-9]{3}-[A-Z0-9]{3})/', $prep['text'], $m);
+        $this->travel(6)->minutes();
+        $this->assertTrue($this->tool('confirmar_accion', ['codigo' => $m[1]], $token)['error']);
+        Mail::assertNothingSent();
+    }
+
+    public function test_payment_is_registered_only_after_confirmation(): void
+    {
+        (new FileStore('facturas.json'))->create(['id' => 'f1', 'numero' => 'INV-0001', 'cliente_id' => 'c1', 'cliente' => 'Café Laurel', 'moneda' => 'COP',
+            'total' => 100000, 'saldo' => 100000, 'estado' => 'Pendiente', 'fecha' => now()->toDateString(), 'items' => [], 'pagos' => []]);
+        $token = $this->token();
+
+        $prep = $this->tool('preparar_pago', ['factura' => 'INV-0001', 'monto' => 100000, 'metodo' => 'Transferencia'], $token);
+        $this->assertSame('Pendiente', (new FileStore('facturas.json'))->find('f1')['estado']);
+
+        preg_match('/código ([A-Z0-9]{3}-[A-Z0-9]{3})/', $prep['text'], $m);
+        $res = $this->tool('confirmar_accion', ['codigo' => $m[1]], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertSame('Pagada', (new FileStore('facturas.json'))->find('f1')['estado']);
+    }
+
+    private function passportKeys(): void
+    {
+        if (!is_file(storage_path('oauth-private.key'))) {
+            $this->artisan('passport:keys', ['--force' => true]);
+        }
+    }
+
+    public function test_oauth_tokens_with_mcp_scope_are_accepted(): void
+    {
+        $this->passportKeys();
+        $this->getJson('/.well-known/oauth-protected-resource/mcp')->assertOk()->assertJsonPath('scopes_supported.0', 'mcp:use');
+
+        Passport::actingAs($this->admin, ['mcp:use'], 'api');
+        $this->rpc('tools/list', [], 'oauth-token')->assertOk();
+    }
+
+    public function test_oauth_tokens_without_scope_are_rejected(): void
+    {
+        $this->passportKeys();
+        Passport::actingAs($this->admin, [], 'api');
+        $this->rpc('tools/list', [], 'oauth-token')->assertStatus(401);
+    }
+
+    public function test_settings_page_shows_new_token_once(): void
+    {
+        $this->actingAs($this->admin)->withSession(['user' => ['id' => $this->admin->id]])
+            ->post('/ajustes/mcp', ['name' => 'Claude', 'access' => 'completo', 'days' => 90])
+            ->assertRedirect('/ajustes/mcp');
+
+        $first = $this->actingAs($this->admin)->get('/ajustes/mcp')->assertOk();
+        preg_match('/ifc_[A-Za-z0-9]{48}/', $first->getContent(), $m);
+        $this->assertNotEmpty($m);
+        $this->assertNotNull((new McpTokens())->findValid($m[0]));
+
+        $this->actingAs($this->admin)->get('/ajustes/mcp')->assertOk()->assertDontSee($m[0]);
+    }
+
+    public function test_full_oauth_flow_from_registration_to_mcp_call(): void
+    {
+        $this->passportKeys();
+        $redirect = 'https://claude.ai/api/mcp/auth_callback';
+
+        $client = $this->postJson('/oauth/register', ['client_name' => 'Claude', 'redirect_uris' => [$redirect]])->assertSuccessful()->json();
+        $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://claude.ai.atacante.test/cb']])->assertStatus(400);
+
+        $verifier = str_repeat('a', 64);
+        $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+        $query = http_build_query(['client_id' => $client['client_id'], 'redirect_uri' => $redirect, 'response_type' => 'code',
+            'scope' => 'mcp:use', 'state' => 'xyz', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256']);
+
+        $this->get('/oauth/authorize?' . $query)->assertRedirect(route('login.show'));
+
+        $page = $this->actingAs($this->admin)->get('/oauth/authorize?' . $query)->assertOk()->assertSee('Claude quiere acceder a tu Infocus');
+        preg_match('/name="auth_token" value="([^"]+)"/', $page->getContent(), $m);
+
+        $approve = $this->actingAs($this->admin)->post('/oauth/authorize', ['state' => 'xyz', 'client_id' => $client['client_id'], 'auth_token' => $m[1]]);
+        parse_str((string) parse_url($approve->headers->get('Location'), PHP_URL_QUERY), $back);
+        $this->assertSame('xyz', $back['state']);
+
+        $token = $this->postJson('/oauth/token', ['grant_type' => 'authorization_code', 'client_id' => $client['client_id'], 'redirect_uri' => $redirect,
+            'code' => $back['code'], 'code_verifier' => $verifier])->assertOk()->json('access_token');
+
+        $this->app['auth']->forgetGuards();
+        $this->rpc('tools/list', [], $token)->assertOk();
+    }
+}

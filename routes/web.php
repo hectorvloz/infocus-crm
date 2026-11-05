@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\LeadsWebhookController;
+use App\Http\Controllers\McpSettingsController;
 use App\Http\Controllers\FacturasController;
 use App\Http\Controllers\GastosController;
 use App\Http\Controllers\ProveedoresController;
@@ -255,6 +256,10 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/ajustes/integraciones/google-calendar/desconectar', [SettingsController::class, 'googleCalendarDisconnect'])->name('settings.integrations.google.disconnect');
     Route::get('/ajustes/social-media', [SettingsController::class, 'socialMedia'])->name('settings.social_media');
     Route::put('/ajustes/social-media', [SettingsController::class, 'updateSocialMedia'])->name('settings.social_media.update');
+    Route::get('/ajustes/mcp', [McpSettingsController::class, 'index'])->name('settings.mcp');
+    Route::post('/ajustes/mcp', [McpSettingsController::class, 'store'])->name('settings.mcp.store');
+    Route::delete('/ajustes/mcp/{id}', [McpSettingsController::class, 'destroy'])->name('settings.mcp.destroy');
+    Route::delete('/ajustes/mcp/oauth/{clientId}', [McpSettingsController::class, 'revokeOauth'])->name('settings.mcp.oauth.revoke');
     Route::get('/ajustes/ia', [SettingsController::class, 'ai'])->name('settings.ai');
     Route::put('/ajustes/ia', [SettingsController::class, 'updateAi'])->name('settings.ai.update');
     Route::put('/ajustes/ia/memoria/{id}', [SettingsController::class, 'updateAiMemory'])->name('settings.ai.memory.update');

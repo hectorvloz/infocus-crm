@@ -43,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->ensureRuntimeDirectories();
+        $this->configureMcp();
 
         // Dynamic Mail Configuration from settings.json
         try {
@@ -141,5 +142,17 @@ class AppServiceProvider extends ServiceProvider
                 // Ignore here; Laravel will surface a concrete filesystem error later if needed.
             }
         }
+    }
+
+    /** MCP para asistentes de IA: límite de uso y OAuth (Passport) para claude.ai y ChatGPT. */
+    private function configureMcp(): void
+    {
+        \Illuminate\Support\Facades\RateLimiter::for('mcp', fn (\Illuminate\Http\Request $request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(60)
+            ->by((string) (\Illuminate\Support\Facades\Auth::id() ?: $request->ip())));
+
+        \Laravel\Passport\Passport::tokensCan([\Laravel\Mcp\Server\Registrar::OAUTH_SCOPE => 'Usar Infocus desde un asistente de IA']);
+        \Laravel\Passport\Passport::tokensExpireIn(now()->addHour());
+        \Laravel\Passport\Passport::refreshTokensExpireIn(now()->addDays(30));
+        \Laravel\Passport\Passport::authorizationView('mcp.authorize');
     }
 }

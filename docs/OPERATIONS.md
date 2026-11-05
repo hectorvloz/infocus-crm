@@ -214,3 +214,28 @@ php artisan schedule:run
 - PDF de factura probado.
 - Correo de factura probado.
 - Portal de cliente probado.
+
+## MCP para asistentes de IA (Claude, Codex, Gemini, ChatGPT)
+
+Infocus expone un servidor MCP en `https://proyecto.estudioindigo.com.co/mcp`. Solo lo pueden usar los administradores.
+
+### Activación en el servidor (una sola vez)
+
+Desde la Terminal de cPanel, en la carpeta del CRM:
+
+```bash
+php artisan migrate --force          # crea las tablas oauth_* de Passport
+php artisan passport:keys            # crea storage/oauth-private.key y oauth-public.key
+chmod 600 storage/oauth-*.key
+php artisan optimize:clear
+```
+
+Las llaves `storage/oauth-*.key` no se suben a git y no se deben compartir.
+
+### Uso
+
+- **Configuración → MCP · Asistentes IA:** crea un token por cada herramienta (Claude Code, Codex, Gemini CLI o Claude Desktop). La pantalla trae las instrucciones listas para copiar. El token se muestra una sola vez, y cada conexión se puede revocar.
+- **claude.ai y ChatGPT:** agrega un conector personalizado con la URL `/mcp`. Se autoriza iniciando sesión en Infocus (OAuth); no necesita token.
+- **Acciones en dos pasos:** enviar correos, enviar facturas y registrar pagos devuelven primero una vista previa y un código. Solo se ejecutan con `confirmar_accion`, el código sirve una vez y vence en 5 minutos.
+- **Historial:** cada llamada queda en `storage/app/private/mcp_activity.json` (últimas 2.000) y se ve en la misma pantalla.
+- **Sin borrado:** desde el MCP no se puede borrar nada.

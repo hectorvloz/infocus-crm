@@ -164,30 +164,7 @@ HTML;
             return back()->withErrors(['to' => 'Debes ingresar al menos un correo válido.'])->withInput();
         }
 
-        $settings = $this->settingsStore->find('settings') ?: [];
-        $firstRecipient = strtolower((string) ($to[0] ?? ''));
-        $client = collect($this->clientsStore->all())->first(function (array $c) use ($firstRecipient) {
-            $email = strtolower(trim((string) ($c['contacto_email'] ?? $c['email'] ?? '')));
-            return $email !== '' && $email === $firstRecipient;
-        }) ?: [];
-
-        $clientName = (string) (
-            $client['contacto_nombre']
-            ?? $client['nombre']
-            ?? $client['empresa']
-            ?? (str_contains($firstRecipient, '@') ? ucfirst(strtolower(strstr($firstRecipient, '@', true) ?: 'Cliente')) : 'Cliente')
-        );
-
-        $vars = [
-            'empresa' => (string) ($settings['company_name'] ?? 'Infocus CRM'),
-            'fecha' => now()->format('d/m/Y'),
-            'usuario' => (string) (auth()->user()->name ?? session('user.name') ?? 'Equipo'),
-            'cliente' => $clientName,
-            'cliente_email' => (string) ($client['contacto_email'] ?? $client['email'] ?? ($to[0] ?? '')),
-            'cliente_telefono' => (string) ($client['contacto_telefono'] ?? $client['telefono'] ?? ''),
-            'cliente_nit' => (string) ($client['nit'] ?? $client['identificacion'] ?? ''),
-            'cliente_direccion' => (string) ($client['direccion'] ?? ''),
-        ];
+        $vars = self::templateVars($to);
 
         $subject = TemplateMail::tokenReplace((string) $data['subject'], $vars);
         $body = nl2br(TemplateMail::tokenReplace((string) $data['body'], $vars));
@@ -199,6 +176,35 @@ HTML;
         ]);
 
         return back()->with('ok', 'Correo enviado correctamente.');
+    }
+
+    /** Variables de plantilla ({cliente}, {empresa}…) según el primer destinatario. También las usa el MCP. */
+    public static function templateVars(array $to): array
+    {
+        $settings = (new FileStore('settings.json'))->find('settings') ?: [];
+        $firstRecipient = strtolower((string) ($to[0] ?? ''));
+        $client = collect((new FileStore('clientes.json'))->all())->first(function (array $c) use ($firstRecipient) {
+            $email = strtolower(trim((string) ($c['contacto_email'] ?? $c['email'] ?? '')));
+            return $email !== '' && $email === $firstRecipient;
+        }) ?: [];
+
+        $clientName = (string) (
+            $client['contacto_nombre']
+            ?? $client['nombre']
+            ?? $client['empresa']
+            ?? (str_contains($firstRecipient, '@') ? ucfirst(strtolower(strstr($firstRecipient, '@', true) ?: 'Cliente')) : 'Cliente')
+        );
+
+        return [
+            'empresa' => (string) ($settings['company_name'] ?? 'Infocus CRM'),
+            'fecha' => now()->format('d/m/Y'),
+            'usuario' => (string) (auth()->user()->name ?? session('user.name') ?? 'Equipo'),
+            'cliente' => $clientName,
+            'cliente_email' => (string) ($client['contacto_email'] ?? $client['email'] ?? ($to[0] ?? '')),
+            'cliente_telefono' => (string) ($client['contacto_telefono'] ?? $client['telefono'] ?? ''),
+            'cliente_nit' => (string) ($client['nit'] ?? $client['identificacion'] ?? ''),
+            'cliente_direccion' => (string) ($client['direccion'] ?? ''),
+        ];
     }
 
     public function storeTemplate(Request $request): RedirectResponse

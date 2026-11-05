@@ -207,6 +207,12 @@
             </svg>
             <span class="text-sm">IA</span>
         </a>
+        @if (in_array(strtolower((string) (auth()->user()->role ?? '')), ['admin', 'super_admin'], true))
+        <a href="{{ route('settings.mcp') }}" class="settings-nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors {{ request()->routeIs('settings.mcp*') ? 'is-active' : '' }}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+            <span class="text-sm">MCP · Asistentes IA</span>
+        </a>
+        @endif
         <a href="{{ route('settings.backup') }}" class="settings-nav-link flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors {{ request()->routeIs('settings.backup') ? 'is-active' : '' }}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
             <span class="text-sm">Respaldos</span>

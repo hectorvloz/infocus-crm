@@ -35,3 +35,6 @@ deploy_*
 
 .phpunit.cache/
 coverage/
+
+# Llaves de Passport (OAuth del MCP): se generan en cada servidor con php artisan passport:keys
+/storage/oauth-*.key
