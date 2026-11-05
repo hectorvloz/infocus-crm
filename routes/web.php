@@ -5,6 +5,7 @@ use App\Http\Controllers\InstallController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadsController;
+use App\Http\Controllers\LeadsWebhookController;
 use App\Http\Controllers\FacturasController;
 use App\Http\Controllers\GastosController;
 use App\Http\Controllers\ProveedoresController;
@@ -353,6 +354,7 @@ Route::get('/portal-acceso/google/callback', [PortalController::class, 'handleGo
 
 // Webhooks publicos
 Route::post('/webhooks/wompi', [PortalController::class, 'wompiWebhook'])->name('webhooks.wompi');
+Route::post('/webhooks/leads', [LeadsWebhookController::class, 'store'])->middleware('throttle:30,1')->name('webhooks.leads');
 
 // Admin: mensajes del portal
 Route::middleware('auth.session')->prefix('clientes/{id}/mensajes')->name('clientes.mensajes.')->group(function () {

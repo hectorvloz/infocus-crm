@@ -46,10 +46,18 @@ class ReunionesController extends Controller
             ->values()
             ->all();
 
+        // Eventos de Google que ya existen como reunión del CRM o de un lead no se muestran dos veces.
+        $knownGoogleIds = collect($this->store->all())->pluck('google_event_id')
+            ->merge(collect($this->leads->all())->flatMap(fn ($lead) => collect($lead['agenda'] ?? [])->pluck('google_event_id')))
+            ->filter()
+            ->map(fn ($id) => 'google:' . $id)
+            ->all();
+
         $reuniones = collect($this->store->all())
             ->map(fn ($meeting) => $this->normalizeMeeting($meeting, $timezone))
             ->merge($this->leadMeetings($timezone))
-            ->merge($this->googleCalendarMeetings($settings, $rangeStart, $rangeEnd, $timezone))
+            ->merge($this->googleCalendarMeetings($settings, $rangeStart, $rangeEnd, $timezone)
+                ->reject(fn ($meeting) => in_array($meeting['id'], $knownGoogleIds, true)))
             ->filter(fn ($meeting) => !empty($meeting['inicio_at']))
             ->filter(fn ($meeting) => $this->canCurrentUserSeeMeeting($meeting))
             ->sortBy('inicio_at')

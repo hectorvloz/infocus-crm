@@ -30,6 +30,7 @@ $app = Application::configure(basePath: $basePath)
             '/install',
             '/install/*',
             '/webhooks/wompi',
+            '/webhooks/leads',
         ]);
         $middleware->alias([
             'installer.guard' => \App\Http\Middleware\InstallerGuard::class,

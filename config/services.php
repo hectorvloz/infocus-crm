@@ -49,6 +49,11 @@ return [
         'calendar_id' => env('GOOGLE_CALENDAR_ID', 'primary'),
     ],
 
+    // Webhook para recibir leads desde formularios externos (por ejemplo la landing de asesoría de Indigo).
+    'leads_webhook' => [
+        'token' => env('LEADS_WEBHOOK_TOKEN'),
+    ],
+
     'meta' => [
         'app_id' => env('META_APP_ID'),
         'app_secret' => env('META_APP_SECRET'),
