@@ -2005,6 +2005,13 @@
       z-index: 2147483600 !important;
     }
 
+    /* La cabecera tiene z-index alto para que el menú de clientes quede sobre el tablero;
+       con cualquier ventana modal abierta debe quedar debajo de ella. */
+    body:has([aria-modal="true"]:not(.hidden)) #projectBoardsHeader,
+    body:has([role="dialog"]:not(.hidden)) #projectBoardsHeader {
+      z-index: 1 !important;
+    }
+
     body.project-new-modal-open #projectBoardsHeader,
     body.timer-choice-modal-open #projectBoardsHeader {
       opacity: 0 !important;
