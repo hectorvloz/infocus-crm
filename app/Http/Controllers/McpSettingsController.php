@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Mcp\Support\McpTokens;
 use App\Repositories\FileStore;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Passport\Passport;
 
@@ -52,6 +55,7 @@ class McpSettingsController extends Controller
             'endpoint' => url('/mcp'),
             'newToken' => session('mcp_new_token'),
             'oauthReady' => $oauthReady,
+            'setup' => $this->setupStatus(),
         ]);
     }
 
@@ -88,5 +92,54 @@ class McpSettingsController extends Controller
         }
 
         return redirect()->route('settings.mcp')->with('success', 'Acceso de la aplicación revocado.');
+    }
+
+    /** Estado de la activación: paquetes registrados, tablas de OAuth y llaves de Passport. */
+    private function setupStatus(): array
+    {
+        $tables = false;
+        try {
+            $tables = Schema::hasTable('oauth_access_tokens') && Schema::hasTable('oauth_clients');
+        } catch (\Throwable) {
+        }
+
+        return [
+            'packages' => Route::has('mcp.oauth.register'),
+            'tables' => $tables,
+            'keys' => is_file(Passport::keyPath('oauth-private.key')) && is_file(Passport::keyPath('oauth-public.key')),
+        ];
+    }
+
+    /**
+     * Activa el MCP desde la web en hostings sin consola: registra los paquetes nuevos,
+     * crea las tablas de OAuth y genera las llaves de Passport. Se puede repetir sin riesgo.
+     */
+    public function activate()
+    {
+        $this->ensureAdmin();
+        $log = [];
+        $run = function (string $command, array $args = []) use (&$log) {
+            $code = Artisan::call($command, $args);
+            $log[] = $command . ($code === 0 ? ': ok' : ': falló (' . trim(Artisan::output()) . ')');
+            return $code === 0;
+        };
+
+        $run('package:discover');
+        $run('migrate', ['--force' => true]);
+        if (!is_file(Passport::keyPath('oauth-private.key'))) {
+            // Si el proveedor de Passport aún no estaba registrado en esta petición, se registra para tener el comando.
+            if (!array_key_exists('passport:keys', Artisan::all())) {
+                app()->register(\Laravel\Passport\PassportServiceProvider::class);
+            }
+            $run('passport:keys');
+        }
+        foreach (['oauth-private.key', 'oauth-public.key'] as $file) {
+            if (is_file(Passport::keyPath($file))) {
+                @chmod(Passport::keyPath($file), 0600);
+            }
+        }
+        $run('optimize:clear');
+
+        return redirect()->route('settings.mcp')->with('success', 'Activación ejecutada · ' . implode(' · ', $log));
     }
 }

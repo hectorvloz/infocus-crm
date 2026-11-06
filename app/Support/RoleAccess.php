@@ -223,6 +223,7 @@ class RoleAccess
         'settings.integrations.google.callback' => 'ajustes.update',
         'settings.integrations.google.disconnect' => 'ajustes.update',
         'settings.mcp.store' => 'ajustes.update',
+        'settings.mcp.activate' => 'ajustes.update',
         'settings.mcp.destroy' => 'ajustes.update',
         'settings.mcp.oauth.revoke' => 'ajustes.update',
         'settings.*' => 'ajustes.read',
