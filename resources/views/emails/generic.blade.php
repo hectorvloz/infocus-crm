@@ -23,7 +23,10 @@
         .shell {
             width: 100%;
             background: radial-gradient(circle at top, #e8f4ff 0%, #f4f7fb 48%, #eef2f7 100%);
-            padding: 32px 12px;
+        }
+
+        .shell-cell {
+            padding: 48px 16px 56px;
         }
 
         .card {
@@ -234,8 +237,8 @@
         }
 
         @media only screen and (max-width: 640px) {
-            .shell {
-                padding: 10px 0 !important;
+            .shell-cell {
+                padding: 24px 10px 32px !important;
             }
 
             .hero,
@@ -318,9 +321,10 @@
         }
     @endphp
     <div class="preheader">{{ $preheader }}</div>
-    <table role="presentation" width="100%" class="shell" cellpadding="0" cellspacing="0" border="0">
+    <table role="presentation" width="100%" class="shell" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#f4f7fb;">
         <tr>
-            <td align="center">
+            {{-- El espacio va en la celda y en línea: muchos clientes de correo ignoran el padding de <table> y de <style>. --}}
+            <td align="center" class="shell-cell" style="padding:48px 16px 56px;">
                 <table role="presentation" width="100%" class="card-wrap" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                         <td align="center">
