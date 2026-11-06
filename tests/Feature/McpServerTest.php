@@ -226,7 +226,9 @@ class McpServerTest extends TestCase
         $redirect = 'https://claude.ai/api/mcp/auth_callback';
 
         $client = $this->postJson('/oauth/register', ['client_name' => 'Claude', 'redirect_uris' => [$redirect]])->assertSuccessful()->json();
+        \Illuminate\Support\Facades\Log::spy();
         $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://claude.ai.atacante.test/cb']])->assertStatus(400);
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')->withArgs(fn ($msg, $ctx) => $msg === 'Registro OAuth del MCP rechazado' && $ctx['redirect_uris'] === ['https://claude.ai.atacante.test/cb']);
         $this->postJson('/oauth/register', ['client_name' => 'Gemini', 'redirect_uris' => ['https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-abc123']])->assertSuccessful();
         $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://oauth-redirect.googleusercontent.com.atacante.test/r/x']])->assertStatus(400);
 
