@@ -505,4 +505,121 @@ class McpServerTest extends TestCase
         $this->assertStringContainsString('Branding Sol', $text);
         $this->assertStringContainsString('Olvidado', $text);
     }
+
+    public function test_guides_are_available_as_tool_and_prompt(): void
+    {
+        $token = $this->token();
+        $guide = $this->tool('ver_guia', ['tema' => 'planear-proyecto'], $token)['text'];
+        $this->assertStringContainsString('Planear proyecto', $guide);
+        $this->assertStringContainsString('Wireframes', $guide);
+        $this->assertStringContainsString('Brief creativo', $this->tool('ver_guia', ['tema' => 'necesito armar el brief del cliente'], $token)['text']);
+
+        $prompts = $this->rpc('prompts/list', [], $token)->assertOk()->json('result.prompts');
+        $this->assertContains('guia_indigo', array_column($prompts, 'name'));
+        $messages = $this->rpc('prompts/get', ['name' => 'guia_indigo', 'arguments' => ['guia' => 'leads', 'pedido' => 'ordena mis leads']], $token)->assertOk()->json('result.messages');
+        $text = json_encode($messages, JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('Clasificar y mover leads', $text);
+        $this->assertStringContainsString('ordena mis leads', $text);
+    }
+
+    public function test_creates_full_project_and_rejects_duplicates(): void
+    {
+        // El almacenamiento recupera datos de respaldo si el archivo está vacío; un registro lo evita.
+        Storage::disk('local')->put('proyectos.json', json_encode([['id' => 'p0', 'titulo' => 'Otro proyecto', 'tareas' => []]]));
+        $token = $this->token();
+        $res = $this->tool('crear_proyecto', [
+            'titulo' => 'Web Laurel', 'cliente_id' => 'c1', 'descripcion' => 'Sitio corporativo',
+            'tareas' => [
+                ['titulo' => 'Brief y referencias', 'columna' => 'Por hacer', 'descripcion' => 'Reunión inicial', 'subtareas' => ['Cuestionario', 'Accesos']],
+                ['titulo' => 'Wireframes de home', 'columna' => 'En proceso'],
+            ],
+        ], $token);
+        $this->assertFalse($res['error'], $res['text']);
+
+        $project = collect((new FileStore('proyectos.json'))->all())->firstWhere('titulo', 'Web Laurel');
+        $this->assertSame(['Por hacer', 'En proceso', 'Revisión', 'Terminado'], $project['task_stages']);
+        $this->assertCount(2, $project['tareas']);
+        $this->assertCount(2, $project['tareas'][0]['subtasks']);
+        $this->assertSame('En proceso', $project['tareas'][1]['board_stage']);
+
+        $this->assertTrue($this->tool('crear_proyecto', ['titulo' => 'web laurel'], $token)['error']);
+        $this->assertCount(2, (new FileStore('proyectos.json'))->all());
+    }
+
+    public function test_contract_from_template_to_sent(): void
+    {
+        $token = $this->token();
+        $res = $this->tool('crear_contrato_desde_plantilla', ['plantilla' => 'sitio_web', 'cliente_id' => 'c1', 'monto' => 4500000], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertStringContainsString('[PLAZO]', $res['text']);
+        $contract = collect((new FileStore('contratos.json'))->all())->first();
+        $this->assertStringContainsString('Café Laurel', $contract['contenido']);
+        $this->assertStringContainsString('COP 4.500.000', $contract['contenido']);
+        $this->assertStringNotContainsString('[CLIENTE]', $contract['contenido']);
+
+        $res = $this->tool('completar_contrato', ['contrato_id' => $contract['id'], 'datos' => ['[PLAZO]' => '8 semanas', 'DOMINIO' => 'cafelaurel.co']], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $contract = (new FileStore('contratos.json'))->find($contract['id']);
+        $this->assertStringContainsString('8 semanas', $contract['contenido']);
+        $this->assertStringContainsString('cafelaurel.co', $contract['contenido']);
+        $this->assertStringContainsString('Datos pendientes:', $this->tool('ver_contrato', ['contrato_id' => $contract['id']], $token)['text']);
+
+        $prev = $this->tool('preparar_envio_contrato', ['contrato_id' => $contract['id']], $token)['text'];
+        $this->assertStringContainsString('laura@laurel.test', $prev);
+        Mail::assertNothingSent();
+        preg_match('/confirmación: (\w{3}-\w{3})/', $prev, $m);
+        $res = $this->tool('confirmar_accion', ['codigo' => $m[1]], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertSame('Enviado', (new FileStore('contratos.json'))->find($contract['id'])['estado']);
+        Mail::assertSent(\App\Mail\GenericMail::class, fn ($mail) => $mail->hasTo('laura@laurel.test') && ($mail->attachment['mime'] ?? '') === 'application/pdf');
+        $this->assertStringContainsString('Enlace del cliente', $this->tool('ver_contrato', ['contrato_id' => $contract['id']], $token)['text']);
+
+        $this->assertTrue($this->tool('crear_contrato_desde_plantilla', ['plantilla' => 'nda', 'cliente_id' => 'c1'], $this->token('lectura'))['error']);
+    }
+
+    public function test_reminders_with_categories_lists_and_edits(): void
+    {
+        $token = $this->token();
+        $this->assertFalse($this->tool('organizar_recordatorios', ['accion' => 'crear_categoria', 'nombre' => 'Espadas'], $token)['error']);
+        $this->assertFalse($this->tool('crear_recordatorio', ['texto' => 'Black Friday', 'categoria' => 'Espadas', 'prioridad' => 'Urgente', 'fecha' => now()->addDays(3)->toDateString()], $token)['error']);
+        $this->assertFalse($this->tool('crear_recordatorio', ['texto' => 'Ideas de ventas', 'categoria' => 'Variado', 'lista' => 'Ideas'], $token)['error']);
+
+        $view = $this->tool('ver_recordatorios', [], $token)['text'];
+        $this->assertMatchesRegularExpression('/Espadas \(1\):\n- \[ \] Black Friday/', $view);
+        $this->assertStringContainsString('Variado › Ideas (1)', $view);
+        $this->assertStringNotContainsString('Ideas de ventas', $this->tool('ver_recordatorios', ['categoria' => 'Espadas'], $token)['text']);
+
+        preg_match('/Black Friday.*recordatorio_id: (\w+)/', $view, $m);
+        $res = $this->tool('editar_recordatorio', ['recordatorio_id' => $m[1], 'texto' => 'Campaña Black Friday', 'fecha' => '', 'categoria' => 'Variado', 'lista' => 'Ideas'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $view = $this->tool('ver_recordatorios', [], $token)['text'];
+        $this->assertStringContainsString('Variado › Ideas (2)', $view);
+        $this->assertStringContainsString('Campaña Black Friday · Urgente', $view);
+
+        $this->assertFalse($this->tool('organizar_recordatorios', ['accion' => 'renombrar_categoria', 'nombre' => 'Variado', 'nuevo_nombre' => 'General'], $token)['error']);
+        $this->assertStringContainsString('General › Ideas (2)', $this->tool('ver_recordatorios', [], $token)['text']);
+        $this->assertTrue($this->tool('organizar_recordatorios', ['accion' => 'crear_categoria', 'nombre' => 'espadas'], $token)['error']);
+    }
+
+    public function test_lists_tasks_across_projects(): void
+    {
+        Storage::disk('local')->put('proyectos.json', json_encode([
+            ['id' => 'p1', 'titulo' => 'Web Laurel', 'tareas' => [
+                ['id' => 't1', 'texto' => 'Logo final', 'done' => false, 'due_date' => now()->subDay()->toDateString(), 'owners' => ['Laura Diseño'], 'board_stage' => 'En proceso'],
+                ['id' => 't2', 'texto' => 'Manual', 'done' => false, 'due_date' => now()->addDays(3)->toDateString(), 'board_stage' => 'Por hacer'],
+                ['id' => 't3', 'texto' => 'Brief', 'done' => true, 'board_stage' => 'Terminado'],
+            ]],
+            ['id' => 'p2', 'titulo' => 'Archivado', 'archived' => true, 'tareas' => [['id' => 't9', 'texto' => 'Vieja', 'done' => false]]],
+        ]));
+        $token = $this->token();
+
+        $pending = $this->tool('listar_tareas', [], $token)['text'];
+        $this->assertStringContainsString('Logo final', $pending);
+        $this->assertStringNotContainsString('Brief', $pending);
+        $this->assertStringNotContainsString('Vieja', $pending);
+        $this->assertStringContainsString('tarea_id: t1', $this->tool('listar_tareas', ['estado' => 'vencidas'], $token)['text']);
+        $this->assertStringNotContainsString('Manual', $this->tool('listar_tareas', ['estado' => 'vencidas'], $token)['text']);
+        $this->assertStringContainsString('Manual', $this->tool('listar_tareas', ['vencen_en_dias' => 7], $token)['text']);
+        $this->assertStringContainsString('Logo final', $this->tool('listar_tareas', ['responsable' => 'laura'], $token)['text']);
+    }
 }

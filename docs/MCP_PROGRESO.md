@@ -9,10 +9,18 @@
 - Dominios de redirección OAuth permitidos en `config/mcp.php` (Claude, ChatGPT, Google/Gemini incluidos sus hosts sandbox y test, localhost).
 - Si una app es rechazada al registrarse por OAuth, `LogRejectedOAuthRegistration` deja el motivo en `storage/logs/laravel.log`.
 
-### Herramientas (43, contando confirmar_accion)
+### Herramientas (52, contando confirmar_accion)
 - Lectura: `resumen_negocio`, `resumen_semanal`, `buscar_clientes`, `ver_cliente`, `listar_leads`, `ver_lead`, `buscar_facturas`, `ver_factura`, `listar_gastos` (solo con permiso de gastos), `listar_proyectos`, `ver_proyecto`, `ver_tarea`, `agenda_reuniones`, `buscar_contratos`, `ver_plantillas_correo`, `listar_notas`, `ver_nota`, `ver_recordatorios`, `ver_cambios_recientes`.
 - Escritura directa: `crear_cliente`, `agregar_nota_cliente`, `crear_lead`, `actualizar_lead`, `convertir_lead_cliente`, `crear_factura_borrador`, `registrar_gasto`, `crear_tarea`, `crear_contrato_borrador`, `actualizar_proyecto`, `actualizar_tarea` (incluye mover de columna y asignar responsables), `agregar_nota_proyecto` (comentarios en tareas), `agregar_subtareas`, `actualizar_subtarea`, `crear_nota`, `editar_nota`, `crear_recordatorio`, `completar_recordatorio`, `restaurar_cambio`.
 - Dos pasos (vista previa + código + `confirmar_accion`): `preparar_correo`, `preparar_envio_factura`, `preparar_pago`, `preparar_reunion` (Meet o llamada con lead o cliente; envía invitación).
+
+### Agregado el 6 de noviembre de 2026
+- Guías de trabajo de Indigo (las mismas skills del agente interno, en `resources/ai-skills`): herramienta `ver_guia` y prompt `guia_indigo`. Las instrucciones del servidor piden consultarlas antes de planear, escribir briefs, propuestas, mensajes, leads o cobros.
+- `crear_proyecto`: tablero completo con columnas, tarjetas, descripciones y subtareas; rechaza nombres duplicados.
+- `listar_tareas`: tareas de todos los proyectos con filtros (pendientes, vencidas, próximos N días, responsable, columna, texto).
+- Contratos: `crear_contrato_desde_plantilla` (plantillas colombianas con datos llenos), `completar_contrato` (llenar [DATOS], se puede restaurar), `ver_contrato` (estado, pendientes, firmas, enlaces de PDF y firma) y `preparar_envio_contrato` (dos pasos con `confirmar_accion`).
+- Recordatorios con categorías y listas: `ver_recordatorios` agrupa por categoría › lista, `crear_recordatorio` acepta categoría y lista, `editar_recordatorio` (texto, fecha, prioridad, mover, hecho) y `organizar_recordatorios` (crear o renombrar categorías y listas; no borra).
+- `maxPaginationLength` y `defaultPaginationLength` en 100: con más de 50 herramientas, laravel/mcp cortaba la lista.
 
 ### Restaurar ediciones de la IA
 - Cada edición del MCP sobre notas, proyectos/tareas/subtareas, leads y recordatorios guarda la versión anterior en `mcp_history.json` (30 días, máx. 500 entradas). Implementación: `app/Mcp/Support/McpHistory.php`.

@@ -131,4 +131,33 @@ class ContractTemplates
             ],
         ];
     }
+
+    /** Reemplaza los datos conocidos del cliente, el valor y la fecha; lo demás queda entre corchetes. */
+    public static function fill(string $html, array $client, string $valor = ''): string
+    {
+        $values = [
+            '[CLIENTE]' => $client['empresa'] ?? ($client['nombre'] ?? ''),
+            '[NIT CLIENTE]' => $client['nit'] ?? '',
+            '[REPRESENTANTE CLIENTE]' => $client['contacto_nombre'] ?? '',
+            '[CIUDAD CLIENTE]' => $client['ciudad'] ?? '',
+            '[CORREO CLIENTE]' => $client['contacto_email'] ?? ($client['email'] ?? ''),
+            '[VALOR]' => $valor,
+            '[FECHA]' => now()->setTimezone('America/Bogota')->locale('es')->translatedFormat('j \d\e F \d\e Y'),
+        ];
+        foreach ($values as $token => $value) {
+            if (trim((string) $value) !== '') {
+                $html = str_replace($token, e((string) $value), $html);
+            }
+        }
+
+        return $html;
+    }
+
+    /** Datos entre corchetes que siguen sin llenar. */
+    public static function pending(string $html): array
+    {
+        preg_match_all('/\[[A-ZÁÉÍÓÚÑ0-9][^\[\]<>]{1,80}\]/u', strip_tags($html), $m);
+
+        return array_values(array_unique($m[0] ?? []));
+    }
 }

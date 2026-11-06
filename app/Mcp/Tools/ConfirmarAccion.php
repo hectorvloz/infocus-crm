@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 
 #[Name('confirmar_accion')]
-#[Description('Ejecuta una acción preparada (enviar correo, enviar factura, registrar pago o programar reunión) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
+#[Description('Ejecuta una acción preparada (enviar correo, enviar factura, registrar pago, programar reunión o enviar contrato) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
 #[IsDestructive]
 class ConfirmarAccion extends InfocusTool
 {
@@ -39,6 +39,7 @@ class ConfirmarAccion extends InfocusTool
             'enviar_factura' => $this->sendInvoice($p, $ctx),
             'registrar_pago' => $this->registerPayment($p, $ctx),
             'programar_reunion' => $this->scheduleMeeting($p, $ctx),
+            'enviar_contrato' => $this->sendContract($p, $ctx),
             default => Response::error('Acción desconocida.'),
         };
     }
@@ -99,5 +100,22 @@ class ConfirmarAccion extends InfocusTool
             . (!empty($item['meet_link']) ? " · Meet: {$item['meet_link']}" : '')
             . (!empty($item['meet_error']) ? " · Aviso: {$item['meet_error']}" : '')
             . '. Se enviaron las invitaciones a los correos de la vista previa.');
+    }
+
+    private function sendContract(array $p, McpContext $ctx): Response
+    {
+        $ctx->allow('contratos.update', write: true);
+        $contract = $this->store('contratos.json')->find((string) ($p['contrato_id'] ?? ''));
+        if (!$contract) {
+            return Response::error('No encontré el contrato.');
+        }
+        try {
+            $email = (new \App\Support\ContractDocuments())->sendToClient($contract);
+        } catch (\RuntimeException $e) {
+            return Response::error($e->getMessage());
+        }
+        $contract = $this->store('contratos.json')->find($contract['id']);
+
+        return Response::text("Contrato publicado y enviado a {$email} con el PDF adjunto. Enlace del cliente para firmar: " . \App\Support\ContractDocuments::publicUrl($contract));
     }
 }

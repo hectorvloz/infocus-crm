@@ -24,6 +24,8 @@ class CrearRecordatorio extends InfocusTool
             'prioridad' => $schema->string()->enum(['Con calma', 'Atención', 'Urgente']),
             'proyecto_id' => $schema->string()->description('Opcional: vincula el recordatorio a un proyecto.'),
             'tarea_id' => $schema->string()->description('Opcional (con proyecto_id): vincula a una tarea.'),
+            'categoria' => $schema->string()->description('Opcional: categoría (ej. Espadas). Se crea si no existe.'),
+            'lista' => $schema->string()->description('Opcional: lista dentro de la categoría. Se crea si no existe.'),
         ];
     }
 
@@ -33,6 +35,7 @@ class CrearRecordatorio extends InfocusTool
         $d = $request->validate([
             'texto' => 'required|string|max:500', 'fecha' => 'nullable|date_format:Y-m-d',
             'prioridad' => 'nullable|in:Con calma,Atención,Urgente', 'proyecto_id' => 'nullable|string', 'tarea_id' => 'nullable|string',
+            'categoria' => 'nullable|string|max:120', 'lista' => 'nullable|string|max:120',
         ]);
 
         $link = null;
@@ -49,9 +52,10 @@ class CrearRecordatorio extends InfocusTool
         $payload = Reminders::payload();
         $now = now()->valueOf();
         $payload['items'] = array_values($payload['items'] ?? []);
+        $sectionId = Reminders::targetSection($payload, $d['categoria'] ?? null, $d['lista'] ?? null);
         array_unshift($payload['items'], [
             'id' => (string) Str::ulid(),
-            'sectionId' => $payload['sections'][0]['id'] ?? 'default',
+            'sectionId' => $sectionId,
             'text' => $d['texto'],
             'done' => false,
             'priority' => $d['prioridad'] ?? '',
@@ -67,6 +71,8 @@ class CrearRecordatorio extends InfocusTool
             return Response::error('No se pudo guardar el recordatorio.');
         }
 
-        return Response::text('Recordatorio creado' . (!empty($d['fecha']) ? " para el {$d['fecha']}" : '') . ': ' . $d['texto'] . '. Si tienes Infocus abierto, aparece al volver a la pestaña.');
+        $place = Reminders::placeOf($payload, ['sectionId' => $sectionId]);
+
+        return Response::text('Recordatorio creado en ' . $place . (!empty($d['fecha']) ? " para el {$d['fecha']}" : '') . ': ' . $d['texto'] . '. Si tienes Infocus abierto, aparece al volver a la pestaña.');
     }
 }
