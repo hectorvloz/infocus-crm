@@ -149,6 +149,30 @@ class LeadsWebhookTest extends TestCase
         config(['services.leads_webhook.notify' => null]);
         $this->send($this->payload)->assertStatus(201);
 
+        Mail::assertNotSent(GenericMail::class, fn ($m) => str_contains($m->subjectLine, 'Nuevo lead'));
+    }
+
+    public function test_lead_gets_a_branded_confirmation_in_colombian_time(): void
+    {
+        Mail::fake();
+        config(['services.leads_webhook.notify' => null]);
+        $this->send($this->payload)->assertStatus(201);
+
+        Mail::assertSent(GenericMail::class, fn ($m) => $m->hasTo('laura@ejemplo.com')
+            && str_contains($m->subjectLine, 'Tu asesoría con Indigo quedó agendada')
+            && str_contains($m->subjectLine, '10:30 a. m.')
+            && str_contains($m->content, 'https://meet.google.com/abc-defg-hij')
+            && str_contains($m->content, 'Laura'));
+    }
+
+    public function test_no_confirmation_without_meeting(): void
+    {
+        Mail::fake();
+        config(['services.leads_webhook.notify' => null]);
+        $payload = $this->payload;
+        unset($payload['reunion']);
+        $this->send($payload)->assertStatus(201);
+
         Mail::assertNothingSent();
     }
 }

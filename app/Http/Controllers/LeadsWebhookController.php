@@ -75,6 +75,7 @@ class LeadsWebhookController extends Controller
                 'notas' => $nota['texto'],
             ], fn ($v) => $v !== null));
             $this->notify($updated ?: $lead, $data, $agendaItem, false);
+            $this->confirmToLead($data, $agendaItem);
 
             return response()->json(['ok' => true, 'lead_id' => $updated['id'] ?? $lead['id'], 'nuevo' => false]);
         }
@@ -94,8 +95,46 @@ class LeadsWebhookController extends Controller
         ]);
 
         $this->notify($created, $data, $agendaItem, true);
+        $this->confirmToLead($data, $agendaItem);
 
         return response()->json(['ok' => true, 'lead_id' => $created['id'], 'nuevo' => true], 201);
+    }
+
+    /**
+     * Confirmación con la marca de Indigo para quien agendó (además de la invitación de Google Calendar).
+     * El asunto y el cuerpo se pueden personalizar en settings con template_lead_asesoria_subject/body.
+     */
+    private function confirmToLead(array $data, ?array $meeting): void
+    {
+        if (!$meeting) {
+            return;
+        }
+        $settings = (new FileStore('settings.json'))->find('settings') ?: [];
+        $start = Carbon::parse($meeting['fecha_hora'])->setTimezone('America/Bogota')->locale('es');
+        $end = $start->copy()->addMinutes((int) $meeting['duracion_min']);
+        $meet = (string) ($meeting['meet_link'] ?? '');
+        $vars = [
+            '{nombre}' => e(Str::of($data['nombre'])->trim()->explode(' ')->first()),
+            '{marca}' => e((string) ($data['marca'] ?? '')),
+            '{fecha}' => $start->translatedFormat('l j \\d\\e F'),
+            '{hora}' => $start->format('g:i') . ' ' . ($start->format('A') === 'AM' ? 'a. m.' : 'p. m.') . ' – ' . $end->format('g:i') . ' ' . ($end->format('A') === 'AM' ? 'a. m.' : 'p. m.'),
+            '{duracion}' => (string) $meeting['duracion_min'],
+            '{meet_url}' => e($meet),
+            '{meet_button}' => $meet !== '' ? '<a href="' . e($meet) . '" target="_blank" rel="noopener" style="display:inline-block;padding:14px 26px;border-radius:9999px;background:#F1C844;color:#050505;font-size:15px;font-weight:800;text-decoration:none;">Entrar a la reunión</a>' : '',
+        ];
+        $subject = (string) ($settings['template_lead_asesoria_subject'] ?? 'Tu asesoría con Indigo quedó agendada · {fecha}, {hora}');
+        $body = (string) ($settings['template_lead_asesoria_body'] ?? '<p>Hola <strong>{nombre}</strong>,</p>'
+            . '<p>Qué bueno que agendaste tu asesoría web gratis con Indigo. Ya te estamos esperando.</p>'
+            . '<p><strong>Cuándo:</strong> {fecha}<br><strong>Hora:</strong> {hora} (hora de Colombia)<br><strong>Duración:</strong> {duracion} minutos por Google Meet</p>'
+            . '<p>{meet_button}</p>'
+            . '<p>En la reunión te contamos qué tipo de web le conviene a tu marca, cuánto cuesta y por dónde empezar. No tienes que preparar nada; si tienes referencias o ideas, tráelas.</p>'
+            . '<p>También te llegó la invitación de Google Calendar: acéptala para tenerla en tu agenda. Si necesitas cambiar la hora, responde este correo.</p>'
+            . '<p>Nos vemos pronto,<br><strong>Equipo Indigo</strong></p>');
+
+        TemplateMail::send(Str::lower(trim($data['email'])), strtr($subject, array_map('strip_tags', $vars)), strtr($body, $vars), [
+            'source' => 'webhook_leads_confirmacion',
+            'sent_by_name' => 'Infocus (confirmación de asesoría)',
+        ]);
     }
 
     /** Aviso por correo al equipo. Si el correo falla, el lead igual queda guardado. */
