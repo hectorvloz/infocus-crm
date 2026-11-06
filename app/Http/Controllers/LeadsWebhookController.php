@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
+use App\Support\TemplateMail;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -73,6 +74,7 @@ class LeadsWebhookController extends Controller
                 'notas_lista' => array_merge($lead['notas_lista'] ?? [], [$nota]),
                 'notas' => $nota['texto'],
             ], fn ($v) => $v !== null));
+            $this->notify($updated ?: $lead, $data, $agendaItem, false);
 
             return response()->json(['ok' => true, 'lead_id' => $updated['id'] ?? $lead['id'], 'nuevo' => false]);
         }
@@ -91,7 +93,40 @@ class LeadsWebhookController extends Controller
             'agenda' => $agendaItem ? [$agendaItem] : [],
         ]);
 
+        $this->notify($created, $data, $agendaItem, true);
+
         return response()->json(['ok' => true, 'lead_id' => $created['id'], 'nuevo' => true], 201);
+    }
+
+    /** Aviso por correo al equipo. Si el correo falla, el lead igual queda guardado. */
+    private function notify(array $lead, array $data, ?array $meeting, bool $isNew): void
+    {
+        $to = array_values(array_filter(array_map('trim', explode(',', (string) config('services.leads_webhook.notify')))));
+        if (!$to) {
+            return;
+        }
+
+        $when = $meeting ? Carbon::parse($meeting['fecha_hora'])->setTimezone('America/Bogota')->locale('es')->translatedFormat('l j \\d\\e F, g:i a') : null;
+        $rows = array_filter([
+            'Nombre' => $data['nombre'],
+            'Marca' => $data['marca'] ?? null,
+            'Correo' => $data['email'],
+            'WhatsApp' => $data['telefono'] ?? null,
+            'Busca' => $data['tipo_web'] ?? null,
+            'Origen' => $data['origen'] ?? 'Landing asesoría',
+            'Reunión' => $when,
+            'Meet' => $meeting['meet_link'] ?? null,
+            'Campaña' => !empty($data['utm']) ? collect($data['utm'])->map(fn ($v, $k) => "$k=$v")->implode(' · ') : null,
+        ]);
+        $body = '<p>' . ($isNew ? 'Llegó un lead nuevo a Infocus.' : 'Un lead que ya estaba en Infocus volvió a escribir.') . '</p><table cellpadding="6">'
+            . collect($rows)->map(fn ($v, $k) => '<tr><td><strong>' . e($k) . '</strong></td><td>' . e($v) . '</td></tr>')->implode('')
+            . '</table><p><a href="' . e(url('/leads')) . '">Ver leads en Infocus</a></p>';
+
+        TemplateMail::send($to, ($isNew ? 'Nuevo lead: ' : 'Lead de nuevo: ') . $data['nombre'] . (!empty($data['marca']) ? ' · ' . $data['marca'] : ''), $body, [
+            'source' => 'webhook_leads',
+            'sent_by_name' => 'Infocus (aviso de leads)',
+            'lead_id' => $lead['id'] ?? null,
+        ]);
     }
 
     private function summary(array $data): string

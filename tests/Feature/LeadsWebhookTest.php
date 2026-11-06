@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Repositories\FileStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Mail\GenericMail;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -130,5 +132,23 @@ class LeadsWebhookTest extends TestCase
         $this->assertTrue($ids->contains(fn ($id) => str_starts_with($id, 'lead:')));
         $this->assertFalse($ids->contains('google:evt123'));
         $this->assertTrue($ids->contains('google:otro'));
+    }
+
+    public function test_team_gets_an_email_for_each_lead(): void
+    {
+        Mail::fake();
+        config(['services.leads_webhook.notify' => 'proyecto@estudioindigo.test']);
+        $this->send($this->payload)->assertStatus(201);
+
+        Mail::assertSent(GenericMail::class, fn ($m) => $m->hasTo('proyecto@estudioindigo.test') && str_contains($m->subjectLine, 'Nuevo lead: Laura Gómez · Café Laurel'));
+    }
+
+    public function test_no_email_when_notify_is_not_configured(): void
+    {
+        Mail::fake();
+        config(['services.leads_webhook.notify' => null]);
+        $this->send($this->payload)->assertStatus(201);
+
+        Mail::assertNothingSent();
     }
 }

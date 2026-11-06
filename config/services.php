@@ -52,6 +52,8 @@ return [
     // Webhook para recibir leads desde formularios externos (por ejemplo la landing de asesoría de Indigo).
     'leads_webhook' => [
         'token' => env('LEADS_WEBHOOK_TOKEN'),
+        // Correos (separados por coma) que reciben un aviso por cada lead que llega por el webhook.
+        'notify' => env('LEADS_NOTIFY_EMAIL'),
     ],
 
     'meta' => [
