@@ -1234,6 +1234,8 @@
           if (select.dataset.nativeSelect === '1') return false;
           if ((select.closest('.sm-shell') || select.closest('[data-social-media-header]')) && select.dataset.nativeSelect === '1') return false;
           if (select.closest('.flatpickr-calendar')) return false;
+          // Los selectores ocultos del editor Quill (encabezado, alineación) los maneja Quill.
+          if (select.closest('.ql-toolbar') || select.closest('.ql-container')) return false;
           if (select.multiple || Number(select.size || 1) > 1) return false;
           if (select.classList.contains('hidden') || select.hidden) return false;
           return true;
@@ -7831,6 +7833,10 @@
           'add_project_task',
           'add_project_subtask',
           'add_project_note',
+          'update_project_task',
+          'update_lead',
+          'add_lead_note',
+          'create_lead',
           'create_personal_note',
           'update_personal_note',
           'create_reminder',
@@ -7957,6 +7963,10 @@
           add_project_task: ['Agregar tarea', 'No agregar', 'Agregando...'],
           add_project_subtask: ['Agregar subtarea', 'No agregar', 'Agregando...'],
           add_project_note: ['Agregar nota', 'No agregar', 'Agregando...'],
+          update_project_task: ['Aplicar a la tarea', 'No aplicar', 'Aplicando...'],
+          update_lead: ['Actualizar lead', 'No actualizar', 'Actualizando...'],
+          add_lead_note: ['Agregar nota', 'No agregar', 'Agregando...'],
+          create_lead: ['Crear lead', 'No crear', 'Creando lead...'],
           create_personal_note: ['Crear nota', 'No crear', 'Creando nota...'],
           update_personal_note: ['Actualizar nota', 'No actualizar', 'Actualizando...'],
           create_reminder: ['Crear recordatorio', 'No crear', 'Creando recordatorio...'],
@@ -8353,6 +8363,7 @@
             ? { id: currentProject.client_id, name: currentProject.client_name || '' }
             : ((formClientId || formClientName) ? { id: formClientId, name: formClientName } : null),
           task_id: window.__infocusAiCurrentTask?.id || params.get('open_task') || '',
+          current_lead: window.__infocusAiCurrentLead || null,
         };
 
         if (messageAsksForVisibleContext(messageText)) {
@@ -8509,6 +8520,28 @@
             parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
             parts.push(aiActionLine('Tarea', aiActionField(action, ['task'])));
             parts.push(aiActionList('Subtareas a agregar', f.subtasks || [title], (item) => `- ${String(item).trim()}`));
+            break;
+          case 'update_project_task':
+            parts.push('Actualizar tarea:');
+            parts.push(aiActionLine('Proyecto', aiActionField(action, ['project'])));
+            parts.push(aiActionLine('Tarea', aiActionField(action, ['task', 'task_title'])));
+            parts.push(aiActionLine('Nuevo título', aiActionField(action, ['title'])));
+            parts.push(aiActionLine('Columna', aiActionField(action, ['column', 'stage'])));
+            parts.push(aiActionLine('Descripción', aiActionField(action, ['description'])));
+            parts.push(aiActionLine('Prioridad', aiActionField(action, ['priority'])));
+            parts.push(aiActionLine('Vencimiento', aiActionField(action, ['due_date', 'date'])));
+            break;
+          case 'update_lead':
+          case 'add_lead_note':
+          case 'create_lead':
+            parts.push(action.type === 'create_lead' ? 'Nuevo lead:' : (action.type === 'add_lead_note' ? 'Nota de lead:' : 'Actualizar lead:'));
+            parts.push(aiActionLine('Lead', aiActionField(action, ['lead', 'name'])));
+            parts.push(aiActionLine('Etapa', aiActionField(action, ['stage'])));
+            parts.push(aiActionLine('Correo', aiActionField(action, ['email'])));
+            parts.push(aiActionLine('Teléfono', aiActionField(action, ['phone'])));
+            parts.push(aiActionLine('Presupuesto', aiActionField(action, ['budget'])));
+            parts.push(aiActionLine('Recordatorio', aiActionField(action, ['reminder'])));
+            parts.push(aiActionLine('Nota', aiActionField(action, ['note'])));
             break;
           case 'add_project_note':
             parts.push('Nota de proyecto:');
@@ -8727,6 +8760,13 @@
           await revealAssistantMessage(thinking, json.message?.content || 'No recibí respuesta.', {
             actions: json.message?.actions || [],
           });
+          const usedSkills = Array.isArray(json.message?.skills) ? json.message.skills.filter(Boolean) : [];
+          if (usedSkills.length && thinking) {
+            const caption = document.createElement('div');
+            caption.style.cssText = 'margin-top:8px;font-size:11px;font-weight:600;color:#94a3b8;';
+            caption.textContent = `Guía de trabajo: ${usedSkills.join(' · ')}`;
+            thinking.appendChild(caption);
+          }
           loadHistory();
         } catch (error) {
           userBubble.remove();
@@ -8794,7 +8834,8 @@
 
         const thinking = appendThinkingMessage();
         const actionContext = pageContext(proposal);
-        if (structuredAction?.type === 'create_invoice_draft') {
+        // La acción estructurada (tipo + campos con IDs) es la fuente de verdad al ejecutar.
+        if (structuredAction?.type) {
           actionContext.structured_action = structuredAction;
         }
         const confirmLabels = aiConfirmLabels(proposal);

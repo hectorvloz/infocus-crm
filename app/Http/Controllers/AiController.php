@@ -157,6 +157,7 @@ class AiController extends Controller
             'created_at' => now()->toISOString(),
             'provider' => $result['provider'] ?? null,
             'actions' => $this->normalizeResponseActions($result['actions'] ?? []),
+            'skills' => array_values(array_slice(array_map('strval', (array) ($result['skills'] ?? [])), 0, 3)),
         ];
 
         if ($supportScope !== '') {
@@ -328,6 +329,10 @@ class AiController extends Controller
             'send_email',
             'send_recurring_invoice_early',
             'create_invoice_draft',
+            'update_project_task',
+            'update_lead',
+            'add_lead_note',
+            'create_lead',
         ];
     }
 
@@ -349,6 +354,10 @@ class AiController extends Controller
             'send_email' => 'Enviar correo',
             'send_recurring_invoice_early' => 'Enviar factura',
             'create_invoice_draft' => 'Crear borrador',
+            'update_project_task' => 'Aplicar a la tarea',
+            'update_lead' => 'Actualizar lead',
+            'add_lead_note' => 'Agregar nota al lead',
+            'create_lead' => 'Crear lead',
             default => 'Ejecutar acción',
         };
     }
@@ -522,6 +531,7 @@ class AiController extends Controller
         $allowedStores = [
             'proyectos' => 'proyectos.json',
             'mis_notas' => 'mis_notas.json',
+            'leads' => 'leads.json',
         ];
 
         if ($id === '' || !isset($allowedStores[$storeName]) || !in_array($operation, ['restore', 'delete'], true)) {

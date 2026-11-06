@@ -54,6 +54,12 @@ class AiActionExecutor
         if (($context['structured_action']['type'] ?? '') === 'create_invoice_draft') {
             return $this->withActionLog($this->createInvoiceDraft((array) ($context['structured_action']['fields'] ?? []), $text), 'factura');
         }
+        // Acciones de proyecto con datos estructurados (IDs exactos): no dependen de interpretar el texto.
+        $structured = $this->executeStructuredProjectAction((array) ($context['structured_action'] ?? []));
+        if ($structured !== null) {
+            return $structured;
+        }
+
         $intent = $this->resolveProposalIntent($text, $normalized);
 
         if ($intent === 'note_update') {
@@ -3039,6 +3045,380 @@ class AiActionExecutor
         ];
     }
 
+    // ---------------------------------------------------------------------
+    // Acciones estructuradas de proyectos
+    // ---------------------------------------------------------------------
+
+    private function executeStructuredProjectAction(array $action): ?array
+    {
+        $type = (string) ($action['type'] ?? '');
+        $fields = (array) ($action['fields'] ?? []);
+
+        return match ($type) {
+            'update_project_task' => $this->withActionLog($this->structuredUpdateTask($fields), 'tarea'),
+            'add_project_task' => $this->structuredHasTasks($fields) ? $this->withActionLog($this->structuredAddTasks($fields), 'tarea') : null,
+            'add_project_subtask' => $this->structuredList($fields, ['subtasks', 'items']) ? $this->withActionLog($this->structuredAddSubtasks($fields), 'subtarea') : null,
+            'add_project_note' => trim((string) ($fields['note'] ?? $fields['content'] ?? $fields['text'] ?? '')) !== '' ? $this->withActionLog($this->structuredAddNote($fields), 'nota de proyecto') : null,
+            'update_lead' => $this->withActionLog($this->structuredUpdateLead($fields, false), 'lead'),
+            'add_lead_note' => $this->withActionLog($this->structuredUpdateLead($fields, true), 'lead'),
+            'create_lead' => $this->withActionLog($this->structuredCreateLead($fields), 'lead'),
+            default => null,
+        };
+    }
+
+    private function structuredProject(array $fields): ?array
+    {
+        $id = trim((string) ($fields['project_id'] ?? ''));
+        if ($id !== '') {
+            $project = $this->projects->find($id);
+            if ($project && $this->canUseProject($project)) {
+                return $project;
+            }
+        }
+        $name = trim((string) ($fields['project'] ?? $fields['project_name'] ?? ''));
+        if ($name !== '') {
+            $project = $this->matchProject($name);
+            if ($project) {
+                return $project;
+            }
+        }
+        $contextId = trim((string) (data_get($this->context, 'current_project.id') ?: data_get($this->context, 'project_id', '')));
+        if ($contextId !== '') {
+            $project = $this->projects->find($contextId);
+            if ($project && $this->canUseProject($project)) {
+                return $project;
+            }
+        }
+
+        return null;
+    }
+
+    /** Busca la tarea por ID o por nombre; nunca toma "la primera" por descarte. */
+    private function structuredTask(array $project, array $fields): ?array
+    {
+        $tasks = collect($project['tareas'] ?? []);
+        $id = trim((string) ($fields['task_id'] ?? ''));
+        if ($id !== '') {
+            $task = $tasks->firstWhere('id', $id);
+            if ($task) {
+                return $task;
+            }
+        }
+        $name = trim((string) ($fields['task'] ?? $fields['task_title'] ?? ''));
+        if ($name === '' && $id === '') {
+            $current = trim((string) data_get($this->context, 'task_id', ''));
+            return $current !== '' ? $tasks->firstWhere('id', $current) : null;
+        }
+
+        return $name !== '' ? $this->matchTask($project, $name) : null;
+    }
+
+    private function structuredList(array $fields, array $keys): array
+    {
+        foreach ($keys as $key) {
+            $value = $fields[$key] ?? null;
+            if (is_array($value) && $value) {
+                return array_values(array_filter(array_map(fn ($item) => is_array($item) ? (string) ($item['title'] ?? $item['text'] ?? $item['name'] ?? '') : (string) $item, $value), fn ($item) => trim($item) !== ''));
+            }
+            if (is_string($value) && trim($value) !== '') {
+                return array_values(array_filter(array_map('trim', preg_split('/\R/', $value) ?: [])));
+            }
+        }
+
+        return [];
+    }
+
+    private function structuredHasTasks(array $fields): bool
+    {
+        return (is_array($fields['tasks'] ?? null) && $fields['tasks']) || trim((string) ($fields['title'] ?? $fields['task'] ?? '')) !== '';
+    }
+
+    private function projectResult(array $updated, string $title, array $lines, string $actionType, array $taskIds, array $before, string $undoLabel): array
+    {
+        $url = '/proyectos?open_project=' . rawurlencode((string) $updated['id']);
+        $detail = implode("\n", array_map(fn ($line) => '- ' . $line, array_filter($lines)));
+
+        return [
+            'ok' => true,
+            'content' => "✅ **{$title}**\n\n- **Proyecto:** " . ($updated['titulo'] ?? 'Proyecto') . "\n{$detail}\n\n[Abrir tablero]({$url})",
+            'url' => $url,
+            'project_id' => $updated['id'],
+            'project_item' => $updated,
+            'project_action' => ['type' => $actionType, 'project_id' => (string) $updated['id'], 'task_ids' => array_values(array_filter($taskIds))],
+            'undo_action' => $this->restoreUndo('proyectos', (string) $updated['id'], $before, $undoLabel),
+        ];
+    }
+
+    private function structuredUpdateTask(array $fields): array
+    {
+        if (! RoleAccess::can(Auth::user(), 'proyectos.update')) {
+            return $this->failure('Tu usuario no tiene permiso para editar tareas.');
+        }
+        $project = $this->structuredProject($fields);
+        if (!$project) {
+            return $this->failure('No encontré el proyecto de esa tarea. Dime en qué proyecto está.');
+        }
+        $task = $this->structuredTask($project, $fields);
+        if (!$task) {
+            return $this->failure('No encontré esa tarea en "' . ($project['titulo'] ?? 'el proyecto') . '". Dime el nombre exacto de la tarjeta.');
+        }
+
+        $stages = $this->projectTaskStages($project);
+        $changes = [];
+        $labels = [];
+        $title = trim((string) ($fields['title'] ?? ''));
+        if ($title !== '' && $title !== (string) ($task['texto'] ?? '')) {
+            $changes['texto'] = Str::limit($this->normalizeTaskTitle($title), 180, '');
+            $labels[] = 'título';
+        }
+        if (array_key_exists('description', $fields) && trim((string) $fields['description']) !== '') {
+            $html = $this->richDescriptionHtmlFromMarkup((string) $fields['description']);
+            $append = Str::lower((string) ($fields['description_mode'] ?? 'replace')) === 'append';
+            $changes['descripcion'] = $append && trim((string) ($task['descripcion'] ?? '')) !== '' ? $task['descripcion'] . $html : $html;
+            $labels[] = $append ? 'descripción ampliada' : 'descripción';
+        }
+        if (trim((string) ($fields['column'] ?? $fields['stage'] ?? '')) !== '') {
+            $changes['board_stage'] = $this->normalizeTaskStage((string) ($fields['column'] ?? $fields['stage']), $stages);
+            $labels[] = 'columna: ' . $changes['board_stage'];
+        }
+        if (trim((string) ($fields['priority'] ?? '')) !== '') {
+            $changes['priority'] = $this->normalizePriority((string) $fields['priority']);
+            $labels[] = 'prioridad: ' . $changes['priority'];
+        }
+        if (trim((string) ($fields['due_date'] ?? '')) !== '' && ($due = $this->parseDate((string) $fields['due_date']))) {
+            $changes['due_date'] = $due;
+            $changes['end_date'] = $due;
+            $labels[] = 'vencimiento: ' . $due;
+        }
+        if (array_key_exists('done', $fields) && $fields['done'] !== null) {
+            $changes['done'] = filter_var($fields['done'], FILTER_VALIDATE_BOOLEAN);
+            $labels[] = $changes['done'] ? 'marcada como hecha' : 'reabierta';
+        }
+        if (!$changes) {
+            return $this->failure('No vi cambios para aplicar a la tarea. Dime qué quieres cambiar.');
+        }
+
+        $tasks = array_map(fn ($item) => (string) ($item['id'] ?? '') === (string) $task['id'] ? array_merge($item, $changes) : $item, array_values($project['tareas'] ?? []));
+        $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
+
+        return $this->projectResult($updated, 'Tarea actualizada', ['**Tarea:** ' . ($changes['texto'] ?? $task['texto'] ?? ''), '**Cambios:** ' . implode(', ', $labels)], 'task_updated', [(string) $task['id']], $project, 'Deshacer cambios en la tarea');
+    }
+
+    private function structuredAddTasks(array $fields): array
+    {
+        if (! RoleAccess::can(Auth::user(), 'proyectos.create')) {
+            return $this->failure('Tu usuario no tiene permiso para agregar tareas.');
+        }
+        $project = $this->structuredProject($fields);
+        if (!$project) {
+            return $this->failure('No encontré el proyecto donde agregar las tareas. Dime cuál es; no voy a crear un proyecto nuevo sin que lo pidas.');
+        }
+        $drafts = is_array($fields['tasks'] ?? null) && $fields['tasks'] ? $fields['tasks'] : [$fields];
+        $stages = $this->projectTaskStages($project);
+        $tasks = array_values($project['tareas'] ?? []);
+        $created = [];
+        foreach (array_slice($drafts, 0, 30) as $draft) {
+            $draft = is_array($draft) ? $draft : ['title' => (string) $draft];
+            $title = trim((string) ($draft['title'] ?? $draft['task'] ?? $draft['text'] ?? $draft['name'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+            $stage = $this->normalizeTaskStage((string) ($draft['column'] ?? $draft['stage'] ?? $fields['column'] ?? ''), $stages);
+            $order = count(array_filter($tasks, fn ($t) => (string) ($t['board_stage'] ?? 'Por hacer') === $stage));
+            $task = $this->taskPayload(
+                $title,
+                null,
+                $this->parseDate((string) ($draft['due_date'] ?? '')),
+                (string) ($draft['priority'] ?? $fields['priority'] ?? 'Con calma'),
+                [],
+                $stage,
+                $order,
+                $this->richDescriptionHtmlFromMarkup((string) ($draft['description'] ?? ''))
+            );
+            $subtasks = $this->structuredList($draft, ['subtasks']);
+            if ($subtasks) {
+                $task['subtasks'] = $this->subtaskPayloadsFromTextList($subtasks);
+            }
+            $tasks[] = $task;
+            $created[] = $task;
+        }
+        if (!$created) {
+            return $this->failure('No encontré tareas para agregar.');
+        }
+        $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
+        $names = array_map(fn ($t) => $t['texto'] . ' (' . $t['board_stage'] . ')', $created);
+
+        return $this->projectResult($updated, count($created) === 1 ? 'Tarea agregada' : 'Tareas agregadas', ['**Tareas:** ' . implode('; ', $names)], 'task_added', array_column($created, 'id'), $project, 'Deshacer tareas agregadas');
+    }
+
+    private function structuredAddSubtasks(array $fields): array
+    {
+        if (! RoleAccess::can(Auth::user(), 'proyectos.create')) {
+            return $this->failure('Tu usuario no tiene permiso para agregar subtareas.');
+        }
+        $project = $this->structuredProject($fields);
+        $task = $project ? $this->structuredTask($project, $fields) : null;
+        if (!$task) {
+            return $this->failure('No encontré la tarea donde agregar las subtareas. Dime el proyecto y la tarjeta.');
+        }
+        $new = $this->subtaskPayloadsFromTextList($this->structuredList($fields, ['subtasks', 'items']));
+        $tasks = array_map(fn ($item) => (string) ($item['id'] ?? '') === (string) $task['id'] ? array_merge($item, ['subtasks' => array_merge(array_values($item['subtasks'] ?? []), $new)]) : $item, array_values($project['tareas'] ?? []));
+        $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
+
+        return $this->projectResult($updated, count($new) === 1 ? 'Subtarea agregada' : 'Subtareas agregadas', ['**Tarea:** ' . ($task['texto'] ?? ''), '**Subtareas:** ' . implode('; ', array_column($new, 'texto'))], 'task_updated', [(string) $task['id']], $project, 'Deshacer subtareas agregadas');
+    }
+
+    private function structuredAddNote(array $fields): array
+    {
+        if (! RoleAccess::can(Auth::user(), 'proyectos.create')) {
+            return $this->failure('Tu usuario no tiene permiso para agregar notas.');
+        }
+        $project = $this->structuredProject($fields);
+        if (!$project) {
+            return $this->failure('No encontré el proyecto de la nota.');
+        }
+        $task = $this->structuredTask($project, $fields);
+        if (!$task) {
+            return $this->failure('Dime en qué tarjeta quieres dejar la nota.');
+        }
+        $note = $this->notePayload($this->stripMarkdown((string) ($fields['note'] ?? $fields['content'] ?? $fields['text'] ?? '')));
+        $tasks = array_map(fn ($item) => (string) ($item['id'] ?? '') === (string) $task['id'] ? array_merge($item, ['notes' => array_merge(array_values($item['notes'] ?? []), [$note])]) : $item, array_values($project['tareas'] ?? []));
+        $updated = $this->projects->update((string) $project['id'], ['tareas' => $tasks]) ?: $project;
+
+        return $this->projectResult($updated, 'Nota agregada', ['**Tarea:** ' . ($task['texto'] ?? '')], 'task_updated', [(string) $task['id']], $project, 'Deshacer nota');
+    }
+
+    // ----- Leads -----
+
+    private const LEAD_STAGES = ['Posible cliente', 'Contactado', 'Volver a llamar', 'Cliente'];
+
+    private function leadStage(string $value): ?string
+    {
+        $needle = Str::lower(Str::ascii(trim($value)));
+        foreach (self::LEAD_STAGES as $stage) {
+            if (Str::lower(Str::ascii($stage)) === $needle) {
+                return $stage;
+            }
+        }
+
+        return null;
+    }
+
+    private function structuredLead(array $fields): ?array
+    {
+        $store = new FileStore('leads.json');
+        $id = trim((string) ($fields['lead_id'] ?? data_get($this->context, 'current_lead.id', '')));
+        if ($id !== '' && ($lead = $store->find($id))) {
+            return $lead;
+        }
+        $name = Str::lower(Str::ascii(trim((string) ($fields['lead'] ?? $fields['name'] ?? ''))));
+        if ($name === '') {
+            return null;
+        }
+        $matches = collect($store->all())->filter(fn ($lead) => str_contains(Str::lower(Str::ascii((string) ($lead['nombre'] ?? ''))), $name));
+
+        return $matches->count() === 1 ? $matches->first() : null;
+    }
+
+    private function leadResult(array $lead, string $title, array $lines, ?array $before): array
+    {
+        $detail = implode("\n", array_map(fn ($line) => '- ' . $line, array_filter($lines)));
+
+        return [
+            'ok' => true,
+            'content' => "✅ **{$title}**\n\n- **Lead:** " . ($lead['nombre'] ?? 'Lead') . "\n{$detail}\n\n[Abrir leads](/leads)",
+            'url' => '/leads',
+            'undo_action' => $before
+                ? $this->restoreUndo('leads', (string) $lead['id'], $before, 'Deshacer cambios del lead')
+                : $this->deleteUndo('leads', (string) $lead['id'], 'Deshacer lead creado'),
+        ];
+    }
+
+    private function structuredUpdateLead(array $fields, bool $noteOnly): array
+    {
+        if (! RoleAccess::can(Auth::user(), $noteOnly ? 'leads.create' : 'leads.update')) {
+            return $this->failure('Tu usuario no tiene permiso para modificar leads.');
+        }
+        $lead = $this->structuredLead($fields);
+        if (!$lead) {
+            return $this->failure('No encontré ese lead con seguridad. Dime su nombre completo o ábrelo en pantalla.');
+        }
+        $changes = [];
+        $labels = [];
+        if (!$noteOnly) {
+            if (trim((string) ($fields['stage'] ?? '')) !== '') {
+                $stage = $this->leadStage((string) $fields['stage']);
+                if (!$stage) {
+                    return $this->failure('Esa etapa no existe. Usa: ' . implode(', ', self::LEAD_STAGES) . '.');
+                }
+                $changes['etapa'] = $stage;
+                $labels[] = 'etapa: ' . $stage;
+            }
+            foreach (['name' => 'nombre', 'email' => 'email', 'phone' => 'telefono', 'origin' => 'origen'] as $from => $to) {
+                if (trim((string) ($fields[$from] ?? '')) !== '' && !($from === 'name' && empty($fields['lead_id']) && empty($fields['lead']))) {
+                    $changes[$to] = trim((string) $fields[$from]);
+                    $labels[] = $to;
+                }
+            }
+            if (is_numeric($fields['budget'] ?? null)) {
+                $changes['presupuesto_estimado'] = (float) $fields['budget'];
+                $changes['valor'] = (float) $fields['budget'];
+                $labels[] = 'presupuesto';
+            }
+            if (trim((string) ($fields['reminder'] ?? '')) !== '') {
+                $changes['recordatorio'] = trim((string) $fields['reminder']);
+                $labels[] = 'recordatorio: ' . $changes['recordatorio'];
+            }
+        }
+        $note = trim($this->stripMarkdown((string) ($fields['note'] ?? $fields['content'] ?? '')));
+        if ($note !== '') {
+            $changes['notas_lista'] = array_merge($lead['notas_lista'] ?? [], [['id' => (string) Str::ulid(), 'texto' => $note, 'fecha' => now()->toISOString(), 'autor' => (string) (Auth::user()->name ?? 'Infocus AI')]]);
+            $changes['notas'] = $note;
+            $labels[] = 'nota de seguimiento';
+        }
+        if (!$changes) {
+            return $this->failure('No vi cambios para aplicar al lead.');
+        }
+        $updated = (new FileStore('leads.json'))->update((string) $lead['id'], $changes) ?: $lead;
+
+        return $this->leadResult($updated, $noteOnly ? 'Nota agregada al lead' : 'Lead actualizado', ['**Cambios:** ' . implode(', ', $labels)], $lead);
+    }
+
+    private function structuredCreateLead(array $fields): array
+    {
+        if (! RoleAccess::can(Auth::user(), 'leads.create')) {
+            return $this->failure('Tu usuario no tiene permiso para crear leads.');
+        }
+        $name = trim((string) ($fields['name'] ?? ''));
+        if ($name === '') {
+            return $this->failure('Necesito al menos el nombre del lead.');
+        }
+        $store = new FileStore('leads.json');
+        $email = Str::lower(trim((string) ($fields['email'] ?? '')));
+        $dup = collect($store->all())->first(fn ($lead) => ($email !== '' && Str::lower((string) ($lead['email'] ?? '')) === $email)
+            || Str::lower(Str::ascii((string) ($lead['nombre'] ?? ''))) === Str::lower(Str::ascii($name)));
+        if ($dup) {
+            return $this->failure('Ya existe un lead parecido: ' . ($dup['nombre'] ?? '') . '. Si quieres, lo actualizo en vez de crear otro.');
+        }
+        $note = trim($this->stripMarkdown((string) ($fields['note'] ?? '')));
+        $budget = is_numeric($fields['budget'] ?? null) ? (float) $fields['budget'] : null;
+        $lead = $store->create([
+            'nombre' => $name,
+            'email' => $email ?: null,
+            'telefono' => trim((string) ($fields['phone'] ?? '')) ?: null,
+            'etapa' => $this->leadStage((string) ($fields['stage'] ?? '')) ?? 'Posible cliente',
+            'origen' => trim((string) ($fields['origin'] ?? '')) ?: 'Infocus AI',
+            'presupuesto_estimado' => $budget,
+            'valor' => $budget,
+            'encargados' => [],
+            'notas' => $note,
+            'notas_lista' => $note !== '' ? [['id' => (string) Str::ulid(), 'texto' => $note, 'fecha' => now()->toISOString()]] : [],
+            'agenda' => [],
+        ]);
+
+        return $this->leadResult($lead, 'Lead creado', ['**Etapa:** ' . $lead['etapa'], $email ? '**Correo:** ' . $email : ''], null);
+    }
+
     private function failure(string $message): array
     {
         return [
@@ -3128,7 +3508,8 @@ class AiActionExecutor
             'cotización' => 'creó una cotización',
             'contrato' => 'creó un contrato',
             'factura recurrente' => 'envió una factura recurrente',
-            'tarea' => 'agregó una tarea',
+            'tarea' => 'actualizó tareas',
+            'lead' => 'actualizó un lead',
             'subtarea' => 'agregó una subtarea',
             'nota de proyecto', 'nota personal' => 'agregó una nota',
             'recordatorio' => 'creó un recordatorio',

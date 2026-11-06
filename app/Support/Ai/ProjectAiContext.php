@@ -21,8 +21,19 @@ class ProjectAiContext
             }
         }
 
+        // Ordenadas como en el tablero (columna y posición) para que "la primera tarea de X" sea exacta.
+        $stages = array_values(array_filter((array) ($project['task_stages'] ?? []), 'is_string'));
+        usort($tasks, function ($a, $b) use ($stages) {
+            $sa = array_search((string) ($a['board_stage'] ?? 'Por hacer'), $stages, true);
+            $sb = array_search((string) ($b['board_stage'] ?? 'Por hacer'), $stages, true);
+            $sa = $sa === false ? 999 : $sa;
+            $sb = $sb === false ? 999 : $sb;
+
+            return [$sa, (int) ($a['board_order'] ?? 0)] <=> [$sb, (int) ($b['board_order'] ?? 0)];
+        });
+
         $lines = [
-            'Proyecto abierto: ' . $this->text($project['titulo'] ?? 'Proyecto', 180),
+            'Proyecto abierto: ' . $this->text($project['titulo'] ?? 'Proyecto', 180) . ' (project_id: ' . (string) ($project['id'] ?? '') . ')',
             'Cliente: ' . $this->text($project['cliente'] ?? 'Sin cliente', 120),
             'Estado: ' . $this->text($project['etapa'] ?? 'Sin estado', 80),
             'Prioridad: ' . $this->text($project['prioridad'] ?? 'Sin prioridad', 80),
@@ -32,17 +43,22 @@ class ProjectAiContext
         ];
 
         if ($selected) {
-            $lines[] = 'Tarjeta abierta: ' . $this->text($selected['texto'] ?? 'Tarjeta', 180);
+            $lines[] = 'Tarjeta abierta: ' . $this->text($selected['texto'] ?? 'Tarjeta', 180) . ' (task_id: ' . (string) ($selected['id'] ?? '') . ', columna: ' . $this->text($selected['board_stage'] ?? 'Por hacer', 60) . ')';
             $lines[] = 'Contenido de la tarjeta abierta: ' . $this->taskDetails($selected, 3000);
         }
 
-        $lines[] = 'Otras tarjetas y tareas del proyecto (' . count($tasks) . ' en total):';
-        foreach (array_slice($tasks, 0, 40) as $task) {
+        $lines[] = 'Tarjetas del proyecto en orden de tablero (' . count($tasks) . ' en total). Formato: [columna #posición] título (task_id) | detalles:';
+        $positions = [];
+        foreach (array_slice($tasks, 0, 60) as $task) {
+            $stage = (string) ($task['board_stage'] ?? 'Por hacer');
+            $positions[$stage] = ($positions[$stage] ?? 0) + 1;
             if ($selected && (string) ($task['id'] ?? '') === (string) ($selected['id'] ?? '')) {
                 continue;
             }
-            $lines[] = '- ' . $this->text($task['texto'] ?? 'Tarjeta', 180)
-                . ' | ' . $this->taskDetails($task, 550);
+            $lines[] = '- [' . $this->text($stage, 60) . ' #' . $positions[$stage] . '] ' . $this->text($task['texto'] ?? 'Tarjeta', 180)
+                . ' (task_id: ' . (string) ($task['id'] ?? '') . ')'
+                . (!empty($task['done']) ? ' · hecha' : '')
+                . ' | ' . $this->taskDetails($task, 450);
         }
 
         return mb_substr(implode("\n", $lines), 0, 14000);

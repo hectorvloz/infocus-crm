@@ -15,6 +15,9 @@ class AiService
     ) {
     }
 
+    /** @var array<int, array<string, mixed>> */
+    private array $activeSkills = [];
+
     public function reply(string $message, array $history = [], array $context = [], array $images = []): array
     {
         $settings = $this->settings();
@@ -48,6 +51,7 @@ class AiService
                 'content' => $this->filter->cleanText($structured['content']),
                 'provider' => $settings['provider'] ?? null,
                 'actions' => $structured['actions'],
+                'skills' => array_values(array_map(fn ($s) => $s['title'], array_filter($this->activeSkills, fn ($s) => !$s['always']))),
             ];
         } catch (\Throwable $exception) {
             report($exception);
@@ -190,8 +194,11 @@ class AiService
 
     private function buildMessages(string $message, array $history, array $context, array $settings, array $images = []): array
     {
+        $path = (string) (parse_url((string) data_get($context, 'url', ''), PHP_URL_PATH) ?: '');
+        $this->activeSkills = AiSkills::select($message, $path);
+        $skillsBlock = AiSkills::promptBlock($this->activeSkills);
         $messages = [
-            ['role' => 'system', 'content' => $this->buildSystemPrompt($settings)],
+            ['role' => 'system', 'content' => $this->buildSystemPrompt($settings) . ($skillsBlock !== '' ? "\n\n" . $skillsBlock : '')],
         ];
 
         $recentHistory = array_slice($history, -12);
@@ -317,6 +324,10 @@ class AiService
             'start_pomodoro',
             'create_project',
             'update_project',
+            'update_project_task',
+            'update_lead',
+            'add_lead_note',
+            'create_lead',
             'add_project_task',
             'add_project_subtask',
             'add_project_note',
@@ -338,6 +349,10 @@ class AiService
             'start_pomodoro' => 'Activar pomodoro',
             'create_project' => 'Crear proyecto',
             'update_project' => 'Aplicar cambios',
+            'update_project_task' => 'Aplicar a la tarea',
+            'update_lead' => 'Actualizar lead',
+            'add_lead_note' => 'Agregar nota al lead',
+            'create_lead' => 'Crear lead',
             'add_project_task' => 'Agregar tarea',
             'add_project_subtask' => 'Agregar subtarea',
             'add_project_note' => 'Agregar nota',
@@ -453,6 +468,11 @@ class AiService
 
         if (!empty($safeContextLines)) {
             $parts[] = "Contexto operativo seguro:\n" . implode("\n", $safeContextLines);
+        }
+
+        $screen = $this->screenContext($url, $cleanContext);
+        if ($screen !== '') {
+            $parts[] = $screen;
         }
 
         $permissionContext = $this->permissionContext();
@@ -576,12 +596,29 @@ class AiService
             $sections[] = $this->expenseContext();
         }
 
-        if ($currentProjectContext === '' && (str_contains($normalized, 'proyecto') || str_contains($normalized, 'tarea'))) {
+        $path = (string) (parse_url((string) data_get($context, 'url', ''), PHP_URL_PATH) ?: '');
+        if (preg_match('/proyecto|tablero|tarea|tarjeta|kanban/', $normalized) || ($currentProjectContext === '' && str_starts_with($path, '/proyectos'))) {
             $sections[] = $this->projectContext();
+        }
+
+        if (preg_match('/lead|prospecto|posible cliente|seguimiento|embudo|pipeline/', $normalized) || str_starts_with($path, '/leads') || trim((string) data_get($context, 'current_lead.id', '')) !== '') {
+            $sections[] = $this->leadsContext($message);
         }
 
         if (str_contains($normalized, 'reunion') || str_contains($normalized, 'meet')) {
             $sections[] = $this->meetingContext();
+        }
+
+        // "¿Qué tengo hoy?": agenda, proyectos, leads y cartera para priorizar el día.
+        if (preg_match('/que tengo hoy|resumen del dia|mi dia|por donde empiezo|prioridades de hoy|que hago primero|que tengo pendiente/', $normalized)) {
+            $sections[] = $this->meetingContext();
+            $sections[] = $this->projectContext();
+            if (RoleAccess::can(Auth::user(), 'leads.read')) {
+                $sections[] = $this->leadsContext($message);
+            }
+            if (RoleAccess::can(Auth::user(), 'facturas.read')) {
+                $sections[] = $this->invoiceContext($context, $message);
+            }
         }
 
         if (str_contains($normalized, 'cotizacion') || str_contains($normalized, 'contrato') || str_contains($normalized, 'ingreso') || str_contains($normalized, 'venta')) {
@@ -596,11 +633,41 @@ class AiService
             $sections[] = $this->aiActionLogContext();
         }
 
-        $sections = array_values(array_filter($sections));
+        $sections = array_values(array_unique(array_filter($sections)));
 
         return $sections
             ? "Contexto interno seguro del CRM:\n" . implode("\n\n", $sections)
             : '';
+    }
+
+    private function leadsContext(string $message = ''): string
+    {
+        if (! RoleAccess::can(Auth::user(), 'leads.read')) {
+            return 'Leads: el usuario actual no tiene permiso para consultar leads desde la IA.';
+        }
+        $normalized = Str::lower(Str::ascii($message));
+        $leads = collect((new FileStore('leads.json'))->all())->filter('is_array');
+        $mentioned = $leads->filter(function ($lead) use ($normalized) {
+            $name = Str::lower(Str::ascii(trim((string) ($lead['nombre'] ?? ''))));
+            $first = Str::before($name, ' ');
+
+            return mb_strlen($first) >= 3 && str_contains($normalized, $first);
+        });
+        $list = $mentioned->merge($leads->sortByDesc(fn ($lead) => $this->timestamp($lead['updated_at'] ?? $lead['created_at'] ?? null))->take(15))
+            ->unique('id')->take(20);
+        if ($list->isEmpty()) {
+            return 'Leads: no hay leads registrados.';
+        }
+        $lines = $list->map(function ($lead) {
+            $notes = collect($lead['notas_lista'] ?? [])->take(-2)->pluck('texto')->map(fn ($t) => Str::limit($this->filter->cleanText((string) $t), 120))->implode(' / ');
+
+            return '- ' . ($lead['nombre'] ?? 'Lead') . ' (lead_id: ' . ($lead['id'] ?? '') . ') | Etapa: ' . ($lead['etapa'] ?? '')
+                . ' | ' . ($lead['email'] ?? 'sin correo') . ' | ' . ($lead['telefono'] ?? 'sin teléfono')
+                . ' | Origen: ' . ($lead['origen'] ?? '-') . ' | Presupuesto: ' . ($lead['presupuesto_estimado'] ?? $lead['valor'] ?? '-')
+                . ($notes !== '' ? ' | Últimas notas: ' . $notes : '');
+        })->implode("\n");
+
+        return "Leads (etapas válidas: Posible cliente, Contactado, Volver a llamar, Cliente):\n{$lines}";
     }
 
     private function currentProjectContext(array $context, string $message = ''): string
@@ -739,26 +806,26 @@ class AiService
         $projects = collect((new FileStore('proyectos.json'))->all())
             ->filter(fn ($project) => $this->canSeeProject($project))
             ->sortByDesc(fn ($project) => $this->timestamp($project['updated_at'] ?? $project['created_at'] ?? null))
-            ->take(8)
+            ->reject(fn ($project) => (bool) ($project['archived'] ?? false))
+            ->take(20)
             ->values();
 
         if ($projects->isEmpty()) {
             return 'Proyectos: no hay proyectos registrados.';
         }
 
-        $tasks = collect((new FileStore('tareas.json'))->all());
-        $lines = $projects->map(function ($project) use ($tasks) {
+        $lines = $projects->map(function ($project) {
             $id = (string) ($project['id'] ?? '');
-            $name = (string) ($project['nombre'] ?? $project['name'] ?? $project['titulo'] ?? 'Proyecto');
-            $status = (string) ($project['estado'] ?? $project['stage'] ?? 'Sin estado');
-            $priority = (string) ($project['prioridad'] ?? 'Sin prioridad');
-            $projectTasks = $tasks->filter(fn ($task) => (string) ($task['proyecto_id'] ?? $task['project_id'] ?? '') === $id);
-            $pending = $projectTasks->filter(fn ($task) => ! in_array(Str::lower((string) ($task['estado'] ?? '')), ['completada', 'completado', 'done', 'finalizada'], true))->count();
+            $name = (string) ($project['titulo'] ?? $project['nombre'] ?? $project['name'] ?? 'Proyecto');
+            $status = (string) ($project['etapa'] ?? $project['estado'] ?? 'Sin estado');
+            $client = (string) ($project['cliente'] ?? 'Sin cliente');
+            $tasks = array_filter((array) ($project['tareas'] ?? []), 'is_array');
+            $pending = count(array_filter($tasks, fn ($task) => empty($task['done'])));
 
-            return "- {$name} | Estado: {$status} | Prioridad: {$priority} | Tareas pendientes: {$pending}";
+            return "- {$name} (project_id: {$id}) | Cliente: {$client} | Estado: {$status} | Tareas: " . count($tasks) . " ({$pending} pendientes)";
         })->implode("\n");
 
-        return "Proyectos recientes:\n{$lines}";
+        return "Proyectos existentes (usa su project_id para agregarles tareas; no crees uno nuevo si ya existe):\n{$lines}";
     }
 
     private function recurringInvoiceContext(): string
@@ -1041,6 +1108,72 @@ class AiService
         return $symbol . number_format($amount, 0, ',', '.');
     }
 
+    /**
+     * Qué tiene el usuario en pantalla, resuelto desde el servidor y con sus permisos, para que
+     * "esta factura", "este cliente", "aquí" o un pedido sin módulo se entiendan sin repetir el nombre.
+     */
+    private function screenContext(string $path, array $context): string
+    {
+        $user = Auth::user();
+        $path = '/' . trim($path, '/');
+        $lines = [];
+        $find = fn (string $file, string $id) => (new FileStore($file))->find($id);
+
+        if (preg_match('#^/facturas/([^/]+)(?:/editar)?$#', $path, $m) && $m[1] !== 'crear' && RoleAccess::can($user, 'facturas.read')) {
+            if ($f = $find('facturas.json', $m[1])) {
+                $currency = (string) ($f['moneda'] ?? '');
+                $lines[] = 'Factura ' . ($f['numero'] ?? '') . ' (factura_id: ' . $f['id'] . ') · cliente: ' . ($f['cliente_nombre'] ?? $f['cliente'] ?? '') . ' · estado: ' . ($f['estado'] ?? '')
+                    . ' · total: ' . $this->formatAmount((float) ($f['total'] ?? 0), $currency) . ' · vence: ' . ($f['vencimiento'] ?? 'sin fecha') . ' · [Abrir](/facturas/' . $f['id'] . ')';
+            }
+        } elseif (preg_match('#^/cotizaciones/([^/]+)(?:/editar)?$#', $path, $m) && $m[1] !== 'crear' && RoleAccess::can($user, 'cotizaciones.read')) {
+            if ($q = $find('cotizaciones.json', $m[1])) {
+                $lines[] = 'Cotización ' . ($q['numero'] ?? '') . ' (cotizacion_id: ' . $q['id'] . ') · cliente: ' . ($q['cliente_nombre'] ?? $q['cliente'] ?? '') . ' · estado: ' . ($q['estado'] ?? '') . ' · total: ' . $this->formatAmount((float) ($q['total'] ?? 0), (string) ($q['moneda'] ?? ''));
+            }
+        } elseif (preg_match('#^/clientes/([^/]+)(?:/editar)?$#', $path, $m) && $m[1] !== 'crear' && RoleAccess::can($user, 'clientes.read')) {
+            if ($c = $find('clientes.json', $m[1])) {
+                $lines[] = 'Cliente ' . ($c['empresa'] ?? '') . ' (cliente_id: ' . $c['id'] . ') · contacto: ' . ($c['contacto_nombre'] ?? '') . ' · ' . ($c['contacto_email'] ?? '') . ' · ciudad: ' . ($c['ciudad'] ?? '') . ' · estado: ' . ($c['estado'] ?? '');
+            }
+        } elseif (preg_match('#^/contratos/([^/]+)(?:/editar)?$#', $path, $m) && $m[1] !== 'crear' && RoleAccess::can($user, 'contratos.read')) {
+            if ($k = $find('contratos.json', $m[1])) {
+                $lines[] = 'Contrato "' . ($k['titulo'] ?? '') . '" (contrato_id: ' . $k['id'] . ') · cliente: ' . ($k['cliente_nombre'] ?? '') . ' · estado: ' . ($k['estado'] ?? '');
+            }
+        } elseif (preg_match('#^/leads/([^/]+)/editar$#', $path, $m) && RoleAccess::can($user, 'leads.read')) {
+            if ($l = $find('leads.json', $m[1])) {
+                $lines[] = 'Lead ' . ($l['nombre'] ?? '') . ' (lead_id: ' . $l['id'] . ') · etapa: ' . ($l['etapa'] ?? '') . ' · ' . ($l['email'] ?? '');
+            }
+        }
+
+        $leadId = trim((string) data_get($context, 'current_lead.id', ''));
+        if ($leadId !== '' && RoleAccess::can($user, 'leads.read') && ($l = $find('leads.json', $leadId))) {
+            $lines[] = 'Lead abierto en el panel lateral: ' . ($l['nombre'] ?? '') . ' (lead_id: ' . $l['id'] . ') · etapa: ' . ($l['etapa'] ?? '') . ' · ' . ($l['email'] ?? '') . ' · ' . ($l['telefono'] ?? '');
+        }
+
+        $section = match (true) {
+            str_starts_with($path, '/proyectos') => 'Proyectos (tableros Kanban)',
+            str_starts_with($path, '/facturas') => 'Facturas',
+            str_starts_with($path, '/cotizaciones') => 'Cotizaciones',
+            str_starts_with($path, '/contratos') => 'Contratos',
+            str_starts_with($path, '/clientes') => 'Clientes',
+            str_starts_with($path, '/leads') => 'Leads',
+            str_starts_with($path, '/gastos') => 'Gastos',
+            str_starts_with($path, '/reuniones') => 'Reuniones',
+            str_starts_with($path, '/mis-notas') => 'Mis notas',
+            str_starts_with($path, '/correo') => 'Correo',
+            str_starts_with($path, '/documentos') => 'Documentos',
+            str_starts_with($path, '/reportes') => 'Reportes',
+            $path === '/' || str_starts_with($path, '/dashboard') => 'Panel',
+            default => '',
+        };
+        if ($section === '' && !$lines) {
+            return '';
+        }
+
+        return "Pantalla actual del usuario" . ($section !== '' ? " · sección {$section}" : '') . ":\n"
+            . ($lines ? '- ' . implode("\n- ", $lines) . "\n" : '')
+            . 'Si el usuario dice "esto", "esta", "este", "aquí" o pide algo sin decir el módulo, se refiere a lo que tiene en pantalla. '
+            . 'Si el pedido claramente es de otro módulo o nombra otro registro, prevalece lo que dice.';
+    }
+
     private function buildSystemPrompt(array $settings): string
     {
         $prompt = <<<'PROMPT'
@@ -1084,7 +1217,19 @@ Para Pomodoro TDAH o bloqueo mental, propone un bloque enfocado con campos claro
 Cuando propongas cualquier acción que requiera botón de confirmación, añade al final un bloque oculto de acción estructurada. No metas explicaciones dentro del bloque. Formato:
 <!-- AI_ACTIONS_JSON {"actions":[{"type":"tipo_permitido","fields":{"campo":"valor"}}]} -->
 Si el usuario pide varias acciones entre módulos, incluye una entrada por acción en actions (máximo cinco), en el orden de ejecución, y muestra para cada una qué registro se creará o cambiará. El usuario confirmará cada acción por separado. No afirmes que una acción posterior ya fue completada.
-Tipos permitidos: start_pomodoro, create_project, update_project, add_project_task, add_project_subtask, add_project_note, create_personal_note, update_personal_note, create_reminder, create_meeting, create_quote, create_contract, create_invoice_draft, send_email, send_recurring_invoice_early.
+Acciones de proyectos y tareas: siempre incluye AI_ACTIONS_JSON con estos campos exactos, porque el CRM ejecuta esos datos (no el texto visible):
+- update_project_task: editar una tarjeta que YA existe: agregarle o cambiarle la descripción, renombrarla, moverla de columna, cambiar prioridad o vencimiento, o marcarla hecha. fields: project_id, task_id y solo lo que cambia: title, description (texto final completo en Markdown), description_mode ("replace" por defecto, "append" si el usuario pide agregar a lo que ya tiene), column, priority, due_date (AAAA-MM-DD), done (true/false). Úsala cuando digan "agrégale/ponle una descripción a la tarea…", "cambia", "mueve", "marca como hecha". Nunca uses add_project_note para escribir una descripción.
+- add_project_task: tarjetas NUEVAS dentro de un proyecto existente. fields: project_id, tasks: [{title, column, description, priority, due_date, subtasks: ["…"]}].
+- add_project_subtask: fields: project_id, task_id, subtasks: ["…"].
+- add_project_note: solo cuando pidan una nota o comentario. fields: project_id, task_id (opcional), note.
+- create_project: solo si piden explícitamente un proyecto o tablero NUEVO y no existe ninguno con ese nombre en el contexto. fields: name, client, description, priority, start_date, due_date, columns: ["…"], tasks: [{title, column, description, subtasks: ["…"]}].
+Toma project_id y task_id del contexto, donde aparecen como "project_id:" y "task_id:". Si el usuario habla de "la primera tarea de En proceso", usa el orden [columna #posición] del contexto. Si pide tareas para un proyecto que ya existe, nunca propongas crear otro proyecto. Si no puedes identificar el proyecto o la tarea con seguridad, pregunta cuál es en vez de proponer la acción.
+Acciones de leads (incluye siempre AI_ACTIONS_JSON con estos campos; toma lead_id del contexto):
+- update_lead: cambiar etapa u otros datos de un lead existente. fields: lead_id y solo lo que cambia: stage (Posible cliente, Contactado, Volver a llamar o Cliente), name, email, phone, budget (número), origin, reminder (AAAA-MM-DD HH:MM), note (nota de seguimiento opcional).
+- add_lead_note: nota de seguimiento de una llamada, reunión o mensaje. fields: lead_id, note.
+- create_lead: solo si no existe ya un lead con ese nombre o correo. fields: name, email, phone, origin, stage, budget, note.
+Si el usuario tiene un lead abierto en pantalla y dice "este lead", "muévelo", "anota que…", usa ese lead_id.
+Tipos permitidos: start_pomodoro, create_project, update_project, update_project_task, update_lead, add_lead_note, create_lead, add_project_task, add_project_subtask, add_project_note, create_personal_note, update_personal_note, create_reminder, create_meeting, create_quote, create_contract, create_invoice_draft, send_email, send_recurring_invoice_early.
 Para start_pomodoro usa también campos directos: {"type":"start_pomodoro","minutes":25,"task":"texto breve del enfoque","open_pip":false}.
 Para las demás acciones, en fields usa nombres simples en snake_case según aplique: title, name, client, project, task, column, description, content, text, priority, start_date, due_date, date, start_time, end_time, location, responsible, recipients, subject, message, currency, status, amount, columns, tasks, subtasks, items, invoice. La previsualización visible debe seguir usando los campos claros en español indicados arriba, porque el CRM también valida esa propuesta antes de ejecutar.
 Si no estás proponiendo una acción confirmable, no incluyas AI_ACTIONS_JSON.
