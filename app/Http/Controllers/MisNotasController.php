@@ -21,24 +21,42 @@ class MisNotasController extends Controller
         $this->users = new FileStore('users.json');
     }
 
+    /** Página con las notas ya incluidas, para no esperar una segunda petición al abrirla. */
+    public function page(Request $request)
+    {
+        return view('mis-notas.index', ['bootNotes' => $this->visibleNotes($request)]);
+    }
+
     public function index(Request $request)
+    {
+        return response()->json(['data' => $this->visibleNotes($request)]);
+    }
+
+    /** Notas que el usuario puede ver, saneadas y con el cliente resuelto (una sola lectura de clientes). */
+    private function visibleNotes(Request $request): array
     {
         $key = $this->resolveUserKey($request);
         $records = $this->store->all();
-        $sanitized = array_map(fn ($item) => $this->sanitizeRecord($item), $records);
-        if ($sanitized !== $records) {
-            $this->store->save($sanitized);
+        $clients = new NoteClient();
+        $notes = [];
+        $dirty = false;
+        foreach ($records as $i => $record) {
+            if (!$this->canSee($record, $key)) {
+                continue;
+            }
+            // Contenido escrito antes del saneamiento (o por otra vía) se limpia y se guarda limpio una vez.
+            $clean = $this->sanitizeRecord($record);
+            if ($clean !== $record) {
+                $records[$i] = $clean;
+                $dirty = true;
+            }
+            $notes[] = $this->toClientNote($clean, $key, $clients);
         }
-        $all = collect($sanitized);
-        $notes = $all
-            ->filter(fn ($item) => $this->canSee($item, $key))
-            ->map(function ($item) use ($key) {
-                return $this->toClientNote($item, $key);
-            })
-            ->values()
-            ->all();
+        if ($dirty) {
+            $this->store->save(array_values($records));
+        }
 
-        return response()->json(['data' => $notes]);
+        return $notes;
     }
 
     public function save(Request $request)
@@ -221,7 +239,7 @@ class MisNotasController extends Controller
         abort_unless(in_array((string) $request->session()->get('user.role'), ['admin', 'super_admin'], true), 403);
     }
 
-    protected function toClientNote(array $record, string $currentKey): array
+    protected function toClientNote(array $record, string $currentKey, ?NoteClient $clients = null): array
     {
         $permission = $this->isOwner($record, $currentKey)
             ? 'owner'
@@ -234,7 +252,7 @@ class MisNotasController extends Controller
             'plainText' => (string) ($record['plainText'] ?? ''),
             'color' => (string) ($record['color'] ?? 'yellow'),
             'linkedClient' => (string) ($record['linkedClient'] ?? ''),
-            'clientId' => (string) ((new NoteClient())->resolve($record)['id'] ?? ''),
+            'clientId' => (string) (($clients ?? new NoteClient())->resolve($record)['id'] ?? ''),
             'createdAt' => $record['createdAt'] ?? now()->valueOf(),
             'updatedAt' => $record['updatedAt'] ?? now()->valueOf(),
             'ownerKey' => (string) ($record['ownerKey'] ?? ''),

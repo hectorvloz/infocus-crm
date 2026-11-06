@@ -2,7 +2,7 @@
 @section('title','Mis Notas')
 
 @section('content')
-<script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
+<script async src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
 <style>
   .notes-search-shell{display:flex;align-items:center;gap:.75rem;max-width:42rem}
   .notes-search-box{position:relative;flex:1 1 auto;min-width:0}
@@ -237,6 +237,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const NOTES_USER_KEY = @json((string) (auth()->id() ?? session('user.id') ?? session('user.email') ?? 'anon'));
   const CURRENT_USER_NAME = @json((string) (optional(auth()->user())->name ?? session('user.name') ?? 'Usuario'));
   const NOTES_KEY = `infocus_quick_notes_v1_${NOTES_USER_KEY}`;
+  let notesBoot = @json($bootNotes ?? null);
   const notesListView = document.getElementById('notes-list-view');
   const noteEditView = document.getElementById('note-edit-view');
   const notesContainer = document.getElementById('notes-container');
@@ -371,9 +372,16 @@ document.addEventListener('DOMContentLoaded', function () {
       isShared: !!note?.isShared,
     });
     try {
-      const res = await fetch('/api/mis-notas', { headers: { Accept: 'application/json' } });
-      const json = await res.json();
-      const remote = Array.isArray(json?.data) ? json.data : [];
+      // La primera vez se usan las notas que vienen con la página; después se piden al servidor.
+      let remote;
+      if (Array.isArray(notesBoot)) {
+        remote = notesBoot;
+        notesBoot = null;
+      } else {
+        const res = await fetch('/api/mis-notas', { headers: { Accept: 'application/json' } });
+        const json = await res.json();
+        remote = Array.isArray(json?.data) ? json.data : [];
+      }
       if (remote.length > 0) {
         allNotes = remote;
         localStorage.removeItem(NOTES_KEY);
@@ -1847,6 +1855,7 @@ document.addEventListener('DOMContentLoaded', function () {
     scrubNoteHtml(holder);
     holder.querySelector('h1,h2,h3')?.remove();
     holder.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+    holder.querySelectorAll('img').forEach((img) => { img.loading = 'lazy'; img.decoding = 'async'; });
     holder.querySelectorAll('.note-checkline').forEach((line) => {
       const checkbox = line.querySelector('input[type="checkbox"]');
       const checked = !!checkbox?.checked;

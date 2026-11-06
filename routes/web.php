@@ -48,7 +48,7 @@ Route::get('/uploads/branding/{file}', function (string $file) {
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard')->middleware('auth.session');
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.alias')->middleware('auth.session');
 Route::middleware('auth.session')->group(function () {
-    Route::view('/mis-notas', 'mis-notas.index')->name('mis-notas.index');
+    Route::get('/mis-notas', [MisNotasController::class, 'page'])->name('mis-notas.index');
     Route::get('/api/mis-notas', [MisNotasController::class, 'index'])->name('api.mis-notas.index');
     Route::post('/api/mis-notas', [MisNotasController::class, 'save'])->name('api.mis-notas.save');
     Route::get('/api/mis-notas/colaboradores', [MisNotasController::class, 'collaborators'])->name('api.mis-notas.collaborators');
