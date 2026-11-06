@@ -77,11 +77,12 @@
     </div>
 
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h3 class="font-semibold text-slate-900">claude.ai y ChatGPT (web y celular)</h3>
+        <h3 class="font-semibold text-slate-900">claude.ai, ChatGPT y Gemini (web y celular)</h3>
         <p class="mt-1 text-sm text-slate-500">No necesitan token: se conectan iniciando sesión en Infocus.</p>
         <ol class="mt-4 list-decimal space-y-2 pl-5 text-sm text-slate-700">
             <li><strong>claude.ai:</strong> Configuración → Conectores → Agregar conector personalizado.</li>
             <li><strong>ChatGPT:</strong> Configuración → Aplicaciones y conectores → Modo desarrollador → Crear.</li>
+            <li><strong>Gemini:</strong> Configuración → Apps conectadas → App personalizada → MCP en la nube.</li>
             <li>Pega esta URL y pulsa conectar:</li>
         </ol>
         <div class="mt-3 flex gap-2">

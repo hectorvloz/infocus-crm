@@ -227,6 +227,8 @@ class McpServerTest extends TestCase
 
         $client = $this->postJson('/oauth/register', ['client_name' => 'Claude', 'redirect_uris' => [$redirect]])->assertSuccessful()->json();
         $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://claude.ai.atacante.test/cb']])->assertStatus(400);
+        $this->postJson('/oauth/register', ['client_name' => 'Gemini', 'redirect_uris' => ['https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-abc123']])->assertSuccessful();
+        $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://oauth-redirect.googleusercontent.com.atacante.test/r/x']])->assertStatus(400);
 
         $verifier = str_repeat('a', 64);
         $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');

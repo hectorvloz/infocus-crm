@@ -21,6 +21,8 @@ return [
         'https://claude.com',
         'https://chatgpt.com',
         'https://chat.openai.com',
+        // Gemini (app web y celular): callback por usuario en oauth-redirect.googleusercontent.com/r/...
+        'https://oauth-redirect.googleusercontent.com',
         'http://localhost',
         'http://127.0.0.1',
         // 'https://example.com',
