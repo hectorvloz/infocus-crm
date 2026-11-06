@@ -18,10 +18,6 @@
     <p class="text-slate-500">Conecta Claude, Codex, Gemini o ChatGPT a tu Infocus para consultar y trabajar desde el chat.</p>
 </div>
 
-@if (session('success'))
-    <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{{ session('success') }}</div>
-@endif
-
 @if (!($setup['packages'] && $setup['tables'] && $setup['keys']))
     <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-6">
         <p class="font-semibold text-amber-900">Falta activar el MCP en este servidor</p>
