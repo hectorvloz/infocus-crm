@@ -30,41 +30,42 @@
 <div id="leadDetailDrawer" class="fixed inset-0 z-[1600] hidden pointer-events-none" aria-modal="true" role="dialog">
   <div id="leadDetailBackdrop" class="absolute inset-0 z-0 bg-slate-900/45 pointer-events-auto"></div>
   <aside id="leadDrawerAside" role="document" class="absolute right-0 top-0 z-10 h-full w-full max-w-2xl bg-white shadow-2xl border-l border-slate-200 flex flex-col pointer-events-auto">
-    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-      <div class="flex items-center gap-3 min-w-0">
-        <button id="closeLeadDrawerBtn" type="button" class="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar detalle">
+    <div class="px-5 pt-4 pb-4 border-b border-slate-100">
+      <div class="flex items-start gap-3">
+        <button id="closeLeadDrawerBtn" type="button" class="shrink-0 -ml-2 rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar detalle">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <div class="min-w-0">
-          <div id="drawerLeadName" class="text-2xl font-extrabold text-slate-900 truncate">Lead</div>
-          <div id="drawerLeadMeta" class="text-xs text-slate-500 truncate">Detalle comercial</div>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <div id="drawerLeadName" class="text-xl sm:text-2xl font-extrabold leading-tight text-slate-900 break-words line-clamp-2">Lead</div>
+          <div class="mt-1.5 flex items-center gap-2 min-w-0">
+            <span id="drawerStageBadge" class="shrink-0 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Etapa</span>
+            <span id="drawerLeadMeta" class="text-xs text-slate-500 truncate">Detalle comercial</span>
+          </div>
+        </div>
+        <div class="shrink-0 flex items-center gap-1">
+          <a id="drawerEditLeadLink" href="{{ route('leads.edit', ['id' => '__LEAD__']) }}" onclick="event.preventDefault();event.stopPropagation();window.location.href=this.getAttribute('href');" class="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-700">Editar</a>
+          <form id="drawerDeleteLeadForm" action="{{ route('leads.destroy', ['id' => '__LEAD__']) }}" method="POST" onsubmit="event.stopPropagation(); return confirm('¿Eliminar este lead?');" class="inline">
+            @csrf @method('DELETE')
+            <button id="drawerDeleteLeadBtn" type="submit" class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar lead" aria-label="Eliminar lead">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </form>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <a id="drawerEditLeadLink" href="{{ route('leads.edit', ['id' => '__LEAD__']) }}" onclick="event.preventDefault();event.stopPropagation();window.location.href=this.getAttribute('href');" class="px-3 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-700">Editar</a>
-        <button id="drawerHeaderTimerBtn" type="button" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-lime-200 bg-lime-50 text-slate-800 text-sm font-extrabold hover:bg-lime-100">
+      <div class="mt-3 flex items-center gap-2 flex-wrap">
+        <a id="drawerCallLink" href="#" class="inline-flex items-center gap-2 whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3a2 2 0 012 2v2a2 2 0 01-1 1.732l-1.5.866a11 11 0 005.634 5.634l.866-1.5A2 2 0 0115 13h2a2 2 0 012 2v3a2 2 0 01-2 2h-1C8.163 20 4 15.837 4 10V5z"/></svg>
+          Llamar
+        </a>
+        <button id="drawerMailLink" type="button" class="inline-flex items-center gap-2 whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+          Email
+        </button>
+        <button id="drawerHeaderTimerBtn" type="button" class="inline-flex items-center gap-2 whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold border-lime-200 bg-lime-50 text-slate-800 font-bold hover:bg-lime-100">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3"/></svg>
           <span id="drawerHeaderTimerLabel">Iniciar timer</span>
         </button>
-        <form id="drawerDeleteLeadForm" action="{{ route('leads.destroy', ['id' => '__LEAD__']) }}" method="POST" onsubmit="event.stopPropagation(); return confirm('¿Eliminar este lead?');" class="inline">
-          @csrf @method('DELETE')
-          <button id="drawerDeleteLeadBtn" type="submit" class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar lead" aria-label="Eliminar lead">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          </button>
-        </form>
       </div>
-    </div>
-
-    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2 flex-wrap">
-      <a id="drawerCallLink" href="#" class="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3a2 2 0 012 2v2a2 2 0 01-1 1.732l-1.5.866a11 11 0 005.634 5.634l.866-1.5A2 2 0 0115 13h2a2 2 0 012 2v3a2 2 0 01-2 2h-1C8.163 20 4 15.837 4 10V5z"/></svg>
-        Llamar
-      </a>
-      <button id="drawerMailLink" type="button" class="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
-        Email
-      </button>
-      <div id="drawerStageBadge" class="ml-auto text-xs font-bold uppercase tracking-wide px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Etapa</div>
     </div>
 
     <div class="flex-1 overflow-y-auto custom-scroll px-5 py-4 space-y-6">
@@ -445,15 +446,15 @@
     }
 
     activeLead = local;
+    window.__infocusAiCurrentLead = { id: local.id, name: local.nombre || '' };
     hydrateDrawer(local);
     drawer.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
   }
 
   function closeDrawer() {
     drawer.classList.add('hidden');
-    document.body.classList.remove('overflow-hidden');
     activeLead = null;
+    window.__infocusAiCurrentLead = null;
   }
 
   function renderAssignees(lead) {
@@ -473,7 +474,7 @@
 
   function hydrateDrawer(lead) {
     document.getElementById('drawerLeadName').textContent = lead.nombre || 'Lead';
-    document.getElementById('drawerLeadMeta').textContent = `${lead.email || 'Sin email'} • ${lead.etapa || ''}`;
+    document.getElementById('drawerLeadMeta').textContent = lead.email || 'Sin email';
     editLeadLink.href = `{{ route('leads.edit', ['id' => '__LEAD__']) }}`.replace('__LEAD__', encodeURIComponent(lead.id || ''));
     deleteLeadForm.action = `{{ route('leads.destroy', ['id' => '__LEAD__']) }}`.replace('__LEAD__', encodeURIComponent(lead.id || ''));
     document.getElementById('drawerCallLink').href = lead.telefono ? `tel:${lead.telefono}` : '#';

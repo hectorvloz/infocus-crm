@@ -506,32 +506,28 @@
         if (!modal) return;
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-        document.body.classList.add('overflow-hidden');
-    }
+        }
 
     function closeBudgetModal() {
         const modal = document.getElementById('budgetModal');
         if (!modal) return;
         modal.classList.add('hidden');
         modal.classList.remove('flex');
-        document.body.classList.remove('overflow-hidden');
-    }
+        }
 
     function openProviderCategoriesModal() {
         const modal = document.getElementById('providerCategoriesModal');
         if (!modal) return;
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-        document.body.classList.add('overflow-hidden');
-    }
+        }
 
     function closeProviderCategoriesModal() {
         const modal = document.getElementById('providerCategoriesModal');
         if (!modal) return;
         modal.classList.add('hidden');
         modal.classList.remove('flex');
-        document.body.classList.remove('overflow-hidden');
-    }
+        }
 
     function bindModalBackdropClose() {
         const ids = ['budgetModal', 'providerCategoriesModal'];
