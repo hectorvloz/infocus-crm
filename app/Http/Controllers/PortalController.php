@@ -258,8 +258,10 @@ class PortalController extends Controller
             ->sort()
             ->values();
 
+        $contracts = $this->portalContracts($clientId);
+
         return compact(
-            'settings', 'invoices', 'projects',
+            'settings', 'invoices', 'projects', 'contracts',
             'totalInvoiced', 'dueAmount', 'paidAmount', 'overdueAmount',
             'upcoming7', 'upcoming15', 'upcoming30',
             'pagosHistory', 'timeline', 'mensajes',
@@ -280,7 +282,7 @@ class PortalController extends Controller
             'upcoming7', 'upcoming15', 'upcoming30',
             'pagosHistory', 'timeline', 'mensajes',
             'documents', 'folderNames', 'docFolder', 'docQ', 'docSort',
-            'clientCurrency', 'useTokenLinks'
+            'clientCurrency', 'useTokenLinks', 'contracts'
         ));
     }
 
@@ -298,7 +300,7 @@ class PortalController extends Controller
             'upcoming7', 'upcoming15', 'upcoming30',
             'pagosHistory', 'timeline', 'mensajes',
             'documents', 'folderNames', 'docFolder', 'docQ', 'docSort',
-            'clientCurrency', 'useTokenLinks'
+            'clientCurrency', 'useTokenLinks', 'contracts'
         ));
     }
 
@@ -1936,5 +1938,35 @@ class PortalController extends Controller
         $request->session()->regenerate();
 
         return redirect()->route('portal.auth.dashboard');
+    }
+
+    /** Contratos publicados del cliente (los borradores no se muestran), con enlaces privados para ver, firmar y descargar. */
+    private function portalContracts($clientId): array
+    {
+        $docs = new \App\Support\ContractDocuments();
+
+        return collect((new FileStore('contratos.json'))->all())
+            ->where('cliente_id', $clientId)
+            ->reject(fn ($c) => ($c['estado'] ?? 'Borrador') === 'Borrador')
+            ->sortByDesc('created_at')
+            ->map(function ($c) use ($docs) {
+                $c = $docs->ensureToken($c);
+                $params = ['id' => $c['id'], 'token' => $c['public_token']];
+                $signature = \App\Support\ContractDocuments::signature($c, 'Cliente');
+
+                return [
+                    'id' => $c['id'],
+                    'titulo' => (string) ($c['titulo'] ?? 'Contrato'),
+                    'numero' => \App\Support\ContractDocuments::number($c),
+                    'estado' => (string) ($c['estado'] ?? ''),
+                    'fecha' => \App\Support\ContractDocuments::formatDate($c['created_at'] ?? null),
+                    'valor' => \App\Support\ContractDocuments::money($c),
+                    'firmado' => $signature ? \App\Support\ContractDocuments::formatDate($signature['fecha'] ?? null) : null,
+                    'ver_url' => route('contratos.public.show', $params),
+                    'pdf_url' => route('contratos.public.pdf', $params),
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

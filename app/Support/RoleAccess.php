@@ -175,6 +175,7 @@ class RoleAccess
         'contratos.edit' => 'contratos.update',
         'contratos.update' => 'contratos.update',
         'contratos.firmar' => 'contratos.update',
+        'contratos.enviar' => 'contratos.update',
         'contratos.destroy' => 'contratos.delete',
 
         'correo.index' => 'correo.read',

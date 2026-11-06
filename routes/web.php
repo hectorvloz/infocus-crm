@@ -203,6 +203,7 @@ Route::middleware('auth.session')->group(function () {
     Route::delete('/contratos/{id}', [ContratosController::class, 'destroy'])->name('contratos.destroy');
     Route::post('/contratos/{id}/firmar', [ContratosController::class, 'firmar'])->name('contratos.firmar');
     Route::get('/contratos/{id}/pdf', [ContratosController::class, 'pdf'])->name('contratos.pdf');
+    Route::post('/contratos/{id}/enviar', [ContratosController::class, 'enviar'])->name('contratos.enviar');
 
     // Correo
     Route::get('/correo', [CorreoController::class, 'index'])->name('correo.index');
@@ -358,6 +359,13 @@ Route::get('/portal-acceso', [PortalController::class, 'showMagicLink'])->name('
 Route::post('/portal-acceso', [PortalController::class, 'sendMagicLink'])->name('portal.magic-link.send');
 Route::get('/portal-acceso/google', [PortalController::class, 'redirectToGoogleForPortal'])->name('portal.magic-link.google');
 Route::get('/portal-acceso/google/callback', [PortalController::class, 'handleGooglePortalCallback'])->name('portal.magic-link.google.callback');
+
+// Contratos: enlace privado para que el cliente lea, descargue y firme
+Route::middleware('throttle:30,1')->group(function () {
+    Route::get('/contrato/{id}/{token}', [ContratosController::class, 'publicShow'])->name('contratos.public.show');
+    Route::get('/contrato/{id}/{token}/pdf', [ContratosController::class, 'publicPdf'])->name('contratos.public.pdf');
+    Route::post('/contrato/{id}/{token}/firmar', [ContratosController::class, 'publicSign'])->middleware('throttle:6,1')->name('contratos.public.sign');
+});
 
 // Webhooks publicos
 Route::post('/webhooks/wompi', [PortalController::class, 'wompiWebhook'])->name('webhooks.wompi');

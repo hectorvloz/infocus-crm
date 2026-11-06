@@ -395,6 +395,7 @@
             <button onclick="scrollToId('payments')" class="px-3 py-1.5 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors text-xs">Pagos</button>
             <button onclick="scrollToId('projects')" class="px-3 py-1.5 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors text-xs">Proyectos</button>
             <button onclick="scrollToId('messages')" class="px-3 py-1.5 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors text-xs">Mensajes</button>
+            <button onclick="scrollToId('contracts')" class="px-3 py-1.5 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors text-xs">Contratos</button>
             <button onclick="scrollToId('documents')" class="px-3 py-1.5 bg-white/10 text-white font-medium rounded-lg hover:bg-white/20 transition-colors text-xs">Documentos</button>
           </div>
         </div>
@@ -783,6 +784,42 @@
       </div>
 
       {{-- TIMELINE --}}
+
+      {{-- CONTRATOS --}}
+      <div id="contracts">
+        <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Contratos
+        </h2>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 divide-y divide-slate-100">
+          @forelse(($contracts ?? []) as $contrato)
+            <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold text-slate-900 truncate">{{ $contrato['titulo'] }}</span>
+                  @if($contrato['estado'] === 'Firmado')
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Firmado</span>
+                  @else
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pendiente de tu firma</span>
+                  @endif
+                </div>
+                <div class="mt-0.5 text-xs text-slate-500">
+                  {{ $contrato['numero'] }} · {{ $contrato['fecha'] }}@if($contrato['valor']) · {{ $contrato['valor'] }}@endif
+                  @if($contrato['firmado']) · Firmado el {{ $contrato['firmado'] }}@endif
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <a href="{{ $contrato['pdf_url'] }}" class="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50">Descargar PDF</a>
+                <a href="{{ $contrato['ver_url'] }}" target="_blank" rel="noopener" class="px-3 py-2 rounded-lg text-xs font-bold {{ $contrato['estado'] === 'Firmado' ? 'border border-slate-200 text-slate-700 hover:bg-slate-50' : 'bg-slate-900 text-white hover:bg-slate-800' }}">
+                  {{ $contrato['estado'] === 'Firmado' ? 'Ver contrato' : 'Revisar y firmar' }}
+                </a>
+              </div>
+            </div>
+          @empty
+            <div class="px-5 py-10 text-center text-sm text-slate-400">Aún no tienes contratos.</div>
+          @endforelse
+        </div>
+      </div>
 
       {{-- DOCUMENTOS --}}
       <div id="documents">
