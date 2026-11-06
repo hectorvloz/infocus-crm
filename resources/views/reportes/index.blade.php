@@ -3,7 +3,7 @@
 @section('title', 'Reportes')
 
 @section('content')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ asset('vendor/chartjs/chart.umd.min.js') }}"></script>
 
 <div class="relative overflow-hidden rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm mb-6 bg-white">
     <div class="absolute -top-16 -right-12 w-60 h-60 rounded-full" style="background: radial-gradient(circle, rgba(var(--accent-ring), 0.35) 0%, rgba(255,255,255,0) 70%);"></div>

@@ -1056,7 +1056,8 @@
           </div>
       </div>
 
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      {{-- Chart.js local y diferido: no bloquea el resto del panel. --}}
+      <script id="dashboardChartJs" src="{{ asset('vendor/chartjs/chart.umd.min.js') }}" defer></script>
       <script>
         const ALLOWED_DASHBOARD_TABS = @json($allowedDashboardTabs);
         const DEFAULT_DASHBOARD_TAB = @json($defaultDashboardTab);
@@ -1559,8 +1560,11 @@
         }
 
         // Advanced Chart Logic
-        const ctx = document.getElementById('advancedChart').getContext('2d');
+        const chartCanvas = document.getElementById('advancedChart');
+        const ctx = chartCanvas.getContext('2d');
         let chartInstance = null;
+        let pendingChartPeriod = '6m';
+        const reduceChartMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         
         // Data from Controller
         const rawData = @json($advancedChartData);
@@ -1581,6 +1585,7 @@
         }
 
         function initChart(dataSet = activeChartData) {
+            if (typeof Chart === 'undefined') return;
             if (chartInstance) chartInstance.destroy();
             activeChartData = dataSet;
 
@@ -1632,6 +1637,13 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    normalized: true,
+                    // Animación corta de entrada; sin animar al redimensionar ni al pasar el mouse.
+                    animation: reduceChartMotion ? false : { duration: 520, easing: 'easeOutCubic' },
+                    transitions: {
+                        active: { animation: { duration: 120 } },
+                        resize: { animation: { duration: 0 } },
+                    },
                     plugins: {
                         legend: {
                             display: false,
@@ -1685,10 +1697,32 @@
             });
         }
 
-        // Init combined monthly chart
-        initChart();
-        const defaultTag = document.querySelector('#chart-period-tags button[data-period="6m"]');
-        if (defaultTag) setChartPeriod('6m', defaultTag);
+        // Un solo dibujo, con el periodo por defecto, cuando Chart.js cargó y la gráfica entra en pantalla.
+        function startDashboardChart() {
+            if (chartInstance || typeof Chart === 'undefined') return;
+            const period = pendingChartPeriod || '6m';
+            initChart(buildPeriodData(period));
+            markChartPeriodTag(document.querySelector(`#chart-period-tags button[data-period="${period}"]`));
+        }
+
+        function whenChartVisible(callback) {
+            if (!('IntersectionObserver' in window)) return callback();
+            const observer = new IntersectionObserver((entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    observer.disconnect();
+                    callback();
+                }
+            }, { rootMargin: '200px' });
+            observer.observe(chartCanvas);
+        }
+
+        whenChartVisible(() => {
+            if (typeof Chart !== 'undefined') {
+                startDashboardChart();
+            } else {
+                document.getElementById('dashboardChartJs')?.addEventListener('load', startDashboardChart, { once: true });
+            }
+        });
 
         function monthRange(startDate, endDate) {
             const out = [];
@@ -1738,14 +1772,23 @@
         }
 
         function setChartPeriod(period, triggerEl) {
+            if (!chartInstance) {
+                // La gráfica todavía no se dibuja: se usará este periodo al dibujarla.
+                pendingChartPeriod = period;
+                markChartPeriodTag(triggerEl);
+                return;
+            }
             const filtered = buildPeriodData(period);
 
             activeChartData = filtered;
-            chartInstance.data.labels = filtered.map(d => d.month);
+            chartInstance.data.labels = filtered.map(d => toSpanishMonthLabel(d.month));
             chartInstance.data.datasets[0].data = filtered.map(d => d.income);
             chartInstance.data.datasets[1].data = filtered.map(d => d.expenses);
             chartInstance.update();
+            markChartPeriodTag(triggerEl);
+        }
 
+        function markChartPeriodTag(triggerEl) {
             const tags = document.querySelectorAll('#chart-period-tags button');
             tags.forEach(btn => {
                 btn.className = 'px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors whitespace-nowrap';
