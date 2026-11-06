@@ -23,6 +23,8 @@ return [
         'https://chat.openai.com',
         // Gemini (app web y celular): callback por usuario en oauth-redirect.googleusercontent.com/r/...
         'https://oauth-redirect.googleusercontent.com',
+        'https://oauth-redirect-sandbox.googleusercontent.com',
+        'https://oauth-redirect-test.googleusercontent.com',
         'http://localhost',
         'http://127.0.0.1',
         // 'https://example.com',

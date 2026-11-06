@@ -229,7 +229,9 @@ class McpServerTest extends TestCase
         \Illuminate\Support\Facades\Log::spy();
         $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://claude.ai.atacante.test/cb']])->assertStatus(400);
         \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')->withArgs(fn ($msg, $ctx) => $msg === 'Registro OAuth del MCP rechazado' && $ctx['redirect_uris'] === ['https://claude.ai.atacante.test/cb']);
-        $this->postJson('/oauth/register', ['client_name' => 'Gemini', 'redirect_uris' => ['https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-abc123']])->assertSuccessful();
+        // Petición real que envía la app de Gemini (6 URLs, incluidos sus entornos sandbox y test).
+        $this->postJson('/oauth/register', ['client_name' => 'Google', 'redirect_uris' => ['https://oauth-redirect-sandbox.googleusercontent.com/r/user_bound_custom-mcp-104705273395253291041-proyecto_estudioindigo_com_co', 'https://oauth-redirect-test.googleusercontent.com/r/user_bound_custom-mcp-104705273395253291041-proyecto_estudioindigo_com_co', 'https://oauth-redirect.googleusercontent.com/r/user_bound_custom-mcp-104705273395253291041-proyecto_estudioindigo_com_co', 'https://oauth-redirect-sandbox.googleusercontent.com/a/user_bound_custom-mcp-104705273395253291041-proyecto_estudioindigo_com_co', 'https://oauth-redirect-test.googleusercontent.com/a/user_bound_custom-mcp-104705273395253291041-proyecto_estudioindigo_com_co', 'https://oauth-redirect.googleusercontent.com/a/user_bound_custom-mcp-104705273395253291041-proyecto_estudioindigo_com_co'],
+            'response_types' => ['code'], 'grant_types' => ['authorization_code', 'refresh_token'], 'token_endpoint_auth_method' => 'none'])->assertSuccessful();
         $this->postJson('/oauth/register', ['client_name' => 'Malo', 'redirect_uris' => ['https://oauth-redirect.googleusercontent.com.atacante.test/r/x']])->assertStatus(400);
 
         $verifier = str_repeat('a', 64);
