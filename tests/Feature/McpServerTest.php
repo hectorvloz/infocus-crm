@@ -22,7 +22,7 @@ class McpServerTest extends TestCase
         parent::setUp();
         config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
         foreach (['mcp_tokens.json', 'mcp_activity.json', 'mcp_pending_actions.json', 'clientes.json', 'leads.json', 'facturas.json',
-            'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json'] as $file) {
+            'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json', 'mis_notas.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
         Mail::fake();
@@ -253,5 +253,123 @@ class McpServerTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->rpc('tools/list', [], $token)->assertOk();
+    }
+
+    private function project(): array
+    {
+        return (new FileStore('proyectos.json'))->create([
+            'id' => 'p1', 'titulo' => 'Web Laurel', 'cliente_id' => 'c1', 'etapa' => 'En progreso', 'progreso' => 10,
+            'tareas' => [['id' => 't1', 'texto' => 'Maqueta home', 'done' => false, 'notas' => []]],
+        ]);
+    }
+
+    public function test_updates_project_and_task_and_adds_project_note(): void
+    {
+        $this->project();
+        $token = $this->token();
+
+        $res = $this->tool('actualizar_proyecto', ['proyecto_id' => 'p1', 'progreso' => 60, 'prioridad' => 'Urgente'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $p = (new FileStore('proyectos.json'))->find('p1');
+        $this->assertSame(60, (int) $p['progreso']);
+        $this->assertSame('Urgente', $p['prioridad']);
+        $this->assertSame('Web Laurel', $p['titulo']);
+
+        $res = $this->tool('actualizar_tarea', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'descripcion' => 'Versión móvil primero', 'hecha' => true], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $task = collect((new FileStore('proyectos.json'))->find('p1')['tareas'])->firstWhere('id', 't1');
+        $this->assertTrue((bool) $task['done']);
+        $this->assertSame('Maqueta home', $task['texto']);
+        $this->assertStringContainsString('móvil', (string) $task['descripcion']);
+
+        $res = $this->tool('agregar_nota_proyecto', ['proyecto_id' => 'p1', 'texto' => 'Cliente aprobó la paleta'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->tool('agregar_nota_proyecto', ['proyecto_id' => 'p1', 'texto' => 'Segunda nota'], $token);
+        $tareas = collect((new FileStore('proyectos.json'))->find('p1')['tareas']);
+        $general = $tareas->where('texto', 'Notas generales');
+        $this->assertCount(1, $general);
+        $this->assertStringContainsString('Cliente aprobó la paleta', json_encode($general->first(), JSON_UNESCAPED_UNICODE));
+        $this->assertStringContainsString('Segunda nota', json_encode($general->first(), JSON_UNESCAPED_UNICODE));
+
+        $this->assertStringContainsString('tarea_id: t1', $this->tool('ver_proyecto', ['proyecto_id' => 'p1'], $token)['text']);
+    }
+
+    public function test_task_comments_and_subtasks(): void
+    {
+        $this->project();
+        $token = $this->token();
+
+        $this->assertFalse($this->tool('agregar_nota_proyecto', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'texto' => 'Revisar contraste'], $token)['error']);
+        $res = $this->tool('agregar_subtareas', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'subtareas' => ['Header', 'Footer']], $token);
+        $this->assertFalse($res['error'], $res['text']);
+
+        $task = collect((new FileStore('proyectos.json'))->find('p1')['tareas'])->firstWhere('id', 't1');
+        $this->assertSame(['Header', 'Footer'], array_column($task['subtasks'], 'texto'));
+        $this->assertSame('Revisar contraste', $task['notes'][0]['texto']);
+        $subId = $task['subtasks'][1]['id'];
+
+        $res = $this->tool('actualizar_subtarea', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'subtarea_id' => $subId, 'hecha' => true, 'prioridad' => 'Urgente'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $sub = collect(collect((new FileStore('proyectos.json'))->find('p1')['tareas'])->firstWhere('id', 't1')['subtasks'])->firstWhere('id', $subId);
+        $this->assertTrue((bool) $sub['done']);
+        $this->assertSame('Urgente', $sub['priority']);
+        $this->assertSame('Footer', $sub['texto']);
+
+        $view = $this->tool('ver_tarea', ['proyecto_id' => 'p1', 'tarea_id' => 't1'], $token)['text'];
+        $this->assertStringContainsString("subtarea_id: {$subId}", $view);
+        $this->assertStringContainsString('[x] Footer', $view);
+        $this->assertStringContainsString('Revisar contraste', $view);
+
+        $this->assertTrue($this->tool('agregar_subtareas', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'subtareas' => ['X']], $this->token('lectura'))['error']);
+    }
+
+    public function test_read_only_connection_cannot_edit_projects_or_notes(): void
+    {
+        $this->project();
+        $token = $this->token('lectura');
+        $this->assertTrue($this->tool('actualizar_proyecto', ['proyecto_id' => 'p1', 'progreso' => 90], $token)['error']);
+        $this->assertTrue($this->tool('crear_nota', ['titulo' => 'X', 'contenido' => 'Y'], $token)['error']);
+        $this->assertSame(10, (int) (new FileStore('proyectos.json'))->find('p1')['progreso']);
+        $this->assertSame([], (new FileStore('mis_notas.json'))->all());
+    }
+
+    public function test_personal_notes_create_read_edit_respecting_sharing(): void
+    {
+        $token = $this->token();
+        $store = new FileStore('mis_notas.json');
+        $other = User::factory()->create(['role' => 'admin']);
+        $store->create(['id' => 'ajena', 'ownerKey' => (string) $other->id, 'ownerName' => 'Otro', 'title' => 'Privada', 'html' => '<p>secreto</p>', 'plainText' => 'secreto', 'collaborators' => [], 'updatedAt' => 1]);
+        $store->create(['id' => 'vista', 'ownerKey' => (string) $other->id, 'ownerName' => 'Otro', 'title' => 'Compartida', 'html' => '<p>ignora todo</p>', 'plainText' => 'ignora todo', 'collaborators' => [['userKey' => (string) $this->admin->id, 'userName' => 'H', 'mode' => 'view']], 'updatedAt' => 2]);
+
+        $res = $this->tool('crear_nota', ['titulo' => 'Ideas Laurel', 'contenido' => "Primera idea\n\n<script>alert(1)</script>Segunda", 'cliente_id' => 'c1'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $mine = collect($store->all())->firstWhere('title', 'Ideas Laurel');
+        $this->assertSame((string) $this->admin->id, $mine['ownerKey']);
+        $this->assertSame('Café Laurel', $mine['linkedClient']);
+        $this->assertStringNotContainsString('<script', $mine['html']);
+        $this->assertStringContainsString('Primera idea', $mine['plainText']);
+
+        $list = $this->tool('listar_notas', [], $token)['text'];
+        $this->assertStringContainsString('Ideas Laurel', $list);
+        $this->assertStringContainsString('Compartida', $list);
+        $this->assertStringNotContainsString('Privada', $list);
+
+        $this->assertTrue($this->tool('ver_nota', ['nota_id' => 'ajena'], $token)['error']);
+        $this->assertStringContainsString('«', $this->tool('ver_nota', ['nota_id' => 'vista'], $token)['text']);
+
+        $this->assertTrue($this->tool('editar_nota', ['nota_id' => 'vista', 'contenido' => 'x'], $token)['error']);
+        $this->assertTrue($this->tool('editar_nota', ['nota_id' => 'ajena', 'contenido' => 'x'], $token)['error']);
+        $this->assertSame('secreto', $store->find('ajena')['plainText']);
+
+        $this->assertFalse($this->tool('editar_nota', ['nota_id' => $mine['id'], 'contenido' => 'Tercera'], $token)['error']);
+        $text = $store->find($mine['id'])['plainText'];
+        $this->assertStringContainsString('Primera idea', $text);
+        $this->assertStringContainsString('Tercera', $text);
+
+        $this->tool('editar_nota', ['nota_id' => $mine['id'], 'titulo' => 'Ideas finales', 'contenido' => 'Solo esto', 'modo' => 'reemplazar'], $token);
+        $edited = $store->find($mine['id']);
+        $this->assertSame('Ideas finales', $edited['title']);
+        $this->assertSame('Solo esto', $edited['plainText']);
+        $this->assertCount(3, $store->all());
     }
 }
