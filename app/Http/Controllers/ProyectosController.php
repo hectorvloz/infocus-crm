@@ -641,38 +641,28 @@ class ProyectosController extends Controller
         $clientes = collect($this->clientes->all())->sortBy('empresa')->values()->all();
         $settings = $this->settings->find('settings') ?: [];
         $stages = $settings['project_stages'] ?? ['Prospecto', 'En curso', 'Revisión', 'Completado'];
-        return view('proyectos.index', compact('clientes', 'stages', 'settings', 'boardSlug'));
+        // Los proyectos van incluidos en la página para pintar las tarjetas sin esperar dos llamadas al API.
+        $clienteId = request()->query('cliente_id');
+        $bootProjects = [
+            'active' => $this->projectList(false, $clienteId),
+            'archived' => $this->projectList(true, $clienteId),
+        ];
+        return view('proyectos.index', compact('clientes', 'stages', 'settings', 'boardSlug', 'bootProjects'));
     }
 
     public function index(Request $request)
     {
-        $clienteId = $request->query('cliente_id');
-        $all = $this->store->all();
-        $list = collect($all)
-            ->reject(fn($project) => (bool) ($project['archived'] ?? false))
-            ->when($clienteId, fn($c)=>$c->where('cliente_id', $clienteId))
-            ->values();
-        // enriquecer con nombre de cliente si existe
-        $clientes = collect($this->clientes->all())->keyBy('id');
-        $list = $list->map(function($p) use ($clientes){
-            if (!empty($p['cliente_id']) && isset($clientes[$p['cliente_id']])) {
-                $p['cliente'] = $clientes[$p['cliente_id']]['empresa'] ?? ($p['cliente'] ?? null);
-            } else {
-                $p['cliente'] = $p['cliente'] ?? null;
-            }
-            return $p;
-        })->values()->all();
-        return response()->json(['data'=>$list]);
+        return response()->json(['data' => $this->projectList(false, $request->query('cliente_id'))]);
     }
 
-    public function archivados(Request $request)
+    /** Proyectos activos o archivados, con el nombre del cliente al día. */
+    private function projectList(bool $archived, $clienteId = null): array
     {
-        $clienteId = $request->query('cliente_id');
         $clientes = collect($this->clientes->all())->keyBy('id');
 
-        $list = collect($this->store->all())
-            ->filter(fn($project) => (bool) ($project['archived'] ?? false))
-            ->when($clienteId, fn($c) => $c->where('cliente_id', $clienteId))
+        return collect($this->store->all())
+            ->filter(fn ($project) => (bool) ($project['archived'] ?? false) === $archived)
+            ->when($clienteId, fn ($c) => $c->where('cliente_id', $clienteId))
             ->map(function ($p) use ($clientes) {
                 if (!empty($p['cliente_id']) && isset($clientes[$p['cliente_id']])) {
                     $p['cliente'] = $clientes[$p['cliente_id']]['empresa'] ?? ($p['cliente'] ?? null);
@@ -683,8 +673,11 @@ class ProyectosController extends Controller
             })
             ->values()
             ->all();
+    }
 
-        return response()->json(['data' => $list]);
+    public function archivados(Request $request)
+    {
+        return response()->json(['data' => $this->projectList(true, $request->query('cliente_id'))]);
     }
 
     public function show(string $id)

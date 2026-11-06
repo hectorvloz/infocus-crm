@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title','Proyectos')
 @section('content')
+<script id="projectsBootData" type="application/json">{!! json_encode($bootProjects ?? null, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) !!}</script>
   <script src="https://code.iconify.design/iconify-icon/1.0.8/iconify-icon.min.js"></script>
   <style>
     #global-header-back-btn {
@@ -937,23 +938,27 @@
 
     .project-board-card {
       position: relative;
-      display: block;
+      /* Columna: el botón no centra el contenido, la portada siempre queda pegada arriba */
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
       width: 100%;
       padding: 0;
       overflow: hidden;
       border-radius: 1rem;
-      border: 1px solid #dbe5f2;
+      border: 0;
       background: #fff;
       color: #172236;
       appearance: none;
-      box-shadow: 0 12px 28px rgba(15, 23, 42, .09);
-      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+      /* Contorno con sombra para que la portada llegue al borde sin dejar franja */
+      box-shadow: 0 0 0 1px #dbe5f2, 0 12px 28px rgba(15, 23, 42, .09);
+      transition: transform .18s ease, box-shadow .18s ease;
     }
 
     .project-board-card:hover {
       transform: translateY(-2px);
-      border-color: #d9ff66;
-      box-shadow: 0 18px 42px rgba(15, 23, 42, .14);
+      box-shadow: 0 0 0 1px #cbd5e1, 0 18px 42px rgba(15, 23, 42, .14);
     }
 
     .project-board-context-menu {
@@ -993,11 +998,12 @@
 
     .project-board-cover {
       position: relative;
+      flex: 0 0 auto;
       overflow: hidden;
-      height: 58px;
-      border-radius: 1rem 1rem 0 0;
+      height: 66px;
+      border-radius: 0;
       background:
-        radial-gradient(circle at 18% 8%, rgba(236, 254, 136, .75), transparent 32%),
+        radial-gradient(circle at 85% 0%, rgba(255, 255, 255, .16), transparent 45%),
         linear-gradient(135deg, var(--board-from), var(--board-to));
       background-size: cover;
       background-position: center;
@@ -1026,8 +1032,8 @@
       border-radius: 1.25rem;
       border: 1px solid #dbe5f2;
       background:
-        radial-gradient(circle at 18% 8%, rgba(236, 254, 136, .75), transparent 32%),
-        linear-gradient(135deg, var(--cover-from, #0f766e), var(--cover-to, #bef264));
+        radial-gradient(circle at 85% 0%, rgba(255, 255, 255, .16), transparent 45%),
+        linear-gradient(135deg, var(--cover-from, #1e1b4b), var(--cover-to, #6d28d9));
       background-size: cover;
       background-position: center;
       box-shadow: inset 0 -42px 80px rgba(15, 23, 42, .22);
@@ -1136,23 +1142,31 @@
       aspect-ratio: 16 / 9;
       overflow: hidden;
       border-radius: .58rem;
-      border: 2px solid transparent;
+      border: 0;
       background: #e2e8f0;
       background-size: cover;
       background-position: center;
-      box-shadow: inset 0 -42px 70px rgba(15, 23, 42, .14);
-      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+      transition: transform .16s ease, box-shadow .16s ease;
+    }
+
+    /* Degradado inferior solo para que el nombre se lea */
+    .project-cover-option::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(15, 23, 42, .55), transparent 55%);
+      pointer-events: none;
     }
 
     .project-cover-option:hover {
       transform: translateY(-1px);
-      border-color: rgba(217, 255, 102, .78);
-      box-shadow: inset 0 -42px 70px rgba(15, 23, 42, .24), 0 14px 28px rgba(15, 23, 42, .12);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .14);
     }
 
-    .project-cover-option.is-active {
-      border-color: #a3e635;
-      box-shadow: inset 0 -42px 70px rgba(15, 23, 42, .18), 0 0 0 3px rgba(236, 254, 136, .75);
+    .project-cover-option.is-active,
+    .project-cover-color-option.is-active {
+      outline: 2px solid #0f172a;
+      outline-offset: 2px;
     }
 
     .project-cover-option span {
@@ -1179,30 +1193,42 @@
       border-radius: 999px;
       display: grid;
       place-items: center;
-      background: #0f172a;
-      color: #ecfe88;
+      background: #fff;
+      color: #0f172a;
       font-size: .68rem;
       font-weight: 900;
       box-shadow: 0 8px 20px rgba(15, 23, 42, .28);
     }
 
     .project-cover-color-option {
+      position: relative;
       min-height: 3.1rem;
       border-radius: .58rem;
-      border: 2px solid transparent;
-      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+      border: 0;
+      transition: transform .16s ease, box-shadow .16s ease;
     }
 
     .project-cover-color-option:hover {
       transform: translateY(-1px);
-      border-color: rgba(217, 255, 102, .78);
-      box-shadow: 0 14px 28px rgba(15, 23, 42, .22);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .18);
     }
 
-    .project-cover-color-option.is-active {
-      border-color: #a3e635;
-      box-shadow: 0 0 0 3px rgba(236, 254, 136, .38);
+    .project-cover-color-option.is-active::after {
+      content: "✓";
+      position: absolute;
+      right: .4rem;
+      top: .4rem;
+      width: 1.1rem;
+      height: 1.1rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #0f172a;
+      font-size: .66rem;
+      font-weight: 900;
     }
+
 
     .project-cover-upload-btn {
       width: 100%;
@@ -1220,9 +1246,9 @@
     }
 
     .project-cover-upload-btn:hover {
-      border-color: #b8f52f;
-      background: #fbffea;
-      box-shadow: 0 0 0 3px rgba(236, 254, 136, .28);
+      border-color: #94a3b8;
+      background: #f8fafc;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, .08);
     }
 
     .project-cover-upload-icon {
@@ -1269,6 +1295,7 @@
     }
 
     .project-board-footer {
+      flex: 1 1 auto;
       background: #fff;
       border-top: 1px solid #e2e8f0;
       padding: .65rem .85rem .7rem;
@@ -1276,10 +1303,9 @@
     }
 
     html[data-color-mode="dark"] .project-board-card {
-      border-color: #243044;
       background: #111827;
       color: #fff;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, .28);
+      box-shadow: 0 0 0 1px #243044, 0 12px 28px rgba(0, 0, 0, .28);
     }
 
     html[data-color-mode="dark"] .project-board-footer {
@@ -3347,6 +3373,9 @@
     let stages = JSON.parse(document.getElementById('stagesData').dataset.stages || '[]');
     const urlParams = new URLSearchParams(location.search);
     let currentClienteId = urlParams.get('cliente_id') || '';
+    let projectsBootData = (() => {
+      try { return JSON.parse(document.getElementById('projectsBootData')?.textContent || 'null'); } catch (_) { return null; }
+    })();
     let openProjectFromQuery = urlParams.get('open_project') || '';
     let openTaskFromQuery = urlParams.get('open_task') || '';
     let openNewProjectFromQuery = urlParams.get('new_project') === '1';
@@ -3467,7 +3496,7 @@
     let projectModalReadOnly = false;
     let focusMode = false;
     let currentProjectId = null; // For modal
-    let newProjectCoverColor = '#0f766e|#bef264';
+    let newProjectCoverColor = '#1e1b4b|#6d28d9';
     let newProjectCoverImage = '';
     let newProjectCoverFile = null;
     let newProjectCoverObjectUrl = '';
@@ -3478,54 +3507,44 @@
       modalColors: false,
     };
     const PROJECT_COVER_PALETTES = [
-      ['#0f766e', '#bef264'],
-      ['#0f4c81', '#ec4899'],
-      ['#7c3aed', '#f472b6'],
-      ['#f97316', '#ef4444'],
-      ['#2563eb', '#22d3ee'],
-      ['#111827', '#64748b'],
-      ['#12355b', '#1d4ed8'],
-      ['#0891b2', '#22d3ee'],
+      ['#1e1b4b', '#6d28d9'],
+      ['#be185d', '#f97316'],
+      ['#0c4a6e', '#0891b2'],
       ['#0f172a', '#334155'],
-      ['#14532d', '#84cc16'],
-      ['#be123c', '#fb7185'],
-      ['#581c87', '#c084fc'],
-      ['#020617', '#a3e635'],
-      ['#172554', '#60a5fa'],
-      ['#164e63', '#67e8f9'],
-      ['#064e3b', '#34d399'],
-      ['#365314', '#bef264'],
-      ['#713f12', '#facc15'],
-      ['#7f1d1d', '#fb923c'],
-      ['#831843', '#f9a8d4'],
-      ['#312e81', '#818cf8'],
-      ['#4c1d95', '#e879f9'],
-      ['#0c4a6e', '#38bdf8'],
-      ['#1e293b', '#94a3b8'],
-      ['#18181b', '#f4f4f5'],
-      ['#3f3f46', '#d4d4d8'],
-      ['#047857', '#fde68a'],
-      ['#1d4ed8', '#f0abfc'],
-      ['#9333ea', '#f97316'],
-      ['#dc2626', '#fef08a'],
-      ['#0f766e', '#2dd4bf'],
-      ['#0f172a', '#ef4444'],
-      ['#1e1b4b', '#c4b5fd'],
-      ['#334155', '#d9f99d'],
-      ['#0e7490', '#f472b6'],
-      ['#065f46', '#86efac'],
-      ['#6d28d9', '#22d3ee'],
-      ['#9f1239', '#fb7185'],
+      ['#312e81', '#2563eb'],
+      ['#134e4a', '#0d9488'],
+      ['#4338ca', '#ec4899'],
+      ['#7c2d12', '#ea580c'],
+      ['#064e3b', '#059669'],
+      ['#831843', '#db2777'],
+      ['#0369a1', '#7c3aed'],
+      ['#9a3412', '#f59e0b'],
+      ['#4c1d95', '#a855f7'],
+      ['#881337', '#e11d48'],
+      ['#1e3a8a', '#6366f1'],
+      ['#0f766e', '#22d3ee'],
+      ['#701a75', '#c026d3'],
+      ['#065f46', '#0284c7'],
+      ['#78350f', '#d97706'],
+      ['#7f1d1d', '#dc2626'],
+      ['#1f2937', '#6b7280'],
+      ['#3f3f46', '#a1a1aa'],
+      ['#18181b', '#52525b'],
+      ['#14532d', '#4d7c0f'],
     ];
     const PROJECT_COVER_PRESETS = [
+      { name: 'Índigo profundo', url: '/images/project-covers/gen-indigo-profundo.webp' },
+      { name: 'Atardecer', url: '/images/project-covers/gen-atardecer.webp' },
       { name: 'Neon suave', url: '/images/project-covers/photo-1550745165-9bc0b252726f.webp', legacyId: 'photo-1550745165-9bc0b252726f' },
       { name: 'Prisma', url: '/images/project-covers/photo-1557683316-973673baf926.webp', legacyId: 'photo-1557683316-973673baf926' },
+      { name: 'Marea', url: '/images/project-covers/gen-marea.webp' },
+      { name: 'Coral', url: '/images/project-covers/gen-coral.webp' },
+      { name: 'Noche violeta', url: '/images/project-covers/gen-noche-violeta.webp' },
+      { name: 'Bosque niebla', url: '/images/project-covers/gen-bosque-niebla.webp' },
       { name: 'Vidrio azul', url: '/images/project-covers/photo-1618005182384-a83a8bd57fbe.webp', legacyId: 'photo-1618005182384-a83a8bd57fbe' },
       { name: 'Luz líquida', url: '/images/project-covers/photo-1557672172-298e090bd0f1.webp', legacyId: 'photo-1557672172-298e090bd0f1' },
-      { name: 'Aurora digital', url: '/images/project-covers/photo-1635776062360-af423602aff3.webp', legacyId: 'photo-1635776062360-af423602aff3' },
       { name: 'Cromo', url: '/images/project-covers/photo-1604076913837-52ab5629fba9.webp', legacyId: 'photo-1604076913837-52ab5629fba9' },
       { name: 'Bruma violeta', url: '/images/project-covers/photo-1579547621706-1a9c79d5c9f1.webp', legacyId: 'photo-1579547621706-1a9c79d5c9f1' },
-      { name: 'Ondas', url: '/images/project-covers/photo-1558591710-4b4a1ae0f04d.webp', legacyId: 'photo-1558591710-4b4a1ae0f04d' },
       { name: 'Malla azul', url: '/images/project-covers/photo-1614851099362-9adf73ccebe9.webp', legacyId: 'photo-1614851099362-9adf73ccebe9' },
       { name: 'Tinta', url: '/images/project-covers/photo-1574169208507-84376144848b.webp', legacyId: 'photo-1574169208507-84376144848b' },
       { name: 'Pulso', url: '/images/project-covers/photo-1620121684840-edffcfc4b878.webp', legacyId: 'photo-1620121684840-edffcfc4b878' },
@@ -3547,7 +3566,6 @@
       { name: 'Niebla verde', url: '/images/project-covers/photo-1473773508845-188df298d2d1.webp', legacyId: 'photo-1473773508845-188df298d2d1' },
       { name: 'Minimal blanco', url: '/images/project-covers/photo-1494438639946-1ebd1d20bf85.webp', legacyId: 'photo-1494438639946-1ebd1d20bf85' },
       { name: 'Luces ciudad', url: '/images/project-covers/photo-1519608487953-e999c86e7455.webp', legacyId: 'photo-1519608487953-e999c86e7455' },
-      { name: 'Gradiente solar', url: '/images/project-covers/photo-1500534314209-a25ddb2bd429-solar.webp', legacyId: 'photo-1500534314209-a25ddb2bd429' },
       { name: 'Textura papel', url: '/images/project-covers/photo-1506784983877-45594efa4cbe.webp', legacyId: 'photo-1506784983877-45594efa4cbe' },
       { name: 'Trabajo en equipo', url: '/images/project-covers/photo-1521737604893-d14cc237f11d.webp', legacyId: 'photo-1521737604893-d14cc237f11d' },
     ];
@@ -5475,6 +5493,12 @@
       } else {
         renderKanban(projects);
       }
+
+      // Si la tarjeta que cambió la IA está abierta, refresca su detalle.
+      const changedTaskIds = (detail.action?.task_ids || []).map(String);
+      if (currentTaskId && changedTaskIds.includes(String(currentTaskId)) && updatedProjectId && typeof openProjectTask === 'function') {
+        openProjectTask(updatedProjectId, currentTaskId);
+      }
     });
 
     function projectBoardTaskCard(project, task) {
@@ -7216,7 +7240,7 @@
         const action = target === 'modal'
           ? `selectModalCoverPreset(${originalIndex})`
           : `selectNewProjectCoverPreset(${originalIndex})`;
-        return `<button type="button" class="project-cover-option ${isActive ? 'is-active' : ''}" style="background-image:url('${escapeHtml(presetUrl)}')" onclick="${action}" aria-label="Usar portada ${escapeHtml(preset.name)}">
+        return `<button type="button" class="project-cover-option ${isActive ? 'is-active' : ''}" style="background-image:url('${escapeHtml(projectCoverThumbUrl(presetUrl))}')" onclick="${action}" aria-label="Usar portada ${escapeHtml(preset.name)}">
           <span>${escapeHtml(preset.name)}</span>
         </button>`;
       }).join('');
@@ -7849,13 +7873,19 @@
       }
     }
 
+    // Las portadas incluidas tienen una versión liviana (480 px) para tarjetas y selector.
+    function projectCoverThumbUrl(value) {
+      const normalized = normalizeProjectCoverUrl(value);
+      return normalized.replace(/^((?:https?:\/\/[^/]+)?\/images\/project-covers\/)([^/?#]+\.webp)$/, '$1thumbs/$2');
+    }
+
     function projectCoverCssUrl(value) {
       const normalized = normalizeProjectCoverUrl(value);
       return normalized ? `url(${JSON.stringify(normalized)})` : '';
     }
 
     function projectCoverImageMarkup(value, alt = '') {
-      const src = normalizeProjectCoverUrl(value);
+      const src = projectCoverThumbUrl(value);
       if (!src) return '';
       return `<img class="project-board-cover__img" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="var p=this.closest('.project-board-cover');if(p)p.classList.add('is-cover-fallback');this.remove();">`;
     }
@@ -13482,15 +13512,25 @@
     }
 
     async function loadData(){
-      const qs = currentClienteId ? ('?cliente_id='+encodeURIComponent(currentClienteId)) : '';
-      const res = await fetch('/api/proyectos'+qs);
-      const json = await res.json();
-      let list = json.data || [];
+      let list;
+      if (projectsBootData) {
+        // Primera carga: los proyectos ya vienen en la página.
+        list = Array.isArray(projectsBootData.active) ? projectsBootData.active : [];
+        archivedProjects = Array.isArray(projectsBootData.archived) ? projectsBootData.archived : [];
+        projectsBootData = null;
+        renderArchivedProjectsModalList(archivedProjects);
+      } else {
+        const qs = currentClienteId ? ('?cliente_id='+encodeURIComponent(currentClienteId)) : '';
+        const [json] = await Promise.all([
+          fetch('/api/proyectos'+qs).then((res) => res.json()),
+          loadArchivedProjects(),
+        ]);
+        list = json.data || [];
+      }
       list = list.map((project) => {
         const pendingDesc = pendingProjectDescriptions[String(project.id || '')];
         return typeof pendingDesc === 'string' ? {...project, descripcion: pendingDesc} : project;
       });
-      await loadArchivedProjects();
       // No filter inputs in new UI for now
       projects = list;
       renderKanban(list);
