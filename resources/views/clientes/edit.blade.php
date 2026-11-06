@@ -42,7 +42,7 @@
       <div class="relative">
         <label class="text-sm font-medium">Website</label>
         <svg class="absolute left-3 top-9 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>
-        <input name="website" type="url" value="{{ $cliente['website'] ?? '' }}" class="form-input pl-9">
+        <input name="website" type="text" inputmode="url" autocomplete="url" placeholder="tumarca.com" value="{{ $cliente['website'] ?? '' }}" class="form-input pl-9">
       </div>
       <div class="md:col-span-2 relative">
         <label class="text-sm font-medium">Dirección</label>
@@ -71,7 +71,7 @@
       <div class="relative">
         <label class="text-sm font-medium">País</label>
         <svg class="absolute left-3 top-9 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v16"/><path d="M5 3l14 2-4 2 4 2-14 2"/></svg>
-        <input name="pais" value="{{ $cliente['pais'] ?? '' }}" class="form-input pl-9">
+        @include('clientes._pais-select', ['pais' => old('pais', $cliente['pais'] ?? '')])
       </div>
       <div class="relative">
         <label class="text-sm font-medium">Código postal</label>

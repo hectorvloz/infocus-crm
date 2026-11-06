@@ -295,6 +295,7 @@ class ClientesController extends Controller
 
     public function store(Request $request)
     {
+        $this->normalizeWebsite($request);
         $data = $request->validate([
             'empresa' => 'required|string',
             'propietario' => 'nullable|string',
@@ -361,6 +362,7 @@ class ClientesController extends Controller
     public function update(Request $request, string $id)
     {
         $current = $this->store->find($id);
+        $this->normalizeWebsite($request);
         $data = $request->validate([
             'empresa' => 'required|string',
             'propietario' => 'nullable|string',
@@ -568,5 +570,14 @@ class ClientesController extends Controller
         User::where('role', 'client')->where('cliente_id', $id)->delete();
         $this->store->delete($id);
         return redirect()->route('clientes.index');
+    }
+
+    /** Acepta "tumarca.com" o "www.tumarca.com" y le agrega https:// para guardar un enlace válido. */
+    private function normalizeWebsite(Request $request): void
+    {
+        $website = trim((string) $request->input('website', ''));
+        if ($website !== '' && !preg_match('#^https?://#i', $website)) {
+            $request->merge(['website' => 'https://' . ltrim($website, '/')]);
+        }
     }
 }
