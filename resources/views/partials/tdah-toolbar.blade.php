@@ -2029,6 +2029,7 @@
         let tdahTasksCache = [];
         let tdahSelectedTask = null;
         let timerInterval = null;
+        let pomodoroTickerStop = null;
         let pomodoroTransitioning = false;
         let nativePipStream = null;
         let nativePipRenderInterval = null;
@@ -2147,6 +2148,7 @@
 
         async function savePomodoroSession() {
             clearInterval(timerInterval);
+            if (pomodoroTickerStop) { pomodoroTickerStop(); pomodoroTickerStop = null; }
             if (pomodoroState.phase === 'work' && pomodoroState.backendTimerActive) {
                 const stopped = await syncPomodoroBackend('stop', { projectId: pomodoroState.activeProjectId, taskId: pomodoroState.activeTaskId }, true);
                 if (stopped) pomodoroState.loggedWorkLogs = Math.max(0, Number(pomodoroState.loggedWorkLogs || 0)) + 1;
@@ -2160,6 +2162,7 @@
 
         async function deletePomodoroSession() {
             clearInterval(timerInterval);
+            if (pomodoroTickerStop) { pomodoroTickerStop(); pomodoroTickerStop = null; }
             const deleted = await deletePomodoroLoggedSegments();
             if (!deleted) return;
             closePomodoroFullscreen();
@@ -2844,24 +2847,26 @@
             playNativePipVideoSilently();
         }
 
+        let nativePipTickerStop = null;
+
         function startNativePipRenderLoop() {
             if (nativePipRenderInterval) clearTimeout(nativePipRenderInterval);
             if (nativePipWatchdogInterval) clearInterval(nativePipWatchdogInterval);
+            if (nativePipTickerStop) { nativePipTickerStop(); nativePipTickerStop = null; }
 
             const pump = () => {
                 if (!isNativePomodoroPipOpen()) {
-                    nativePipRenderInterval = null;
+                    if (nativePipTickerStop) { nativePipTickerStop(); nativePipTickerStop = null; }
                     return;
                 }
                 renderNativePipFrame();
                 if (isNativePomodoroPipOpen() && nativePipVideo?.paused) {
                     playNativePipVideoSilently();
                 }
-                nativePipRenderInterval = setTimeout(pump, 500);
             };
             pump();
 
-            nativePipWatchdogInterval = setInterval(() => {
+            const watchdog = () => {
                 if (!isNativePomodoroPipOpen()) return;
                 renderNativePipFrame();
                 const staleFrame = nativePipLastFrameAt && Date.now() - nativePipLastFrameAt > 2600;
@@ -2871,10 +2876,18 @@
                         recoverNativePipSource();
                     }
                 }
-            }, 1000);
+            };
+
+            // Tic del Worker: sigue andando aunque la pestaña esté en segundo plano.
+            let ticks = 0;
+            nativePipTickerStop = window.InfocusTicker.subscribe(() => {
+                pump();
+                if (++ticks % 2 === 0) watchdog();
+            });
         }
 
         function stopNativePipRenderLoop() {
+            if (nativePipTickerStop) { nativePipTickerStop(); nativePipTickerStop = null; }
             if (nativePipRenderInterval) {
                 clearTimeout(nativePipRenderInterval);
                 nativePipRenderInterval = null;
@@ -3037,8 +3050,9 @@
 
         function syncPomodoroInterval() {
             clearInterval(timerInterval);
+            if (pomodoroTickerStop) { pomodoroTickerStop(); pomodoroTickerStop = null; }
             if (!pomodoroState.isRunning) return;
-            timerInterval = setInterval(async () => {
+            const pomodoroTick = async () => {
                 const remaining = getRemainingSeconds();
                 pomodoroState.remainingSeconds = remaining;
                 renderPomodoro();
@@ -3088,7 +3102,9 @@
                 renderPomodoro();
                 syncPomodoroInterval();
                 pomodoroTransitioning = false;
-            }, 250);
+            };
+            // Tic del Worker (cada 500 ms): el cambio de fase llega a tiempo aunque la pestaña esté oculta.
+            pomodoroTickerStop = window.InfocusTicker.subscribe(pomodoroTick);
         }
 
         async function startOrPausePomodoro(options = {}) {
@@ -3139,6 +3155,7 @@
 
         async function resetPomodoro(silent = false) {
             clearInterval(timerInterval);
+            if (pomodoroTickerStop) { pomodoroTickerStop(); pomodoroTickerStop = null; }
             if (pomodoroState.phase === 'work' && pomodoroState.backendTimerActive) {
                 const stopped = await syncPomodoroBackend('stop', { projectId: pomodoroState.activeProjectId, taskId: pomodoroState.activeTaskId }, true);
                 if (stopped) {

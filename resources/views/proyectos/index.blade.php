@@ -9356,13 +9356,16 @@
       return value;
     }
 
+    let pipTickerStop = null;
+
     function startPipRenderLoop() {
       if (pipRenderInterval) clearTimeout(pipRenderInterval);
       if (pipWatchdogInterval) clearInterval(pipWatchdogInterval);
+      if (pipTickerStop) { pipTickerStop(); pipTickerStop = null; }
 
       const pump = () => {
         if (!isTimerNativePipOpen()) {
-          pipRenderInterval = null;
+          if (pipTickerStop) { pipTickerStop(); pipTickerStop = null; }
           return;
         }
         const val = getPipLiveDisplayValue();
@@ -9374,11 +9377,10 @@
             setTimeout(() => { suppressPipPlaybackSync = false; }, 0);
           });
         }
-        pipRenderInterval = setTimeout(pump, 500);
       };
       pump();
 
-      pipWatchdogInterval = setInterval(() => {
+      const watchdog = () => {
         const video = document.getElementById('timerPipVideo');
         if (!isTimerNativePipOpen()) return;
         drawTimerPipCanvas(getPipLiveDisplayValue());
@@ -9392,10 +9394,18 @@
             recoverTimerPipSource();
           }
         }
-      }, 1000);
+      };
+
+      // Tic del Worker: sigue andando aunque la pestaña esté en segundo plano.
+      let ticks = 0;
+      pipTickerStop = window.InfocusTicker.subscribe(() => {
+        pump();
+        if (++ticks % 2 === 0) watchdog();
+      });
     }
 
     function stopPipRenderLoop() {
+      if (pipTickerStop) { pipTickerStop(); pipTickerStop = null; }
       if (pipRenderInterval) {
         clearTimeout(pipRenderInterval);
         pipRenderInterval = null;

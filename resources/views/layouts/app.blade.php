@@ -1872,6 +1872,52 @@
     }
 
   </style>
+  <script>
+    /*
+     * Tic de fondo para los PiP de temporizadores. Chrome y Safari frenan setTimeout/setInterval
+     * de pestañas ocultas (en Chrome, a una vez por minuto tras unos minutos), lo que congelaba el
+     * reloj del PiP. Un Web Worker no sufre ese freno: avisa cada medio segundo y la página redibuja.
+     * Si el navegador no permite el Worker, se usa setInterval como antes.
+     */
+    window.InfocusTicker = window.InfocusTicker || (function () {
+      const subscribers = new Map();
+      let worker = null;
+      let fallback = null;
+      let nextId = 0;
+      const fire = () => Array.from(subscribers.values()).forEach((fn) => { try { fn(); } catch (_) {} });
+      function start() {
+        if (worker || fallback) return;
+        try {
+          const source = 'let t=null;onmessage=function(e){if(e.data==="start"&&!t){t=setInterval(function(){postMessage(1)},500)}else if(e.data==="stop"){clearInterval(t);t=null}};';
+          worker = new Worker(URL.createObjectURL(new Blob([source], { type: 'text/javascript' })));
+          worker.onmessage = fire;
+          worker.onerror = () => { stopWorker(); fallback = setInterval(fire, 500); };
+          worker.postMessage('start');
+        } catch (_) {
+          worker = null;
+          fallback = setInterval(fire, 500);
+        }
+      }
+      function stopWorker() {
+        if (worker) { try { worker.postMessage('stop'); worker.terminate(); } catch (_) {} worker = null; }
+      }
+      function stop() {
+        stopWorker();
+        if (fallback) { clearInterval(fallback); fallback = null; }
+      }
+      return {
+        subscribe(fn) {
+          const id = ++nextId;
+          subscribers.set(id, fn);
+          start();
+          return () => {
+            subscribers.delete(id);
+            if (!subscribers.size) stop();
+          };
+        },
+      };
+    })();
+  </script>
 </head>
 <body class="bg-neutral-50 text-slate-800 antialiased overflow-hidden" data-theme="{{ $uiTheme }}" data-decimals="{{ $decimals }}">
   @php
@@ -5221,6 +5267,7 @@
       let globalTimerInterval = null;
       let globalPipRenderInterval = null;
       let globalPipWatchdogInterval = null;
+      let globalPipTickerStop = null;
       let globalPipStream = null;
       let globalPipStreamReady = false;
       let globalPipVideoTrack = null;
@@ -5963,10 +6010,11 @@
       function startGlobalPipRenderLoop() {
         if (globalPipRenderInterval) clearTimeout(globalPipRenderInterval);
         if (globalPipWatchdogInterval) clearInterval(globalPipWatchdogInterval);
+        if (globalPipTickerStop) { globalPipTickerStop(); globalPipTickerStop = null; }
 
         const pump = () => {
           if (!isGlobalNativePipOpen()) {
-            globalPipRenderInterval = null;
+            if (globalPipTickerStop) { globalPipTickerStop(); globalPipTickerStop = null; }
             return;
           }
           syncGlobalTimerPanels();
@@ -5977,11 +6025,10 @@
               setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
             });
           }
-          globalPipRenderInterval = setTimeout(pump, 250);
         };
         pump();
 
-        globalPipWatchdogInterval = setInterval(() => {
+        const watchdog = () => {
           const video = document.getElementById('globalTimerPipVideo');
           if (!isGlobalNativePipOpen()) return;
           syncGlobalTimerPanels();
@@ -5995,10 +6042,18 @@
               recoverGlobalPipSource();
             }
           }
-        }, 1000);
+        };
+
+        // Tic del Worker: sigue andando aunque la pestaña esté en segundo plano.
+        let ticks = 0;
+        globalPipTickerStop = window.InfocusTicker.subscribe(() => {
+          pump();
+          if (++ticks % 2 === 0) watchdog();
+        });
       }
 
       function stopGlobalPipRenderLoop() {
+        if (globalPipTickerStop) { globalPipTickerStop(); globalPipTickerStop = null; }
         if (globalPipRenderInterval) {
           clearTimeout(globalPipRenderInterval);
           globalPipRenderInterval = null;
