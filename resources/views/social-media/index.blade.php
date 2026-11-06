@@ -1684,7 +1684,8 @@
   </div>
 </div>
 
-<script src="{{ asset('vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ asset('assets/chartjs/chart.umd.min.js') }}"></script>
+<script>window.Chart || document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"><\/script>');</script>
   {{-- MEDIA LIBRARY MODAL ──────────────────────────────────────────────────── --}}
   <div id="smMediaLibraryModal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm z-[2147483600] p-4" role="dialog" aria-modal="true">
     <div class="relative w-full max-w-5xl max-h-[85vh] h-[800px] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden" onclick="event.stopPropagation()" role="document">

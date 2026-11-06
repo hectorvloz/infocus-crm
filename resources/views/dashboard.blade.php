@@ -1056,8 +1056,23 @@
           </div>
       </div>
 
-      {{-- Chart.js local y diferido: no bloquea el resto del panel. --}}
-      <script id="dashboardChartJs" src="{{ asset('vendor/chartjs/chart.umd.min.js') }}" defer></script>
+      {{-- Chart.js local y diferido (no bloquea el panel). Si el archivo local no carga, se usa jsDelivr con la misma versión. --}}
+      <script>
+        window.__chartJsWaiting = [];
+        window.whenChartJs = function (callback) {
+          if (window.Chart) { callback(); } else { window.__chartJsWaiting.push(callback); }
+        };
+        window.__chartJsReady = function () {
+          window.__chartJsWaiting.splice(0).forEach(function (fn) { try { fn(); } catch (e) { console.error(e); } });
+        };
+        window.__chartJsFallback = function () {
+          var script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+          script.onload = window.__chartJsReady;
+          document.head.appendChild(script);
+        };
+      </script>
+      <script src="{{ asset('assets/chartjs/chart.umd.min.js') }}" defer onload="window.Chart ? window.__chartJsReady() : window.__chartJsFallback()" onerror="window.__chartJsFallback()"></script>
       <script>
         const ALLOWED_DASHBOARD_TABS = @json($allowedDashboardTabs);
         const DEFAULT_DASHBOARD_TAB = @json($defaultDashboardTab);
@@ -1716,13 +1731,7 @@
             observer.observe(chartCanvas);
         }
 
-        whenChartVisible(() => {
-            if (typeof Chart !== 'undefined') {
-                startDashboardChart();
-            } else {
-                document.getElementById('dashboardChartJs')?.addEventListener('load', startDashboardChart, { once: true });
-            }
-        });
+        whenChartVisible(() => window.whenChartJs(startDashboardChart));
 
         function monthRange(startDate, endDate) {
             const out = [];
