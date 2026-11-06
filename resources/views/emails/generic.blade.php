@@ -296,7 +296,7 @@
 <body>
     @php
         $theme = $mailTheme ?? [];
-        $headerLabel = $theme['headerLabel'] ?? 'Mensaje automatizado';
+        $headerLabel = trim((string) ($theme['headerLabel'] ?? ''));
         $headerFrom = $theme['headerFrom'] ?? '#0f172a';
         $headerTo = $theme['headerTo'] ?? '#1580c6';
         $headerAccent = $theme['headerAccent'] ?? '#d7f171';
@@ -333,7 +333,7 @@
                         <td class="hero" style="background: linear-gradient(135deg, {{ $headerFrom }} 0%, {{ $headerTo }} 100%); color: {{ $headerText }};">
                             <div class="brand-row">
                                 <div class="brand-copy">
-                                    <div class="eyebrow" style="color: {{ $headerAccent }};">{{ $headerLabel }}</div>
+                                    @if($headerLabel !== '')<div class="eyebrow" style="color: {{ $headerAccent }};">{{ $headerLabel }}</div>@endif
                                     <h1 class="brand-name" style="color: {{ $headerText }};">{{ $brandName }}</h1>
                                     <p class="subject" style="color: {{ $headerText }}; opacity: 0.86;">{{ $subjectLine }}</p>
                                 </div>

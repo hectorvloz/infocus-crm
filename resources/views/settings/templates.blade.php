@@ -227,7 +227,7 @@
                 <div class="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Texto pequeño del header</label>
-                        <input type="text" id="mail_header_label" name="mail_header_label" value="{{ $settings['mail_header_label'] ?? 'Mensaje automatizado' }}" class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-[#ecfe88] focus:border-[#ecfe88] text-sm" placeholder="Mensaje automatizado">
+                        <input type="text" id="mail_header_label" name="mail_header_label" value="{{ $settings['mail_header_label'] ?? '' }}" placeholder="Opcional, ej. Estudio creativo" class="block w-full px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-[#ecfe88] focus:border-[#ecfe88] text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Texto del footer</label>
@@ -273,7 +273,7 @@
                     <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Preview estilo</p>
                     <div class="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
                         <div id="mail-preview-header" class="px-4 py-3" style="background:linear-gradient(135deg, {{ $settings['mail_header_gradient_from'] ?? '#0f172a' }} 0%, {{ $settings['mail_header_gradient_to'] ?? '#1580c6' }} 100%);">
-                            <div id="mail-preview-eyebrow" class="text-[10px] uppercase tracking-[0.16em] font-bold" style="color: {{ $settings['mail_header_accent'] ?? '#d7f171' }};">{{ $settings['mail_header_label'] ?? 'Mensaje automatizado' }}</div>
+                            <div id="mail-preview-eyebrow" class="text-[10px] uppercase tracking-[0.16em] font-bold" style="color: {{ $settings['mail_header_accent'] ?? '#d7f171' }};">{{ $settings['mail_header_label'] ?? '' }}</div>
                             <div id="mail-preview-brand" class="text-base font-bold mt-1" style="color: {{ $settings['mail_header_text_color'] ?? '#ffffff' }};">{{ $settings['company_name'] ?? 'Tu Empresa' }}</div>
                         </div>
                         <div class="px-4 py-3 text-[12px] text-slate-600">Cuerpo del correo con contenido dinámico...</div>

@@ -262,7 +262,7 @@ class GenericMail extends Mailable
     protected function resolveMailTheme(array $settings): array
     {
         return [
-            'headerLabel' => $settings['mail_header_label'] ?? 'Mensaje automatizado',
+            'headerLabel' => trim((string) ($settings['mail_header_label'] ?? '')),
             'headerFrom' => $settings['mail_header_gradient_from'] ?? '#0f172a',
             'headerTo' => $settings['mail_header_gradient_to'] ?? '#1580c6',
             'headerAccent' => $settings['mail_header_accent'] ?? '#d7f171',
