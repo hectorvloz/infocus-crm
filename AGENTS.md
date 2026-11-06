@@ -2,6 +2,10 @@
 
 Infocus CRM de Indigo. Estudio Creativo (Colombia). Dueño: Héctor. Responde en español colombiano, claro y directo, sin emojis en código, interfaces ni documentación.
 
+## Proyecto relacionado: Indigo Web
+
+El sitio público de Indigo (`/Volumes/Dev/Proyectos/Indigo/Indigo Web`, Astro, con su propio `AGENTS.md`) trabaja junto con este CRM: su página `/asesoria/` agenda reuniones y envía cada reserva como lead a `/webhooks/leads` (`LeadsWebhookController`, token `LEADS_WEBHOOK_TOKEN` del `.env`). Si cambias ese webhook, revisa también `public/api/asesoria/book.php` en Indigo Web. Cuando una tarea toque los dos, el agente coordinador está en `/Volumes/Dev/Proyectos/Indigo/AGENTS.md`. Si tienes subagentes, usa uno por proyecto. Cada proyecto es un repo aparte: commits separados.
+
 ## Lo esencial del proyecto
 
 - Laravel 12 + PHP 8.x. Los datos NO están en base de datos: viven en JSON dentro de `storage/app/private/*.json` y se leen/escriben con `App\Repositories\FileStore` (`all`, `find`, `create`, `update`, `delete`, `save`). La base de datos solo guarda usuarios y tablas de Passport/OAuth.
