@@ -119,27 +119,46 @@ class McpSettingsController extends Controller
         $this->ensureAdmin();
         $log = [];
         $run = function (string $command, array $args = []) use (&$log) {
-            $code = Artisan::call($command, $args);
-            $log[] = $command . ($code === 0 ? ': ok' : ': falló (' . trim(Artisan::output()) . ')');
-            return $code === 0;
+            try {
+                $code = Artisan::call($command, $args);
+                $log[] = $command . ($code === 0 ? ': ok' : ': falló');
+            } catch (\Throwable $e) {
+                report($e);
+                $log[] = $command . ': falló (' . $e->getMessage() . ')';
+            }
         };
 
         $run('package:discover');
         $run('migrate', ['--force' => true]);
-        if (!is_file(Passport::keyPath('oauth-private.key'))) {
-            // Si el proveedor de Passport aún no estaba registrado en esta petición, se registra para tener el comando.
-            if (!array_key_exists('passport:keys', Artisan::all())) {
-                app()->register(\Laravel\Passport\PassportServiceProvider::class);
-            }
-            $run('passport:keys');
-        }
-        foreach (['oauth-private.key', 'oauth-public.key'] as $file) {
-            if (is_file(Passport::keyPath($file))) {
-                @chmod(Passport::keyPath($file), 0600);
-            }
-        }
+        $log[] = 'llaves: ' . $this->ensurePassportKeys();
         $run('optimize:clear');
 
         return redirect()->route('settings.mcp')->with('success', 'Activación ejecutada · ' . implode(' · ', $log));
+    }
+
+    /**
+     * Genera las llaves de OAuth como lo hace "php artisan passport:keys". Ese comando solo
+     * existe en consola, y este hosting no tiene consola.
+     */
+    private function ensurePassportKeys(): string
+    {
+        $public = Passport::keyPath('oauth-public.key');
+        $private = Passport::keyPath('oauth-private.key');
+        if (is_file($public) && is_file($private)) {
+            return 'ya existían';
+        }
+        try {
+            $key = \phpseclib4\Crypt\RSA::createKey(4096);
+            file_put_contents($public, (string) $key->getPublicKey());
+            file_put_contents($private, (string) $key);
+            @chmod($public, 0660);
+            @chmod($private, 0600);
+
+            return 'creadas';
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 'falló (' . $e->getMessage() . ')';
+        }
     }
 }

@@ -38,15 +38,23 @@ class McpSettingsWithoutOauthTest extends TestCase
             Schema::dropIfExists($table);
         }
         \Illuminate\Support\Facades\DB::table('migrations')->where('migration', 'like', '%oauth%')->delete();
+        $keysDir = storage_path('framework/testing/passport-keys-' . uniqid());
+        mkdir($keysDir, 0700, true);
+        \Laravel\Passport\Passport::loadKeysFrom($keysDir);
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin)->withSession(['user' => ['id' => $admin->id]])
             ->post('/ajustes/mcp/activar')
             ->assertRedirect('/ajustes/mcp')
-            ->assertSessionHas('success');
+            ->assertSessionHas('success', fn ($msg) => str_contains($msg, 'llaves: creadas') && str_contains($msg, 'migrate: ok'));
 
         $this->assertTrue(Schema::hasTable('oauth_access_tokens'));
-        $this->assertFileExists(storage_path('oauth-private.key'));
+        $this->assertFileExists($keysDir . '/oauth-private.key');
+        $this->assertStringContainsString('PRIVATE KEY', file_get_contents($keysDir . '/oauth-private.key'));
+        $this->assertSame('0600', substr(sprintf('%o', fileperms($keysDir . '/oauth-private.key')), -4));
+        \Laravel\Passport\Passport::loadKeysFrom(storage_path());
+        array_map('unlink', glob($keysDir . '/*'));
+        rmdir($keysDir);
     }
 
     public function test_non_admins_cannot_activate(): void
