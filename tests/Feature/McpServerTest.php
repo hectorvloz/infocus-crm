@@ -22,7 +22,7 @@ class McpServerTest extends TestCase
         parent::setUp();
         config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
         foreach (['mcp_tokens.json', 'mcp_activity.json', 'mcp_pending_actions.json', 'clientes.json', 'leads.json', 'facturas.json',
-            'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json', 'mis_notas.json'] as $file) {
+            'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json', 'mis_notas.json', 'mcp_history.json', 'header_reminders.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
         Mail::fake();
@@ -371,5 +371,138 @@ class McpServerTest extends TestCase
         $this->assertSame('Ideas finales', $edited['title']);
         $this->assertSame('Solo esto', $edited['plainText']);
         $this->assertCount(3, $store->all());
+    }
+
+    public function test_restores_note_edited_by_mcp_and_warns_about_later_edits(): void
+    {
+        $token = $this->token();
+        $store = new FileStore('mis_notas.json');
+        $this->tool('crear_nota', ['titulo' => 'Brief', 'contenido' => 'Contenido original'], $token);
+        $note = collect($store->all())->first();
+
+        $this->tool('editar_nota', ['nota_id' => $note['id'], 'contenido' => 'Texto nuevo', 'modo' => 'reemplazar'], $token);
+        $this->assertSame('Texto nuevo', $store->find($note['id'])['plainText']);
+
+        $list = $this->tool('ver_cambios_recientes', [], $token)['text'];
+        $this->assertStringContainsString('Editó la nota "Brief"', $list);
+        preg_match('/cambio_id: (\w+)/', $list, $m);
+
+        $other = User::factory()->create(['role' => 'admin']);
+        $this->assertTrue($this->tool('restaurar_cambio', ['cambio_id' => $m[1]], $this->token('completo', $other))['error']);
+        $this->assertTrue($this->tool('restaurar_cambio', ['cambio_id' => $m[1]], $this->token('lectura'))['error']);
+
+        $res = $this->tool('restaurar_cambio', ['cambio_id' => $m[1]], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertSame('Contenido original', $store->find($note['id'])['plainText']);
+
+        // La restauración también se puede deshacer, pero si alguien editó después pide confirmación.
+        $this->tool('editar_nota', ['nota_id' => $note['id'], 'contenido' => 'Otra versión', 'modo' => 'reemplazar'], $token);
+        preg_match('/cambio_id: (\w+)/', $this->tool('ver_cambios_recientes', [], $token)['text'], $m2);
+        $store->update($note['id'], ['plainText' => 'Editado a mano', 'html' => '<p>Editado a mano</p>']);
+        $res = $this->tool('restaurar_cambio', ['cambio_id' => $m2[1]], $token);
+        $this->assertTrue($res['error']);
+        $this->assertStringContainsString('forzar', $res['text']);
+        $this->assertSame('Editado a mano', $store->find($note['id'])['plainText']);
+        $this->assertFalse($this->tool('restaurar_cambio', ['cambio_id' => $m2[1], 'forzar' => true], $token)['error']);
+        $this->assertSame('Contenido original', $store->find($note['id'])['plainText']);
+    }
+
+    public function test_restores_project_after_task_edits_and_assigns_people(): void
+    {
+        $this->project();
+        $token = $this->token();
+        $laura = User::factory()->create(['role' => 'admin', 'name' => 'Laura Diseño', 'email' => 'laura@indigo.test']);
+
+        $res = $this->tool('actualizar_tarea', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'columna' => 'En progreso', 'responsables' => ['laura@indigo.test']], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $task = collect((new FileStore('proyectos.json'))->find('p1')['tareas'])->firstWhere('id', 't1');
+        $this->assertSame('En progreso', $task['board_stage']);
+        $this->assertSame(['db:' . $laura->id], $task['owner_ids']);
+        $this->assertSame(['Laura Diseño'], $task['owners']);
+        $this->assertTrue($this->tool('actualizar_tarea', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'responsables' => ['Nadie Inventado']], $token)['error']);
+
+        $this->tool('agregar_subtareas', ['proyecto_id' => 'p1', 'tarea_id' => 't1', 'subtareas' => ['A']], $token);
+        preg_match_all('/cambio_id: (\w+)/', $this->tool('ver_cambios_recientes', ['texto' => 'Maqueta'], $token)['text'], $m);
+        $this->assertCount(2, $m[1]);
+        // Restaurar el más antiguo (con forzar, porque después se agregaron subtareas) deja la tarea como al inicio.
+        $this->assertFalse($this->tool('restaurar_cambio', ['cambio_id' => end($m[1]), 'forzar' => true], $token)['error']);
+        $task = collect((new FileStore('proyectos.json'))->find('p1')['tareas'])->firstWhere('id', 't1');
+        $this->assertArrayNotHasKey('owner_ids', $task);
+        $this->assertSame([], $task['subtasks'] ?? []);
+    }
+
+    public function test_converts_lead_into_client(): void
+    {
+        $token = $this->token();
+        (new FileStore('leads.json'))->create(['id' => 'l1', 'nombre' => 'Pedro Ruiz', 'email' => 'pedro@panaderia.test', 'telefono' => '300', 'etapa' => 'Contactado', 'empresa' => 'Panadería Ruiz']);
+
+        $res = $this->tool('convertir_lead_cliente', ['lead_id' => 'l1', 'moneda' => 'COP'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $client = collect((new FileStore('clientes.json'))->all())->firstWhere('empresa', 'Panadería Ruiz');
+        $this->assertSame('pedro@panaderia.test', $client['contacto_email']);
+        $lead = (new FileStore('leads.json'))->find('l1');
+        $this->assertSame('Cliente', $lead['etapa']);
+        $this->assertSame($client['id'], $lead['cliente_id']);
+        $this->assertTrue($this->tool('convertir_lead_cliente', ['lead_id' => 'l1'], $token)['error']);
+        $this->assertCount(2, (new FileStore('clientes.json'))->all());
+    }
+
+    public function test_reminders_are_created_listed_and_completed(): void
+    {
+        $this->project();
+        $token = $this->token();
+        $this->assertFalse($this->tool('crear_recordatorio', ['texto' => 'Escribirle a Laura', 'fecha' => now()->addDays(2)->toDateString(), 'prioridad' => 'Urgente'], $token)['error']);
+        $this->assertFalse($this->tool('crear_recordatorio', ['texto' => 'Revisar maqueta', 'proyecto_id' => 'p1', 'tarea_id' => 't1'], $token)['error']);
+
+        $row = (new FileStore('header_reminders.json'))->find('user:' . \Illuminate\Support\Str::slug('hector@indigo.test', '-'));
+        $this->assertCount(2, $row['payload']['items']);
+        $this->assertSame('task', collect($row['payload']['items'])->firstWhere('text', 'Revisar maqueta')['link']['type']);
+
+        $list = $this->tool('ver_recordatorios', [], $token)['text'];
+        $this->assertStringContainsString('Escribirle a Laura', $list);
+        preg_match('/Escribirle a Laura.*recordatorio_id: (\w+)/', $list, $m);
+        $this->assertFalse($this->tool('completar_recordatorio', ['recordatorio_id' => $m[1]], $token)['error']);
+        $this->assertStringNotContainsString('Escribirle a Laura', $this->tool('ver_recordatorios', [], $token)['text']);
+    }
+
+    public function test_meetings_need_confirmation(): void
+    {
+        $token = $this->token();
+        (new FileStore('leads.json'))->create(['id' => 'l1', 'nombre' => 'Pedro Ruiz', 'email' => 'pedro@panaderia.test', 'etapa' => 'Contactado']);
+        $day = now()->addDays(3)->toDateString();
+
+        $prev = $this->tool('preparar_reunion', ['lead_id' => 'l1', 'titulo' => 'Llamada inicial', 'fecha' => $day, 'hora' => '10:00', 'tipo' => 'llamada'], $token);
+        $this->assertFalse($prev['error'], $prev['text']);
+        $this->assertStringContainsString('pedro@panaderia.test', $prev['text']);
+        $this->assertSame([], (new FileStore('leads.json'))->find('l1')['agenda'] ?? []);
+        preg_match('/confirmación: (\w{3}-\w{3})/', $prev['text'], $m);
+        $res = $this->tool('confirmar_accion', ['codigo' => $m[1]], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertSame('Llamada inicial', (new FileStore('leads.json'))->find('l1')['agenda'][0]['titulo']);
+
+        $prev = $this->tool('preparar_reunion', ['cliente_id' => 'c1', 'titulo' => 'Revisión web', 'fecha' => $day, 'hora' => '15:00', 'duracion_min' => 45, 'tipo' => 'llamada'], $token);
+        $this->assertStringContainsString('laura@laurel.test', $prev['text']);
+        preg_match('/confirmación: (\w{3}-\w{3})/', $prev['text'], $m);
+        $res = $this->tool('confirmar_accion', ['codigo' => $m[1]], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $meeting = collect((new FileStore('reuniones.json'))->all())->firstWhere('titulo', 'Revisión web');
+        $this->assertSame('15:45', $meeting['hora_fin']);
+
+        $this->assertTrue($this->tool('preparar_reunion', ['lead_id' => 'l1', 'titulo' => 'X', 'fecha' => now()->subDay()->toDateString(), 'hora' => '10:00'], $token)['error']);
+    }
+
+    public function test_weekly_summary(): void
+    {
+        $token = $this->token();
+        (new FileStore('proyectos.json'))->create(['id' => 'p2', 'titulo' => 'Branding Sol', 'vencimiento' => now()->subDays(3)->toDateString(), 'progreso' => 40,
+            'tareas' => [['id' => 't9', 'texto' => 'Logo final', 'done' => false, 'due_date' => now()->subDay()->toDateString()],
+                ['id' => 't8', 'texto' => 'Manual', 'done' => false, 'due_date' => now()->addDays(2)->toDateString()]]]);
+        (new FileStore('leads.json'))->save([['id' => 'l9', 'nombre' => 'Olvidado', 'etapa' => 'Contactado', 'created_at' => now()->subDays(20)->toISOString(), 'updated_at' => now()->subDays(20)->toISOString()]]);
+
+        $text = $this->tool('resumen_semanal', [], $token)['text'];
+        $this->assertMatchesRegularExpression('/Tareas vencidas \(1\):\n- Logo final/', $text);
+        $this->assertMatchesRegularExpression('/vencen esta semana \(1\):\n- Manual/', $text);
+        $this->assertStringContainsString('Branding Sol', $text);
+        $this->assertStringContainsString('Olvidado', $text);
     }
 }

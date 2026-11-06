@@ -42,7 +42,7 @@ class ActualizarLead extends InfocusTool
             $changes['notas_lista'] = array_merge($lead['notas_lista'] ?? [], [['id' => (string) Str::ulid(), 'texto' => $d['nota'], 'fecha' => now()->toISOString()]]);
             $changes['notas'] = $d['nota'];
         }
-        $store->update($lead['id'], $changes);
+        $this->tracked('leads.json', $lead['id'], "Actualizó el lead {$lead['nombre']}", fn () => $store->update($lead['id'], $changes));
 
         return Response::text("Lead {$lead['nombre']} actualizado" . (!empty($d['etapa']) ? " · etapa: {$d['etapa']}" : '') . (!empty($d['nota']) ? ' · nota agregada' : '') . '.');
     }

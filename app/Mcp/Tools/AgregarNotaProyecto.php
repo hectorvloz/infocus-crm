@@ -32,6 +32,11 @@ class AgregarNotaProyecto extends InfocusTool
         $project = $this->store('proyectos.json')->find($d['proyecto_id']);
         abort_if(!$project, 404);
 
+        return $this->tracked('proyectos.json', $project['id'], "Agregó un comentario en el proyecto \"{$project['titulo']}\"", fn () => $this->addNote($project, $d));
+    }
+
+    private function addNote(array $project, array $d): Response
+    {
         $taskId = $d['tarea_id'] ?? null;
         if ($taskId) {
             abort_if(!collect($project['tareas'] ?? [])->firstWhere('id', $taskId), 404);

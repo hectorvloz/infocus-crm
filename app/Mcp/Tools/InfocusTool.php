@@ -79,6 +79,12 @@ abstract class InfocusTool extends Tool
         return ['status' => $response->getStatusCode(), 'data' => $data];
     }
 
+    /** Hace la escritura guardando antes una copia para poder restaurarla con restaurar_cambio. */
+    protected function tracked(string $file, string $recordId, string $label, callable $write): mixed
+    {
+        return (new \App\Mcp\Support\McpHistory())->track($file, $recordId, $label, $write, McpContext::current()->connection);
+    }
+
     protected function money(float|int|string|null $amount, ?string $currency): string
     {
         return trim(($currency ?: '') . ' ' . number_format((float) $amount, 0, ',', '.'));

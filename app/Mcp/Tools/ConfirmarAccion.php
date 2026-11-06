@@ -3,6 +3,8 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Controllers\FacturasController;
+use App\Http\Controllers\LeadsController;
+use App\Http\Controllers\ReunionesController;
 use App\Mcp\Support\McpContext;
 use App\Mcp\Support\PendingActions;
 use App\Support\TemplateMail;
@@ -14,7 +16,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 
 #[Name('confirmar_accion')]
-#[Description('Ejecuta una acción preparada (enviar correo, enviar factura o registrar pago) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
+#[Description('Ejecuta una acción preparada (enviar correo, enviar factura, registrar pago o programar reunión) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
 #[IsDestructive]
 class ConfirmarAccion extends InfocusTool
 {
@@ -36,6 +38,7 @@ class ConfirmarAccion extends InfocusTool
             'enviar_correo' => $this->sendEmail($p, $ctx),
             'enviar_factura' => $this->sendInvoice($p, $ctx),
             'registrar_pago' => $this->registerPayment($p, $ctx),
+            'programar_reunion' => $this->scheduleMeeting($p, $ctx),
             default => Response::error('Acción desconocida.'),
         };
     }
@@ -71,5 +74,30 @@ class ConfirmarAccion extends InfocusTool
         return $result['status'] < 300
             ? Response::text('Pago registrado.' . ($item ? " Factura {$item['numero']} · estado: {$item['estado']}." : '') . (!empty($result['data']['message']) ? ' ' . $result['data']['message'] : ''))
             : Response::error('No se pudo registrar el pago.');
+    }
+
+    private function scheduleMeeting(array $p, McpContext $ctx): Response
+    {
+        if ($p['kind'] === 'lead') {
+            $ctx->allow('leads.create', write: true);
+            $result = $this->callController(LeadsController::class, 'agendaProgramar', collect($p)->except('kind')->all());
+            if ($result['status'] >= 300 || !($result['data']['ok'] ?? false)) {
+                return Response::error('No se pudo programar: ' . ($result['data']['message'] ?? 'error desconocido'));
+            }
+            $item = $result['data']['agenda_item'] ?? [];
+        } else {
+            $ctx->allow('reuniones.create', write: true);
+            $result = $this->callController(ReunionesController::class, 'store', collect($p)->except('kind')->all());
+            if ($result['status'] >= 400) {
+                return Response::error('No se pudo crear la reunión.');
+            }
+            $item = collect($this->store('reuniones.json')->all())
+                ->where('cliente_id', $p['cliente_id'])->where('titulo', $p['titulo'])->where('fecha', $p['fecha'])->last() ?? [];
+        }
+
+        return Response::text('Reunión programada: ' . $p['titulo']
+            . (!empty($item['meet_link']) ? " · Meet: {$item['meet_link']}" : '')
+            . (!empty($item['meet_error']) ? " · Aviso: {$item['meet_error']}" : '')
+            . '. Se enviaron las invitaciones a los correos de la vista previa.');
     }
 }

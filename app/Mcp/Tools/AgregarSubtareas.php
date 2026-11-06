@@ -35,11 +35,17 @@ class AgregarSubtareas extends InfocusTool
         $task = collect($project['tareas'] ?? [])->firstWhere('id', $d['tarea_id']);
         abort_if(!$task, 404);
 
-        foreach ($d['subtareas'] as $text) {
-            $result = $this->callController(ProyectosController::class, 'subtareaAgregar', ['id' => $project['id'], 'tarea_id' => $task['id'], 'texto' => trim($text)]);
-            if ($result['status'] >= 300) {
-                return Response::error('No se pudieron agregar todas las subtareas.');
+        $ok = $this->tracked('proyectos.json', $project['id'], 'Agregó subtareas a "' . ($task['texto'] ?? '') . '"', function () use ($d, $project, $task) {
+            foreach ($d['subtareas'] as $text) {
+                if ($this->callController(ProyectosController::class, 'subtareaAgregar', ['id' => $project['id'], 'tarea_id' => $task['id'], 'texto' => trim($text)])['status'] >= 300) {
+                    return false;
+                }
             }
+
+            return true;
+        });
+        if (!$ok) {
+            return Response::error('No se pudieron agregar todas las subtareas.');
         }
 
         return Response::text(count($d['subtareas']) . ' subtarea(s) agregada(s) a "' . ($task['texto'] ?? 'Tarea') . '".');

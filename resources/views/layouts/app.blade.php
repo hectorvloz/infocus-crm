@@ -4857,6 +4857,8 @@
         if (!document.hidden) {
           updateBrowserNotificationsButton();
           loadNotifications();
+          // Trae recordatorios creados desde otro lugar (por ejemplo el MCP) antes de volver a guardar.
+          loadRemindersFromServer();
         }
       });
     })();

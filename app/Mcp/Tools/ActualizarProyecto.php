@@ -43,7 +43,8 @@ class ActualizarProyecto extends InfocusTool
         $project = $this->store('proyectos.json')->find($d['proyecto_id']);
         abort_if(!$project, 404);
 
-        $result = $this->callController(ProyectosController::class, 'actualizar', ['id' => $d['proyecto_id']] + $changes);
+        $result = $this->tracked('proyectos.json', $project['id'], "Actualizó el proyecto \"{$project['titulo']}\" (" . implode(', ', array_keys($changes)) . ')',
+            fn () => $this->callController(ProyectosController::class, 'actualizar', ['id' => $d['proyecto_id']] + $changes));
         if ($result['status'] >= 300 || empty($result['data']['ok'] ?? true)) {
             return Response::error('No se pudo actualizar el proyecto.');
         }

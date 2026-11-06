@@ -49,14 +49,16 @@ class ActualizarSubtarea extends InfocusTool
         }
 
         $done = [];
-        if ($edits) {
-            $this->callController(ProyectosController::class, 'subtareaActualizar', $ids + $edits);
-            $done[] = 'editada';
-        }
-        if (isset($d['hecha']) && (bool) ($sub['done'] ?? false) !== (bool) $d['hecha']) {
-            $this->callController(ProyectosController::class, 'subtareaToggle', $ids);
-            $done[] = $d['hecha'] ? 'marcada como hecha' : 'reabierta';
-        }
+        $this->tracked('proyectos.json', $project['id'], 'Actualizó la subtarea "' . ($sub['texto'] ?? '') . '"', function () use ($d, $edits, $ids, $sub, &$done) {
+            if ($edits) {
+                $this->callController(ProyectosController::class, 'subtareaActualizar', $ids + $edits);
+                $done[] = 'editada';
+            }
+            if (isset($d['hecha']) && (bool) ($sub['done'] ?? false) !== (bool) $d['hecha']) {
+                $this->callController(ProyectosController::class, 'subtareaToggle', $ids);
+                $done[] = $d['hecha'] ? 'marcada como hecha' : 'reabierta';
+            }
+        });
 
         return Response::text('Subtarea "' . ($d['texto'] ?? $sub['texto']) . '" ' . ($done ? implode(' y ', $done) : 'sin cambios (ya estaba así)') . '.');
     }
