@@ -10,6 +10,8 @@ use App\Support\Ai\AiToolBridge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use App\Support\Ai\AiApproval;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -25,9 +27,11 @@ class AiToolModeTest extends TestCase
         config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
         foreach (['mcp_activity.json', 'clientes.json', 'leads.json', 'facturas.json', 'gastos.json', 'proyectos.json', 'reuniones.json',
             'contratos.json', 'settings.json', 'roles.json', 'mis_notas.json', 'header_reminders.json', 'ai_memories.json', 'ai_action_logs.json',
-            'timeline.json', 'users.json', 'sales_documents.json', 'cotizaciones.json'] as $file) {
+            'timeline.json', 'users.json', 'sales_documents.json', 'cotizaciones.json', 'mcp_pending_actions.json', 'email_templates.json',
+            'email_history.json', 'mcp_history.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
+        Mail::fake();
         $this->admin = User::factory()->create(['role' => 'admin', 'name' => 'Héctor']);
         (new FileStore('clientes.json'))->create(['id' => 'c1', 'empresa' => 'Somos Domus', 'contacto_nombre' => 'Laura Navarro', 'contacto_email' => 'laura@domus.test', 'estado' => 'Activo']);
     }
@@ -101,7 +105,7 @@ class AiToolModeTest extends TestCase
         Http::assertSentCount(6);
     }
 
-    public function test_bridge_does_not_expose_outbound_or_high_impact_tools(): void
+    public function test_bridge_does_not_expose_high_impact_direct_writes(): void
     {
         $this->actingAs($this->admin);
         $bridge = new AiToolBridge();
@@ -110,8 +114,7 @@ class AiToolModeTest extends TestCase
 
         $this->assertStringStartsWith('ERROR', $result);
         $this->assertCount(1, (new FileStore('clientes.json'))->all());
-        foreach (['confirmar_accion', 'preparar_correo', 'preparar_envio_factura', 'preparar_pago', 'preparar_reunion', 'preparar_envio_contrato',
-            'crear_cliente', 'crear_factura_borrador', 'registrar_gasto', 'crear_proyecto', 'actualizar_proyecto', 'convertir_lead_cliente'] as $name) {
+        foreach (['crear_cliente', 'crear_factura_borrador', 'registrar_gasto', 'crear_proyecto', 'actualizar_proyecto', 'convertir_lead_cliente'] as $name) {
             $this->assertNotContains($name, $bridge->names(), "{$name} no debe estar en el asistente todavía.");
         }
         $this->assertFalse($bridge->writes('buscar_clientes'));
@@ -169,7 +172,7 @@ class AiToolModeTest extends TestCase
     {
         $definitions = (new AiToolBridge())->definitions();
 
-        $this->assertCount(37, $definitions);
+        $this->assertCount(43, $definitions);
         foreach ($definitions as $definition) {
             $this->assertSame('function', $definition['type']);
             $this->assertMatchesRegularExpression('/^[a-z_]+$/', $definition['function']['name']);
@@ -189,5 +192,134 @@ class AiToolModeTest extends TestCase
         ])->assertRedirect(route('settings.ai'));
 
         $this->assertTrue((new FileStore('settings.json'))->find('settings')['ai_tools_enabled']);
+    }
+
+    private array $replies = [];
+
+    private bool $repliesFaked = false;
+
+    /** Respuestas del modelo en orden; se puede llamar varias veces en un mismo test. */
+    private function queueReplies(array $replies): void
+    {
+        $this->replies = $replies;
+        if (!$this->repliesFaked) {
+            $this->repliesFaked = true;
+            Http::fake(function ($request) {
+                $next = array_shift($this->replies);
+
+                return Http::response(is_callable($next) ? $next($request) : $next);
+            });
+        }
+    }
+
+    private function text(string $content): array
+    {
+        return ['choices' => [['message' => ['role' => 'assistant', 'content' => $content]]]];
+    }
+
+    private function prepareEmailTurn(): array
+    {
+        $queue = [
+            $this->toolCall('preparar_correo', ['cliente_id' => 'c1', 'asunto' => 'Seguimiento', 'mensaje' => '<p>Hola {cliente}, te escribo por el diseño.</p>']),
+            $this->text('Te preparé el correo para Laura. ¿Lo envío?'),
+        ];
+        $this->queueReplies($queue);
+        $this->actingAs($this->admin);
+
+        return (new AiService())->reply('Mándale un correo a Somos Domus por el diseño');
+    }
+
+    public function test_two_step_email_shows_the_real_preview_and_sends_only_after_explicit_yes(): void
+    {
+        $this->enableAi(true);
+        $first = $this->prepareEmailTurn();
+
+        $this->assertStringContainsString('Te preparé el correo', $first['content']);
+        $this->assertStringContainsString('Asunto: Seguimiento', $first['content'], 'La vista previa la agrega Infocus tal cual.');
+        $this->assertMatchesRegularExpression('/Código de confirmación: [A-Z0-9]{3}-[A-Z0-9]{3}\./', $first['content']);
+        $this->assertStringNotContainsString('confirmar_accion', $first['content']);
+        Mail::assertNothingSent();
+
+        $code = AiToolBridge::codesIn($first['content'])[0];
+        $history = [['role' => 'user', 'content' => 'Mándale un correo a Somos Domus por el diseño'], ['role' => 'assistant', 'content' => $first['content']]];
+        $queue = [$this->toolCall('confirmar_accion', ['codigo' => $code]), $this->text('Listo, enviado.')];
+        $this->queueReplies($queue);
+
+        $second = (new AiService())->reply('Sí, envíalo', $history);
+
+        $this->assertSame(['confirmar_accion'], $second['tools_used']);
+        Mail::assertSentCount(1);
+    }
+
+    public function test_confirmation_is_blocked_when_the_user_did_not_approve(): void
+    {
+        $this->enableAi(true);
+        $first = $this->prepareEmailTurn();
+        $code = AiToolBridge::codesIn($first['content'])[0];
+        $history = [['role' => 'user', 'content' => 'Mándale un correo'], ['role' => 'assistant', 'content' => $first['content']]];
+
+        $queue = [$this->toolCall('confirmar_accion', ['codigo' => $code]), $this->text('Ok.')];
+        $this->queueReplies($queue);
+        (new AiService())->reply('¿Y cuánto le cobramos por el diseño?', $history);
+
+        Mail::assertNothingSent();
+        $toolMessage = collect(Http::recorded()->last()[0]['messages'])->firstWhere('role', 'tool');
+        $this->assertStringStartsWith('ERROR: no confirmes todavía', $toolMessage['content']);
+    }
+
+    public function test_model_cannot_prepare_and_confirm_in_the_same_turn(): void
+    {
+        $this->enableAi(true);
+        $queue = [
+            $this->toolCall('preparar_correo', ['para' => ['laura@domus.test'], 'asunto' => 'Hola', 'mensaje' => 'Texto']),
+            function ($request) {
+                $prepared = collect($request['messages'])->where('role', 'tool')->last()['content'];
+
+                return $this->toolCall('confirmar_accion', ['codigo' => AiToolBridge::codesIn($prepared)[0]]);
+            },
+            $this->text('Listo.'),
+        ];
+        $this->queueReplies($queue);
+        $this->actingAs($this->admin);
+
+        (new AiService())->reply('Sí, mándale un hola a Laura');
+
+        Mail::assertNothingSent();
+        $toolMessage = collect(Http::recorded()->last()[0]['messages'])->where('role', 'tool')->last();
+        $this->assertStringContainsString('no es el de la vista previa que el usuario acaba de ver', $toolMessage['content']);
+    }
+
+    public function test_approval_detection_is_strict(): void
+    {
+        foreach (['sí', 'Sí, envíalo', 'dale', 'listo, mándalo', 'ok', 'confirmo'] as $yes) {
+            $this->assertTrue(AiApproval::isExplicit($yes), $yes);
+        }
+        foreach (['no', 'sí pero cambia el asunto', '¿y cuánto vale?', 'espera', 'mejor mañana', '', 'mándale otro correo a Pedro con el resumen de la reunión y los entregables'] as $no) {
+            $this->assertFalse(AiApproval::isExplicit($no), $no);
+        }
+    }
+
+    public function test_gemini_uses_function_calling_with_the_same_tools(): void
+    {
+        $this->enableAi(true, 'gemini');
+        Http::fakeSequence('generativelanguage.googleapis.com/*')
+            ->push(['candidates' => [['content' => ['role' => 'model', 'parts' => [['functionCall' => ['name' => 'buscar_clientes', 'args' => ['texto' => 'domus']], 'thoughtSignature' => 'sig-1']]]]]])
+            ->push(['candidates' => [['content' => ['role' => 'model', 'parts' => [['text' => 'Laura Navarro, laura@domus.test.']]]]]]);
+
+        $this->actingAs($this->admin);
+        $reply = (new AiService())->reply('¿Quién es el contacto de Somos Domus?');
+
+        $this->assertSame('Laura Navarro, laura@domus.test.', $reply['content']);
+        $this->assertSame(['buscar_clientes'], $reply['tools_used']);
+        $requests = Http::recorded();
+        $declarations = collect($requests[0][0]['tools'][0]['functionDeclarations'])->pluck('name');
+        $this->assertTrue($declarations->contains('buscar_clientes'));
+        $contents = $requests[1][0]['contents'];
+        $model = collect($contents)->firstWhere('role', 'model');
+        $this->assertSame('buscar_clientes', $model['parts'][0]['functionCall']['name']);
+        $this->assertSame('sig-1', $model['parts'][0]['thoughtSignature']);
+        $response = collect(end($contents)['parts'])->first();
+        $this->assertSame('buscar_clientes', $response['functionResponse']['name']);
+        $this->assertStringContainsString('laura@domus.test', $response['functionResponse']['response']['content']);
     }
 }

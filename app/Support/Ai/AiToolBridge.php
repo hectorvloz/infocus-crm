@@ -16,9 +16,10 @@ use Throwable;
  * sesión, sus permisos y el mismo registro de uso que el MCP.
  *
  * Las de lectura corren con un contexto de solo lectura, para que si alguna intenta
- * escribir falle. Las de escritura (fase 2) son solo las de bajo riesgo, internas y
+ * escribir falle. Las de escritura directa son las de bajo riesgo, internas y
  * reversibles: recordatorios, notas, tareas y leads. Las que salen hacia afuera
- * (correos, facturas, pagos, reuniones, contratos) siguen fuera del asistente.
+ * (correos, facturas, pagos, reuniones, contratos) van en dos pasos y confirmar_accion
+ * solo se ejecuta si el usuario aprobó explícitamente un código que ya vio.
  */
 class AiToolBridge
 {
@@ -69,13 +70,52 @@ class AiToolBridge
         Tools\CrearLead::class,
         Tools\ActualizarLead::class,
         Tools\RestaurarCambio::class,
+        // Dos pasos (fase 3): preparan una vista previa con código; solo confirmar_accion ejecuta.
+        Tools\PrepararCorreo::class,
+        Tools\PrepararEnvioFactura::class,
+        Tools\PrepararPago::class,
+        Tools\PrepararReunion::class,
+        Tools\PrepararEnvioContrato::class,
+        Tools\ConfirmarAccion::class,
     ];
+
+    public const CONFIRM_TOOL = 'confirmar_accion';
 
     /** @var array<string, Tool>|null */
     private ?array $tools = null;
 
     /** @var array<int, string> */
     private array $writeNames = [];
+
+    private bool $userApproved = false;
+
+    /** @var array<int, string> */
+    private array $shownCodes = [];
+
+    /**
+     * Qué puede confirmar el modelo en esta vuelta: solo códigos que el usuario ya vio
+     * en la respuesta anterior, y solo si su mensaje actual es una aprobación explícita.
+     *
+     * @param  array<int, string>  $shownCodes
+     */
+    public function allowConfirmation(bool $userApproved, array $shownCodes): void
+    {
+        $this->userApproved = $userApproved;
+        $this->shownCodes = array_values(array_map(fn ($c) => strtoupper(trim((string) $c)), $shownCodes));
+    }
+
+    public static function isPrepareTool(string $name): bool
+    {
+        return str_starts_with($name, 'preparar_');
+    }
+
+    /** @return array<int, string> */
+    public static function codesIn(string $text): array
+    {
+        preg_match_all('/\b([A-Za-z0-9]{3}-[A-Za-z0-9]{3})\b/', $text, $matches);
+
+        return array_values(array_unique(array_map('strtoupper', $matches[1] ?? [])));
+    }
 
     /**
      * Definiciones en formato de funciones de OpenAI/DeepSeek.
@@ -121,6 +161,16 @@ class AiToolBridge
         $tool = $this->tools()[$name] ?? null;
         if (!$tool) {
             return 'ERROR: la herramienta ' . $name . ' no está disponible en el asistente.';
+        }
+
+        if ($name === self::CONFIRM_TOOL) {
+            $code = strtoupper(trim((string) ($arguments['codigo'] ?? '')));
+            if (!$this->userApproved) {
+                return 'ERROR: no confirmes todavía. El usuario debe aprobar la vista previa con un mensaje explícito (por ejemplo "sí, envíalo"). Pídeselo.';
+            }
+            if (!in_array($code, $this->shownCodes, true)) {
+                return 'ERROR: ese código no es el de la vista previa que el usuario acaba de ver. Prepara la acción de nuevo y muéstrale la vista previa.';
+            }
         }
 
         $previous = app()->bound(McpContext::class) ? app(McpContext::class) : null;

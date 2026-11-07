@@ -130,7 +130,7 @@
         <input type="checkbox" name="ai_tools_enabled" value="1" class="mt-1 rounded text-lime-500 focus:ring-lime-300" {{ ($settings['ai_tools_enabled'] ?? false) ? 'checked' : '' }}>
         <span>
           <span class="block font-extrabold text-slate-900">Asistente con herramientas (beta)</span>
-          <span class="block text-sm text-slate-500">La IA consulta los datos del CRM con las mismas herramientas del MCP antes de responder, y puede crear o editar recordatorios, notas, tareas y leads cuando se lo pidas (se puede deshacer). Enviar correos, facturas o contratos, registrar pagos y crear clientes sigue pidiendo tu confirmación. Funciona con OpenAI y DeepSeek; con Gemini se usa el asistente clásico.</span>
+          <span class="block text-sm text-slate-500">La IA consulta los datos del CRM con las mismas herramientas del MCP antes de responder, y puede crear o editar recordatorios, notas, tareas y leads cuando se lo pidas (se puede deshacer). Para enviar correos, facturas o contratos, registrar pagos o programar reuniones te muestra la vista previa y solo lo hace si respondes "sí". Funciona con DeepSeek, OpenAI y Gemini.</span>
         </span>
       </label>
     </div>

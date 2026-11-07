@@ -35,7 +35,8 @@
 - `DeepSeekProvider` y `OpenAiProvider` implementan `AiToolCallingProvider::chatWithTools()` (formato OpenAI; en DeepSeek el modo pensar va apagado con herramientas). `AiService::reply()` hace el ciclo (máximo 6 vueltas) cuando `ai_tools_enabled` está activo en Configuración > IA. Gemini sigue con el asistente clásico.
 - Tests en `tests/Feature/AiToolModeTest.php`.
 - Fase 2 (hecha): 15 herramientas que escriben, de bajo riesgo e internas, con `McpContext('asistente', 'completo')` y los permisos del rol del usuario: recordatorios (crear, completar, editar, organizar), notas personales, notas de cliente y de proyecto, tareas y subtareas, crear y actualizar leads, más `ver_cambios_recientes` y `restaurar_cambio` para deshacer. Quedan fuera: clientes, proyectos, facturas, gastos, contratos, conversión de leads y todo lo de dos pasos. El chat guarda `tools_used` en cada respuesta.
-- Siguiente: fase 3 (dos pasos con confirmación protegida en el servidor y Gemini), fase 4 (canal de WhatsApp).
+- Fase 3 (hecha): los cinco `preparar_*` y `confirmar_accion` están en el asistente. Infocus agrega la vista previa real de la herramienta al final de la respuesta (el modelo no la resume) con "Código de confirmación: XXX-XXX". `AiToolBridge` solo deja ejecutar `confirmar_accion` si el mensaje actual del usuario es una aprobación explícita (`AiApproval`, estricto) y el código estaba en la respuesta anterior del asistente: así no se puede preparar y confirmar en el mismo turno. `GeminiProvider` también soporta herramientas (functionCall/functionResponse, conserva thoughtSignature).
+- Pendiente del asistente: crear clientes, proyectos, facturas en borrador, gastos y contratos (escrituras directas que aún no expone); fase 4, canal de WhatsApp.
 
 ## Pendiente en este repo
 - Hacer "Update from Remote" en cPanel después del último push (Héctor).
