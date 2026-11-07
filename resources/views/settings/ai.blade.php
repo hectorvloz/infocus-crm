@@ -192,12 +192,18 @@
     @endforeach
   </section>
 
+  @php
+    $waProvider = old('whatsapp_provider', $settings['whatsapp_provider'] ?? 'twilio');
+    $waProviders = \App\Support\WhatsApp\WhatsAppChannel::PROVIDERS;
+    $waInput = 'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900';
+    $waMono = $waInput . ' font-mono text-sm';
+    $waTextmebotKey = (string) ($settings['whatsapp_textmebot_webhook_key'] ?? '');
+    $waVerifyToken = (string) ($settings['whatsapp_meta_verify_token'] ?? '');
+  @endphp
   <section data-ai-settings-panel="whatsapp" class="{{ $activeAiTab === 'whatsapp' ? '' : 'hidden' }} space-y-5">
     <div class="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-relaxed text-slate-700">
       <div class="font-black text-slate-900">Habla con el asistente por WhatsApp</div>
-      <p class="mt-1">Infocus recibe tus mensajes por Twilio y los contesta el mismo asistente con herramientas, con los permisos del usuario que elijas. Solo responde al número del dueño. Para correos, facturas, pagos, reuniones y contratos te manda la vista previa y lo hace solo si contestas "sí".</p>
-      <p class="mt-2">En Twilio, en la configuración del número de WhatsApp (o del sandbox), pon como webhook de mensajes entrantes (método POST):</p>
-      <code class="mt-2 block break-all rounded-xl bg-white px-3 py-2 font-mono text-xs text-slate-900 border border-slate-200">{{ url('/webhooks/whatsapp') }}</code>
+      <p class="mt-1">Infocus recibe tus mensajes y los contesta el mismo asistente con herramientas, con los permisos del usuario que elijas. Solo responde a tu número. Para correos, facturas, pagos, reuniones y contratos te manda la vista previa y lo hace solo si contestas "sí". Elige el proveedor y llena solo su sección.</p>
     </div>
 
     <form method="POST" action="{{ route('settings.ai.whatsapp.update') }}" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
@@ -213,43 +219,127 @@
       </label>
 
       <div class="grid gap-5 md:grid-cols-2">
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-2">Twilio Account SID</label>
-          <input name="whatsapp_twilio_sid" value="{{ old('whatsapp_twilio_sid', $settings['whatsapp_twilio_sid'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900" placeholder="AC..." autocomplete="off">
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-2">Twilio Auth Token</label>
-          <input name="whatsapp_twilio_token" type="password" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900" placeholder="Dejar vacío para mantener el actual" autocomplete="new-password">
-          <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['whatsapp_token_preview'] ?? 'Sin configurar' }}</span></p>
-        </div>
-        <div>
-          <label class="block text-sm font-bold text-slate-700 mb-2">Número de WhatsApp de Twilio</label>
-          <input name="whatsapp_from" value="{{ old('whatsapp_from', $settings['whatsapp_from'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900" placeholder="+14155238886">
-          <p class="mt-2 text-sm text-slate-500">El número del sandbox o el que compraste en Twilio.</p>
+        <div class="md:col-span-2">
+          <label for="waProvider" class="block text-sm font-bold text-slate-700 mb-2">Proveedor</label>
+          <select id="waProvider" name="whatsapp_provider" class="{{ $waInput }} font-semibold">
+            @foreach($waProviders as $value => $label)
+              <option value="{{ $value }}" {{ $waProvider === $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+          </select>
         </div>
         <div>
           <label class="block text-sm font-bold text-slate-700 mb-2">Tu WhatsApp (el único que puede hablarle)</label>
-          <input name="whatsapp_owner" value="{{ old('whatsapp_owner', $settings['whatsapp_owner'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900" placeholder="+573001234567">
+          <input name="whatsapp_owner" value="{{ old('whatsapp_owner', $settings['whatsapp_owner'] ?? '') }}" class="{{ $waInput }}" placeholder="+573001234567">
         </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-bold text-slate-700 mb-2">Plantilla para avisos programados (opcional)</label>
-          <input name="whatsapp_template_sid" value="{{ old('whatsapp_template_sid', $settings['whatsapp_template_sid'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900" placeholder="HX..." autocomplete="off">
-          <p class="mt-2 text-sm text-slate-500">WhatsApp solo deja escribirte libremente durante 24 horas después de tu último mensaje. Para los avisos programados fuera de ese tiempo, crea en Twilio (Content Template Builder) una plantilla de tipo utilidad con el texto "Aviso de Infocus: @{{1}}", espera la aprobación y pega aquí su Content SID. Sin plantilla, esos avisos llegan por correo.</p>
-          @error('whatsapp_template_sid')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
-        </div>
-        <div class="md:col-span-2">
+        <div>
           <label class="block text-sm font-bold text-slate-700 mb-2">Responder como</label>
-          <select name="whatsapp_user_id" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold">
+          <select name="whatsapp_user_id" class="{{ $waInput }} font-semibold">
             <option value="">Elegir usuario administrador</option>
             @foreach($whatsappAdmins ?? [] as $admin)
               <option value="{{ $admin->id }}" {{ (string) old('whatsapp_user_id', $settings['whatsapp_user_id'] ?? '') === (string) $admin->id ? 'selected' : '' }}>{{ $admin->name }} · {{ $admin->email }}</option>
             @endforeach
           </select>
-          <p class="mt-2 text-sm text-slate-500">El asistente usa los permisos de este usuario y deja su actividad registrada a su nombre.</p>
           @error('whatsapp_user_id')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
-          @error('whatsapp_twilio_sid')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
         </div>
       </div>
+
+      {{-- Twilio --}}
+      <details data-wa-provider="twilio" class="rounded-2xl border border-slate-200 px-5 py-4 {{ $waProvider === 'twilio' ? '' : 'hidden' }}" {{ $waProvider === 'twilio' ? 'open' : '' }}>
+        <summary class="cursor-pointer font-extrabold text-slate-900">Twilio</summary>
+        <div class="mt-4 grid gap-5 md:grid-cols-2">
+          <div class="md:col-span-2 text-sm text-slate-600">
+            En Twilio, en el número de WhatsApp o en el sandbox (requiere cuenta con upgrade), pon como webhook de mensajes entrantes, método POST:
+            <code class="mt-2 block break-all rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 border border-slate-200">{{ url('/webhooks/whatsapp') }}</code>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Account SID</label>
+            <input name="whatsapp_twilio_sid" value="{{ old('whatsapp_twilio_sid', $settings['whatsapp_twilio_sid'] ?? '') }}" class="{{ $waMono }}" placeholder="AC..." autocomplete="off">
+            @error('whatsapp_twilio_sid')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Auth Token</label>
+            <input name="whatsapp_twilio_token" type="password" class="{{ $waMono }}" placeholder="Dejar vacío para mantener el actual" autocomplete="new-password">
+            <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['whatsapp_token_preview'] ?? 'Sin configurar' }}</span></p>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Número de WhatsApp de Twilio</label>
+            <input name="whatsapp_from" value="{{ old('whatsapp_from', $settings['whatsapp_from'] ?? '') }}" class="{{ $waInput }}" placeholder="+14155238886">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Plantilla para avisos (opcional)</label>
+            <input name="whatsapp_template_sid" value="{{ old('whatsapp_template_sid', $settings['whatsapp_template_sid'] ?? '') }}" class="{{ $waMono }}" placeholder="HX..." autocomplete="off">
+            @error('whatsapp_template_sid')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          </div>
+          <p class="md:col-span-2 text-sm text-slate-500">Para avisos programados fuera de las 24 horas desde tu último mensaje: crea en Twilio (Content Template Builder) una plantilla de utilidad con el texto "Aviso de Infocus: @{{1}}" y pega su Content SID. Sin plantilla, esos avisos llegan por correo.</p>
+        </div>
+      </details>
+
+      {{-- Meta --}}
+      <details data-wa-provider="meta" class="rounded-2xl border border-slate-200 px-5 py-4 {{ $waProvider === 'meta' ? '' : 'hidden' }}" {{ $waProvider === 'meta' ? 'open' : '' }}>
+        <summary class="cursor-pointer font-extrabold text-slate-900">Meta (WhatsApp Cloud API)</summary>
+        <div class="mt-4 grid gap-5 md:grid-cols-2">
+          <div class="md:col-span-2 text-sm text-slate-600 space-y-2">
+            <p>En developers.facebook.com, en tu app &gt; WhatsApp &gt; Configuración, en Webhook pon esta URL y el token de verificación, y suscríbete al campo <strong>messages</strong>:</p>
+            <code class="block break-all rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 border border-slate-200">{{ url('/webhooks/whatsapp/meta') }}</code>
+            <p>Token de verificación: @if($waVerifyToken !== '')<code class="break-all rounded-lg bg-slate-50 px-2 py-1 font-mono text-xs text-slate-900 border border-slate-200">{{ $waVerifyToken }}</code>@else<span class="font-bold">se genera al guardar esta configuración.</span>@endif</p>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Phone Number ID</label>
+            <input name="whatsapp_meta_phone_id" value="{{ old('whatsapp_meta_phone_id', $settings['whatsapp_meta_phone_id'] ?? '') }}" class="{{ $waMono }}" placeholder="Identificador del número" autocomplete="off">
+            @error('whatsapp_meta_phone_id')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Access token</label>
+            <input name="whatsapp_meta_token" type="password" class="{{ $waMono }}" placeholder="Dejar vacío para mantener el actual" autocomplete="new-password">
+            <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['whatsapp_meta_token_preview'] ?? 'Sin configurar' }}</span>. El temporal vence en 24 horas; para uso real crea uno permanente con un usuario del sistema.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">App Secret</label>
+            <input name="whatsapp_meta_app_secret" type="password" class="{{ $waMono }}" placeholder="Dejar vacío para mantener el actual" autocomplete="new-password">
+            <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['whatsapp_meta_app_secret_preview'] ?? 'Sin configurar' }}</span>. Está en Configuración de la app &gt; Básica. Sirve para validar la firma de Meta.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Versión de la Graph API</label>
+            <input name="whatsapp_meta_version" value="{{ old('whatsapp_meta_version', $settings['whatsapp_meta_version'] ?? \App\Support\WhatsApp\MetaWhatsApp::DEFAULT_VERSION) }}" class="{{ $waMono }}" placeholder="{{ \App\Support\WhatsApp\MetaWhatsApp::DEFAULT_VERSION }}">
+            @error('whatsapp_meta_version')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Plantilla para avisos (opcional)</label>
+            <input name="whatsapp_meta_template_name" value="{{ old('whatsapp_meta_template_name', $settings['whatsapp_meta_template_name'] ?? '') }}" class="{{ $waMono }}" placeholder="aviso_infocus">
+            @error('whatsapp_meta_template_name')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">Idioma de la plantilla</label>
+            <input name="whatsapp_meta_template_lang" value="{{ old('whatsapp_meta_template_lang', $settings['whatsapp_meta_template_lang'] ?? 'es') }}" class="{{ $waMono }}" placeholder="es">
+            @error('whatsapp_meta_template_lang')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          </div>
+          <p class="md:col-span-2 text-sm text-slate-500">La plantilla se crea en WhatsApp Manager, de categoría utilidad, con el cuerpo "Aviso de Infocus: @{{1}}". Sin plantilla, los avisos fuera de las 24 horas llegan por correo.</p>
+        </div>
+      </details>
+
+      {{-- TextMeBot --}}
+      <details data-wa-provider="textmebot" class="rounded-2xl border border-slate-200 px-5 py-4 {{ $waProvider === 'textmebot' ? '' : 'hidden' }}" {{ $waProvider === 'textmebot' ? 'open' : '' }}>
+        <summary class="cursor-pointer font-extrabold text-slate-900">TextMeBot (no oficial)</summary>
+        <div class="mt-4 grid gap-5 md:grid-cols-2">
+          <div class="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            TextMeBot vincula un número de WhatsApp como si fuera WhatsApp Web. No es oficial: WhatsApp puede bloquear ese número y el servicio puede ver sus chats. Úsalo con un número aparte, no con tu WhatsApp de trabajo.
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">API key de TextMeBot</label>
+            <input name="whatsapp_textmebot_apikey" type="password" class="{{ $waMono }}" placeholder="Dejar vacío para mantener la actual" autocomplete="new-password">
+            <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['whatsapp_textmebot_apikey_preview'] ?? 'Sin configurar' }}</span></p>
+          </div>
+          <div class="md:col-span-2 text-sm text-slate-600 space-y-2">
+            <p>Para recibir mensajes, pídele a support@textmebot.com que configure este webhook (lleva una clave secreta: no la compartas en otro lado):</p>
+            @if($waTextmebotKey !== '')
+              <code class="block break-all rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs text-slate-900 border border-slate-200">{{ url('/webhooks/whatsapp/textmebot/' . $waTextmebotKey) }}</code>
+            @else
+              <p class="font-bold">La URL se genera al guardar esta configuración.</p>
+            @endif
+            <p>Sin ventana de 24 horas ni plantillas: los avisos programados salen como mensaje normal.</p>
+          </div>
+        </div>
+      </details>
 
       <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
         <button type="submit" class="rounded-2xl bg-[#ecfe88] px-7 py-3 font-extrabold text-slate-950 hover:bg-[#d9ef60]">Guardar WhatsApp</button>
@@ -258,7 +348,7 @@
 
     <form method="POST" action="{{ route('settings.ai.whatsapp.test') }}" class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
       @csrf
-      <p class="text-sm text-slate-600">Envía un mensaje de prueba a tu WhatsApp. Con el sandbox de Twilio, primero únete desde tu celular con el código "join" que te da Twilio.</p>
+      <p class="text-sm text-slate-600">Envía un mensaje de prueba a tu WhatsApp con el proveedor guardado.</p>
       <button type="submit" class="rounded-2xl border border-slate-200 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-50">Enviar prueba</button>
     </form>
   </section>
@@ -291,6 +381,14 @@
     });
 
     rebuildAiModels(document.getElementById('aiProvider')?.value || 'gemini', selectedAiModel);
+
+    document.getElementById('waProvider')?.addEventListener('change', function () {
+      document.querySelectorAll('[data-wa-provider]').forEach((panel) => {
+        const active = panel.dataset.waProvider === this.value;
+        panel.classList.toggle('hidden', !active);
+        panel.open = active;
+      });
+    });
 
     document.querySelectorAll('[data-ai-settings-tab]').forEach((button) => {
       button.addEventListener('click', () => {

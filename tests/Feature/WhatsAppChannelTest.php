@@ -175,6 +175,7 @@ class WhatsAppChannelTest extends TestCase
     {
         $this->actingAs($this->admin)->put(route('settings.ai.whatsapp.update'), [
             'whatsapp_enabled' => '1',
+            'whatsapp_provider' => 'twilio',
             'whatsapp_twilio_sid' => $this->sid(),
             'whatsapp_twilio_token' => 'nuevo-token',
             'whatsapp_from' => 'whatsapp:+1 415 523 8886',
@@ -196,7 +197,7 @@ class WhatsAppChannelTest extends TestCase
 
         $member = User::factory()->create(['role' => 'ventas']);
         $this->actingAs($this->admin)->put(route('settings.ai.whatsapp.update'), [
-            'whatsapp_twilio_sid' => $this->sid(), 'whatsapp_user_id' => (string) $member->id,
+            'whatsapp_provider' => 'twilio', 'whatsapp_twilio_sid' => $this->sid(), 'whatsapp_user_id' => (string) $member->id,
         ])->assertSessionHasErrors('whatsapp_user_id');
     }
 

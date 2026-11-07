@@ -32,6 +32,8 @@ $app = Application::configure(basePath: $basePath)
             '/webhooks/wompi',
             '/webhooks/leads',
             '/webhooks/whatsapp',
+            '/webhooks/whatsapp/meta',
+            '/webhooks/whatsapp/textmebot/*',
         ]);
         // Passport (autorización OAuth del MCP) manda a los invitados al login de Infocus.
         $middleware->redirectGuestsTo(fn () => route('login.show'));

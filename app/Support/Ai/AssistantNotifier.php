@@ -5,7 +5,7 @@ namespace App\Support\Ai;
 use App\Models\User;
 use App\Repositories\FileStore;
 use App\Support\TemplateMail;
-use App\Support\WhatsApp\TwilioWhatsApp;
+use App\Support\WhatsApp\WhatsAppChannel;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -16,7 +16,7 @@ use Throwable;
  */
 class AssistantNotifier
 {
-    public function __construct(private readonly TwilioWhatsApp $whatsapp = new TwilioWhatsApp())
+    public function __construct(private readonly ?WhatsAppChannel $whatsapp = null)
     {
     }
 
@@ -35,8 +35,9 @@ class AssistantNotifier
 
     private function viaWhatsApp(User $user, string $text): ?string
     {
-        $settings = $this->whatsapp->settings();
-        if (!$settings['enabled'] || !$this->whatsapp->configured($settings) || $settings['user_id'] !== (string) $user->id) {
+        $channel = $this->whatsapp ?? WhatsAppChannel::current();
+        $settings = $channel->settings();
+        if (!$settings['enabled'] || !$channel->configured($settings) || $settings['user_id'] !== (string) $user->id) {
             return null;
         }
 
@@ -46,10 +47,10 @@ class AssistantNotifier
         $windowOpen = $lastInbound && $lastInbound->greaterThan(now()->subHours(23)->subMinutes(50));
 
         $error = $windowOpen
-            ? $this->whatsapp->send($settings['owner'], TwilioWhatsApp::toWhatsAppText($text), $settings)
-            : $this->whatsapp->sendTemplate($settings['owner'], $text, $settings);
+            ? $channel->send($settings['owner'], WhatsAppChannel::toWhatsAppText($text), $settings)
+            : $channel->sendTemplate($settings['owner'], $text, $settings);
         if ($error !== null) {
-            if ($windowOpen || $settings['template_sid'] !== '') {
+            if ($windowOpen || $channel->hasTemplate($settings)) {
                 report(new \RuntimeException('Aviso por WhatsApp: ' . $error));
             }
 

@@ -373,6 +373,9 @@ Route::middleware('throttle:30,1')->group(function () {
 Route::post('/webhooks/wompi', [PortalController::class, 'wompiWebhook'])->name('webhooks.wompi');
 Route::post('/webhooks/leads', [LeadsWebhookController::class, 'store'])->middleware('throttle:30,1')->name('webhooks.leads');
 Route::post('/webhooks/whatsapp', [\App\Http\Controllers\WhatsAppWebhookController::class, 'handle'])->middleware('throttle:60,1')->name('webhooks.whatsapp');
+Route::get('/webhooks/whatsapp/meta', [\App\Http\Controllers\WhatsAppWebhookController::class, 'metaVerify'])->middleware('throttle:30,1')->name('webhooks.whatsapp.meta.verify');
+Route::post('/webhooks/whatsapp/meta', [\App\Http\Controllers\WhatsAppWebhookController::class, 'meta'])->middleware('throttle:120,1')->name('webhooks.whatsapp.meta');
+Route::post('/webhooks/whatsapp/textmebot/{key}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'textmebot'])->middleware('throttle:60,1')->name('webhooks.whatsapp.textmebot');
 
 // Admin: mensajes del portal
 Route::middleware('auth.session')->prefix('clientes/{id}/mensajes')->name('clientes.mensajes.')->group(function () {

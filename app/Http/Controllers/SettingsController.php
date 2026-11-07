@@ -1289,6 +1289,9 @@ class SettingsController extends Controller
         $settings['ai_api_key_preview'] = $settings['ai_api_key_previews'][$provider] ?? 'Sin configurar';
         $aiMemories = (new AiMemoryService())->groupedForUser();
         $settings['whatsapp_token_preview'] = $this->maskedSecret((string) ($settings['whatsapp_twilio_token'] ?? ''));
+        $settings['whatsapp_meta_token_preview'] = $this->maskedSecret((string) ($settings['whatsapp_meta_token'] ?? ''));
+        $settings['whatsapp_meta_app_secret_preview'] = $this->maskedSecret((string) ($settings['whatsapp_meta_app_secret'] ?? ''));
+        $settings['whatsapp_textmebot_apikey_preview'] = $this->maskedSecret((string) ($settings['whatsapp_textmebot_apikey'] ?? ''));
         $whatsappAdmins = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->orderBy('name')->get(['id', 'name', 'email']);
 
         return view('settings.ai', compact('settings', 'aiMemories', 'whatsappAdmins'));
