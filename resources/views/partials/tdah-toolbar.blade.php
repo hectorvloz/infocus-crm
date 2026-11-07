@@ -2240,6 +2240,7 @@
                             id: state.projectId,
                             action: 'stop',
                             tarea_id: state.taskId || null,
+                            close: true,
                         }),
                     });
                 }

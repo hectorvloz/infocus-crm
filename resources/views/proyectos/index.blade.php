@@ -7172,11 +7172,12 @@
       }
     }
 
-    async function sendTimerAction(projectId, action, taskId = null) {
+    // close=true al guardar: termina la sesión. Sin close, "stop" es una pausa que se puede reanudar.
+    async function sendTimerAction(projectId, action, taskId = null, close = false) {
       const res = await fetch('/api/proyectos/timer', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken},
-        body: JSON.stringify({id: projectId, action, tarea_id: taskId || null})
+        body: JSON.stringify({id: projectId, action, tarea_id: taskId || null, close: !!close})
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -9063,12 +9064,10 @@
       }
       // Stop timer on server first if running
       const running = getRunningLog(project);
-      if (running) {
-        try {
-          const stopped = await sendTimerAction(project.id, 'stop', null);
-          patchProjectInState(stopped);
-        } catch (_) {}
-      }
+      try {
+        const stopped = await sendTimerAction(project.id, 'stop', null, true);
+        patchProjectInState(stopped);
+      } catch (_) {}
       const refreshedProject = projects.find(x => String(x.id) === String(project.id)) || project;
       const refreshedTask = task?.id ? getTaskFromProject(refreshedProject, task.id) : null;
       const pendingSeconds = getCurrentProjectTotalSeconds(refreshedProject) || pendingBeforeStop;

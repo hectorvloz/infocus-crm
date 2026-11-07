@@ -96,6 +96,8 @@ class ProyectosController extends Controller
             'id' => 'required|string',
             'action' => 'required|in:start,stop',
             'tarea_id' => 'nullable|string',
+            // close=true: se guarda el tiempo y termina la sesión. Sin close, "stop" es una pausa.
+            'close' => 'nullable|boolean',
         ]);
         
         $project = $this->store->find($data['id']);
@@ -166,20 +168,48 @@ class ProyectosController extends Controller
                 }
             }
 
-            $logs[] = [
+            // Si el último tramo de este usuario quedó en pausa con la misma tarea, la sesión
+            // continúa: el tramo nuevo arrastra los segundos acumulados.
+            $carry = 0;
+            for ($i = count($logs) - 1; $i >= 0; $i--) {
+                $log = $logs[$i] ?? [];
+                if (empty($log['end']) || empty($log['start']) || !$matchesCurrentUser($log)) {
+                    continue;
+                }
+                if (!empty($log['paused']) && (string) ($log['task_id'] ?? '') === $taskId) {
+                    $carry = (int) ($log['carry'] ?? 0) + max(0, (int) $log['end'] - (int) $log['start']);
+                }
+                break;
+            }
+            $logs = $this->clearPausedFlags($logs, $matchesCurrentUser);
+            $this->clearPausedFlagsInOtherProjects((string) $data['id'], $matchesCurrentUser);
+
+            $newLog = [
                 'start' => now()->timestamp,
                 'end' => null,
                 'user' => (string) (optional(auth()->user())->name ?? 'Sistema'),
                 'task_id' => $taskId !== '' ? $taskId : null,
                 'task_name' => $taskName,
             ];
+            if ($carry > 0) {
+                $newLog['carry'] = $carry;
+            }
+            $logs[] = $newLog;
         } else {
+            // Una pausa deja marcado el último tramo para que al reanudar se sume; cerrar
+            // (guardar) termina la sesión.
             // Stop every running log for this user in this project. This prevents ghost timers
             // when a stale active log is not the last item in the history.
             $runningIndexes = $findRunningIndexes(false);
+            if (!empty($data['close']) || !empty($runningIndexes)) {
+                $logs = $this->clearPausedFlags($logs, $matchesCurrentUser);
+            }
             foreach ($runningIndexes as $lastParams) {
                 $endTs = now()->timestamp;
                 $logs[$lastParams]['end'] = $endTs;
+                if (empty($data['close'])) {
+                    $logs[$lastParams]['paused'] = true;
+                }
 
                 $startTs = (int) ($logs[$lastParams]['start'] ?? $endTs);
                 $duration = max(0, $endTs - $startTs);
@@ -272,12 +302,43 @@ class ProyectosController extends Controller
             return $task;
         })->values()->all();
 
+        $logs = $this->clearPausedFlags($logs, function ($log) use ($currentUser): bool {
+            $actor = Str::lower(trim((string) ($log['user'] ?? '')));
+            return $currentUser === '' || $actor === '' || $actor === $currentUser;
+        });
+
         $updated = $this->store->update($data['id'], [
             'time_logs' => $logs,
             'tareas' => $tasks,
         ]);
 
         return response()->json(['ok' => true, 'item' => $updated]);
+    }
+
+    /** Quita la marca de pausa de los tramos del usuario: la sesión anterior ya no continúa. */
+    private function clearPausedFlags(array $logs, callable $matchesUser): array
+    {
+        foreach ($logs as $i => $log) {
+            if (!empty($log['paused']) && $matchesUser($log)) {
+                unset($logs[$i]['paused']);
+            }
+        }
+        return array_values($logs);
+    }
+
+    private function clearPausedFlagsInOtherProjects(string $projectId, callable $matchesUser): void
+    {
+        foreach ($this->store->all() as $other) {
+            $otherId = (string) ($other['id'] ?? '');
+            if ($otherId === '' || $otherId === $projectId) {
+                continue;
+            }
+            $logs = array_values($other['time_logs'] ?? []);
+            $hasPaused = collect($logs)->contains(fn ($log) => !empty($log['paused']) && $matchesUser($log));
+            if ($hasPaused) {
+                $this->store->update($otherId, ['time_logs' => $this->clearPausedFlags($logs, $matchesUser)]);
+            }
+        }
     }
 
     public function tiempoManual(Request $request)
@@ -348,36 +409,51 @@ class ProyectosController extends Controller
             ->values();
 
         $active = null;
-
-        foreach ($projects as $project) {
-            $logs = collect($project['time_logs'] ?? []);
-            $running = $logs->last(function ($log) use ($currentUser) {
-                $actor = Str::lower(trim((string) ($log['user'] ?? '')));
-                return empty($log['end']) && $actor !== '' && ($currentUser === '' || $actor === $currentUser);
-            });
-
-            if (!$running) {
-                continue;
-            }
-
-            $runningStart = (int) ($running['start'] ?? now()->timestamp);
-            $currentSeconds = max(0, now()->timestamp - $runningStart);
-
-            $candidate = [
+        $paused = null;
+        $isMine = function ($log) use ($currentUser): bool {
+            $actor = Str::lower(trim((string) ($log['user'] ?? '')));
+            return $actor !== '' && ($currentUser === '' || $actor === $currentUser);
+        };
+        $buildItem = function (array $project, array $log, bool $running) {
+            $start = (int) ($log['start'] ?? now()->timestamp);
+            $end = $running ? now()->timestamp : (int) ($log['end'] ?? $start);
+            return [
                 'project_id' => (string) ($project['id'] ?? ''),
                 'project_title' => (string) ($project['titulo'] ?? 'Proyecto'),
                 'client' => (string) ($project['cliente'] ?? 'Sin Cliente'),
-                'task_id' => (string) ($running['task_id'] ?? ''),
-                'task_name' => (string) ($running['task_name'] ?? 'Temporizador activo'),
-                'running' => true,
-                'start' => $runningStart,
-                'current_seconds' => $currentSeconds,
+                'task_id' => (string) ($log['task_id'] ?? ''),
+                'task_name' => (string) ($log['task_name'] ?? 'Temporizador activo'),
+                'running' => $running,
+                'start' => $start,
+                'end' => $running ? null : $end,
+                // Total de la sesión: tramos anteriores (pausas) + tramo actual.
+                'current_seconds' => (int) ($log['carry'] ?? 0) + max(0, $end - $start),
             ];
+        };
 
-            if (!$active || $candidate['start'] > ($active['start'] ?? 0)) {
-                $active = $candidate;
+        foreach ($projects as $project) {
+            $logs = collect($project['time_logs'] ?? []);
+            $running = $logs->last(fn ($log) => empty($log['end']) && $isMine($log));
+
+            if ($running) {
+                $candidate = $buildItem($project, $running, true);
+                if (!$active || $candidate['start'] > ($active['start'] ?? 0)) {
+                    $active = $candidate;
+                }
+                continue;
+            }
+
+            $pausedLog = $logs->last(fn ($log) => !empty($log['end']) && !empty($log['paused']) && $isMine($log));
+            if ($pausedLog) {
+                $candidate = $buildItem($project, $pausedLog, false);
+                if (!$paused || $candidate['end'] > ($paused['end'] ?? 0)) {
+                    $paused = $candidate;
+                }
             }
         }
+
+        // Un temporizador en pausa sigue visible (con su tiempo congelado) hasta guardarlo o eliminarlo.
+        $active = $active ?? $paused;
 
         return response()->json([
             'ok' => true,

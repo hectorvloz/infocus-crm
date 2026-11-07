@@ -6018,13 +6018,7 @@
             return;
           }
           syncGlobalTimerPanels();
-          const video = document.getElementById('globalTimerPipVideo');
-          if (isGlobalNativePipOpen() && video?.paused) {
-            suppressGlobalPipPlaybackSync = true;
-            video.play().catch(() => {}).finally(() => {
-              setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
-            });
-          }
+          syncGlobalPipPlayback();
         };
         pump();
 
@@ -6032,6 +6026,8 @@
           const video = document.getElementById('globalTimerPipVideo');
           if (!isGlobalNativePipOpen()) return;
           syncGlobalTimerPanels();
+          // En pausa el video se queda quieto a propósito: no hay nada que recuperar.
+          if (!globalTimerState?.isRunning) return;
           const staleFrame = globalPipLastFrameAt && Date.now() - globalPipLastFrameAt > 2600;
           if (!globalPipTrackHealthy() || video?.paused || video?.readyState < 2 || staleFrame) {
             suppressGlobalPipPlaybackSync = true;
@@ -6071,12 +6067,42 @@
         ensureGlobalPipSource().then(() => {
           const video = document.getElementById('globalTimerPipVideo');
           if (!video) return;
+          syncGlobalPipPlayback();
+          if (!globalPipRenderInterval) startGlobalPipRenderLoop();
+        });
+      }
+
+      // El video del PiP refleja el temporizador: se reproduce si corre y se queda en pausa
+      // (mostrando el tiempo congelado) si está pausado. Así el botón del PiP muestra el estado real.
+      let globalPipToggleInFlight = false;
+      function syncGlobalPipPlayback() {
+        const video = document.getElementById('globalTimerPipVideo');
+        if (!video || !isGlobalNativePipOpen() || globalPipToggleInFlight) return;
+        const shouldPlay = !!globalTimerState?.isRunning;
+        if (shouldPlay && video.paused) {
           suppressGlobalPipPlaybackSync = true;
           video.play().catch(() => {}).finally(() => {
             setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
           });
-          if (!globalPipRenderInterval) startGlobalPipRenderLoop();
-        });
+        } else if (!shouldPlay && !video.paused) {
+          // Pintamos el último cuadro con el tiempo congelado antes de pausar.
+          syncGlobalTimerPanels();
+          suppressGlobalPipPlaybackSync = true;
+          video.pause();
+          setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
+        }
+      }
+
+      async function toggleGlobalTimerFromPip(wantRunning) {
+        if (!globalTimerState?.projectId || globalPipToggleInFlight) return;
+        if (!!globalTimerState.isRunning === wantRunning) return;
+        globalPipToggleInFlight = true;
+        try {
+          await toggleGlobalTimer();
+        } finally {
+          globalPipToggleInFlight = false;
+          syncGlobalPipPlayback();
+        }
       }
 
       function setGlobalPipActionButtonState() {
@@ -6097,12 +6123,10 @@
           });
           navigator.mediaSession.playbackState = globalTimerState?.isRunning ? 'playing' : 'paused';
           navigator.mediaSession.setActionHandler('play', () => {
-            if (!globalTimerState?.projectId || globalTimerState.isRunning) return;
-            toggleGlobalTimer().catch(() => {});
+            toggleGlobalTimerFromPip(true).catch(() => {});
           });
           navigator.mediaSession.setActionHandler('pause', () => {
-            if (!globalTimerState?.projectId || !globalTimerState.isRunning) return;
-            toggleGlobalTimer().catch(() => {});
+            toggleGlobalTimerFromPip(false).catch(() => {});
           });
           navigator.mediaSession.setActionHandler('previoustrack', () => { window.focus(); });
         } catch (_) {}
@@ -6162,13 +6186,13 @@
         const projectId = globalTimerState.projectId;
         const seconds = getDisplayedSeconds();
         if (seconds <= 0) return;
-        // Stop timer on server first if running
-        if (globalTimerState.isRunning) {
+        // Detiene el tramo (si corre) y cierra la sesión, también si estaba en pausa.
+        {
           try {
             const stopResponse = await fetch('/api/proyectos/timer', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
-              body: JSON.stringify({ id: projectId, action: 'stop', tarea_id: globalTimerState.taskId || null }),
+              body: JSON.stringify({ id: projectId, action: 'stop', tarea_id: globalTimerState.taskId || null, close: true }),
             });
             const stopJson = await stopResponse.json().catch(() => ({}));
             if (!stopResponse.ok || stopJson?.ok === false) {
@@ -6226,6 +6250,10 @@
             syncedAt: Date.now(),
           });
           renderGlobalTimer();
+          if (isGlobalNativePipOpen()) {
+            updateGlobalPipMediaSession();
+            syncGlobalPipPlayback();
+          }
         } catch (error) {
           if (window.showNotification) window.showNotification('No se pudo actualizar el temporizador', 'error');
         }
@@ -6278,6 +6306,7 @@
       }
 
       async function syncGlobalTimerFromServer() {
+        const requestedAt = Date.now();
         try {
           const response = await fetch('/api/header/active-timer', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
           const json = await response.json().catch(() => ({}));
@@ -6291,7 +6320,16 @@
             return;
           }
 
+          // Si mientras llegaba la respuesta se pausó o reanudó (aquí o en otra pestaña),
+          // la respuesta ya es vieja: no la aplicamos.
+          if (stored && Number(stored.syncedAt || 0) > requestedAt) {
+            globalTimerState = stored;
+            renderGlobalTimer();
+            return;
+          }
+
           if (item?.project_id) {
+            // El servidor devuelve el total de la sesión (tramos en pausa + tramo actual).
             const serverSeconds = Math.max(0, Number(item.current_seconds || 0));
             setStoredState({
               projectId: String(item.project_id),
@@ -6300,7 +6338,7 @@
               taskId: String(item.task_id || ''),
               taskName: String(item.task_name || 'Temporizador activo'),
               currentSeconds: serverSeconds,
-              isRunning: true,
+              isRunning: item.running !== false,
               syncedAt: Date.now(),
             });
           } else if (stored?.projectId && stored.isRunning) {
@@ -6365,17 +6403,15 @@
         if (suppressGlobalPipPlaybackSync) return;
         const isNativePip = document.pictureInPictureElement === globalPipVideo || globalPipVideo.webkitPresentationMode === 'picture-in-picture';
         if (!isNativePip || !globalTimerState?.projectId) return;
-        suppressGlobalPipPlaybackSync = true;
-        globalPipVideo.play().catch(() => {}).finally(() => {
-          setTimeout(() => { suppressGlobalPipPlaybackSync = false; }, 0);
-        });
-        syncGlobalTimerPanels();
+        // Pausa pulsada en el PiP (Safari pausa el video directamente): pausa el temporizador.
+        toggleGlobalTimerFromPip(false).catch(() => {});
       });
       globalPipVideo?.addEventListener('play', () => {
         if (suppressGlobalPipPlaybackSync) return;
         const isNativePip = document.pictureInPictureElement === globalPipVideo || globalPipVideo.webkitPresentationMode === 'picture-in-picture';
         if (!isNativePip || !globalTimerState?.projectId) return;
         syncGlobalTimerPanels();
+        toggleGlobalTimerFromPip(true).catch(() => {});
       });
       globalPipVideo?.addEventListener('emptied', refreshGlobalPipAfterResume);
       globalPipVideo?.addEventListener('stalled', refreshGlobalPipAfterResume);
