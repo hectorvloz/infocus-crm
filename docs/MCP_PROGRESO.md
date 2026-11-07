@@ -30,8 +30,15 @@
 ### Recordatorios
 - Se guardan en `header_reminders.json` con la clave `user:` + slug del correo (igual que `ProfileController`). La pantalla ahora recarga los recordatorios al volver a la pestaña para no pisar los creados por el MCP.
 
+### Asistente interno con herramientas del MCP (fase 1, 7 de noviembre de 2026)
+- `App\Support\Ai\AiToolBridge` expone 21 herramientas de lectura del MCP al asistente interno como funciones. Se ejecutan dentro de Infocus con el usuario de la sesión, siempre con un `McpContext('asistente', 'lectura')` (si una herramienta intenta escribir, falla) y quedan en `mcp_activity.json` con conexión `asistente`.
+- `DeepSeekProvider` y `OpenAiProvider` implementan `AiToolCallingProvider::chatWithTools()` (formato OpenAI; en DeepSeek el modo pensar va apagado con herramientas). `AiService::reply()` hace el ciclo (máximo 6 vueltas) cuando `ai_tools_enabled` está activo en Configuración > IA. Gemini sigue con el asistente clásico.
+- Tests en `tests/Feature/AiToolModeTest.php`.
+- Siguiente: fase 2 (herramientas que escriben: recordatorios, notas, tareas, leads), fase 3 (dos pasos con confirmación protegida en el servidor y Gemini), fase 4 (canal de WhatsApp).
+
 ## Pendiente en este repo
 - Hacer "Update from Remote" en cPanel después del último push (Héctor).
+- Probar en producción el "Asistente con herramientas (beta)" con DeepSeek: activarlo en Configuración > IA y preguntar algo que exija datos (por ejemplo "¿quién me debe?").
 - Probar en producción: crear/editar/restaurar una nota, `preparar_reunion` con Meet automático (requiere Google Calendar conectado en Integraciones).
 - Reconectar Google Calendar en Infocus y revocar el token viejo en myaccount.google.com/permissions (el refresh token estuvo expuesto antes de la corrección de seguridad).
 - Actualizar dependencias de Symfony con avisos de seguridad (correr `composer update` local, commitear `vendor/`).

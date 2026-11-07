@@ -1300,6 +1300,7 @@ class SettingsController extends Controller
             'ai_model' => 'nullable|string|max:120',
             'ai_api_key' => 'nullable|string|max:800',
             'ai_send_visible_context' => 'nullable|boolean',
+            'ai_tools_enabled' => 'nullable|boolean',
             'ai_system_prompt' => 'nullable|string|max:3000',
         ]);
 
@@ -1311,6 +1312,7 @@ class SettingsController extends Controller
             'ai_model' => trim((string) ($data['ai_model'] ?? 'auto')) ?: 'auto',
             'ai_temperature' => 0.4,
             'ai_send_visible_context' => $request->boolean('ai_send_visible_context', false),
+            'ai_tools_enabled' => $request->boolean('ai_tools_enabled', false),
             'ai_system_prompt' => trim((string) ($data['ai_system_prompt'] ?? '')),
         ];
 

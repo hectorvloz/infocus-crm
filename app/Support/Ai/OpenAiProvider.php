@@ -4,8 +4,41 @@ namespace App\Support\Ai;
 
 use Illuminate\Support\Facades\Http;
 
-class OpenAiProvider implements AiProvider
+class OpenAiProvider implements AiProvider, AiToolCallingProvider
 {
+    use ParsesToolCalls;
+
+    public function chatWithTools(array $messages, array $tools, array $settings): array
+    {
+        $apiKey = (string) ($settings['api_key'] ?? '');
+        $lastResponse = null;
+        foreach ($this->candidateModels((string) ($settings['model'] ?? 'gpt-4o-mini')) as $candidateModel) {
+            $response = Http::withToken($apiKey)
+                ->timeout(60)
+                ->acceptJson()
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => $candidateModel,
+                    'messages' => $messages,
+                    'tools' => $tools,
+                    'tool_choice' => 'auto',
+                    'temperature' => (float) ($settings['temperature'] ?? 0.4),
+                ]);
+
+            if ($response->successful()) {
+                return $this->parseToolResponse((array) $response->json());
+            }
+
+            $lastResponse = $response;
+            if (! $this->looksLikeModelError((array) $response->json(), $response->status())) {
+                break;
+            }
+        }
+
+        $lastResponse?->throw();
+
+        return ['content' => '', 'tool_calls' => [], 'message' => ['role' => 'assistant', 'content' => '']];
+    }
+
     public function chat(array $messages, array $settings): string
     {
         $apiKey = (string) ($settings['api_key'] ?? '');
