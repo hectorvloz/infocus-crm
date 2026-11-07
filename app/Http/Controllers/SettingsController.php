@@ -1288,8 +1288,10 @@ class SettingsController extends Controller
         ];
         $settings['ai_api_key_preview'] = $settings['ai_api_key_previews'][$provider] ?? 'Sin configurar';
         $aiMemories = (new AiMemoryService())->groupedForUser();
+        $settings['whatsapp_token_preview'] = $this->maskedSecret((string) ($settings['whatsapp_twilio_token'] ?? ''));
+        $whatsappAdmins = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('settings.ai', compact('settings', 'aiMemories'));
+        return view('settings.ai', compact('settings', 'aiMemories', 'whatsappAdmins'));
     }
 
     public function updateAi(Request $request)

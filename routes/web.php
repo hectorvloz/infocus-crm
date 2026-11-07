@@ -266,6 +266,8 @@ Route::middleware('auth.session')->group(function () {
     Route::put('/ajustes/ia', [SettingsController::class, 'updateAi'])->name('settings.ai.update');
     Route::put('/ajustes/ia/memoria/{id}', [SettingsController::class, 'updateAiMemory'])->name('settings.ai.memory.update');
     Route::delete('/ajustes/ia/memoria/{id}', [SettingsController::class, 'deleteAiMemory'])->name('settings.ai.memory.delete');
+    Route::put('/ajustes/ia/whatsapp', [\App\Http\Controllers\WhatsAppSettingsController::class, 'update'])->name('settings.ai.whatsapp.update');
+    Route::post('/ajustes/ia/whatsapp/prueba', [\App\Http\Controllers\WhatsAppSettingsController::class, 'test'])->middleware('throttle:6,1')->name('settings.ai.whatsapp.test');
     Route::get('/pagos', [PagosController::class, 'index'])->name('pagos.index');
     Route::delete('/pagos/{facturaId}/{pagoIndex}', [PagosController::class, 'destroy'])->name('pagos.destroy');
 
@@ -370,6 +372,7 @@ Route::middleware('throttle:30,1')->group(function () {
 // Webhooks publicos
 Route::post('/webhooks/wompi', [PortalController::class, 'wompiWebhook'])->name('webhooks.wompi');
 Route::post('/webhooks/leads', [LeadsWebhookController::class, 'store'])->middleware('throttle:30,1')->name('webhooks.leads');
+Route::post('/webhooks/whatsapp', [\App\Http\Controllers\WhatsAppWebhookController::class, 'handle'])->middleware('throttle:60,1')->name('webhooks.whatsapp');
 
 // Admin: mensajes del portal
 Route::middleware('auth.session')->prefix('clientes/{id}/mensajes')->name('clientes.mensajes.')->group(function () {

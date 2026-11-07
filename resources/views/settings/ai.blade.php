@@ -48,7 +48,7 @@
   </div>
 
   @php
-    $activeAiTab = request('tab') === 'memoria' ? 'memoria' : 'conexion';
+    $activeAiTab = in_array(request('tab'), ['memoria', 'whatsapp'], true) ? request('tab') : 'conexion';
     $memoryGroups = [
       'project' => ['label' => 'Proyectos', 'empty' => 'Todavía no hay memorias vinculadas a proyectos.'],
       'client' => ['label' => 'Clientes', 'empty' => 'Todavía no hay memorias vinculadas a clientes.'],
@@ -60,6 +60,7 @@
   <div class="mb-5 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
     <button type="button" data-ai-settings-tab="conexion" class="ai-settings-tab rounded-xl px-4 py-2 text-sm font-extrabold {{ $activeAiTab === 'conexion' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Conexión</button>
     <button type="button" data-ai-settings-tab="memoria" class="ai-settings-tab rounded-xl px-4 py-2 text-sm font-extrabold {{ $activeAiTab === 'memoria' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50' }}">Memoria</button>
+    <button type="button" data-ai-settings-tab="whatsapp" class="ai-settings-tab rounded-xl px-4 py-2 text-sm font-extrabold {{ $activeAiTab === 'whatsapp' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50' }}">WhatsApp</button>
   </div>
 
   <form method="POST" action="{{ route('settings.ai.update') }}" data-ai-settings-panel="conexion" class="{{ $activeAiTab === 'conexion' ? '' : 'hidden' }} bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-7">
@@ -191,6 +192,71 @@
     @endforeach
   </section>
 
+  <section data-ai-settings-panel="whatsapp" class="{{ $activeAiTab === 'whatsapp' ? '' : 'hidden' }} space-y-5">
+    <div class="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-relaxed text-slate-700">
+      <div class="font-black text-slate-900">Habla con el asistente por WhatsApp</div>
+      <p class="mt-1">Infocus recibe tus mensajes por Twilio y los contesta el mismo asistente con herramientas, con los permisos del usuario que elijas. Solo responde al número del dueño. Para correos, facturas, pagos, reuniones y contratos te manda la vista previa y lo hace solo si contestas "sí".</p>
+      <p class="mt-2">En Twilio, en la configuración del número de WhatsApp (o del sandbox), pon como webhook de mensajes entrantes (método POST):</p>
+      <code class="mt-2 block break-all rounded-xl bg-white px-3 py-2 font-mono text-xs text-slate-900 border border-slate-200">{{ url('/webhooks/whatsapp') }}</code>
+    </div>
+
+    <form method="POST" action="{{ route('settings.ai.whatsapp.update') }}" class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-6">
+      @csrf
+      @method('PUT')
+
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="whatsapp_enabled" value="1" class="mt-1 rounded text-lime-500 focus:ring-lime-300" {{ ($settings['whatsapp_enabled'] ?? false) ? 'checked' : '' }}>
+        <span>
+          <span class="block font-extrabold text-slate-900">Activar WhatsApp</span>
+          <span class="block text-sm text-slate-500">Requiere el "Asistente con herramientas" activo en la pestaña Conexión.</span>
+        </span>
+      </label>
+
+      <div class="grid gap-5 md:grid-cols-2">
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">Twilio Account SID</label>
+          <input name="whatsapp_twilio_sid" value="{{ old('whatsapp_twilio_sid', $settings['whatsapp_twilio_sid'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900" placeholder="AC..." autocomplete="off">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">Twilio Auth Token</label>
+          <input name="whatsapp_twilio_token" type="password" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900" placeholder="Dejar vacío para mantener el actual" autocomplete="new-password">
+          <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['whatsapp_token_preview'] ?? 'Sin configurar' }}</span></p>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">Número de WhatsApp de Twilio</label>
+          <input name="whatsapp_from" value="{{ old('whatsapp_from', $settings['whatsapp_from'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900" placeholder="+14155238886">
+          <p class="mt-2 text-sm text-slate-500">El número del sandbox o el que compraste en Twilio.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">Tu WhatsApp (el único que puede hablarle)</label>
+          <input name="whatsapp_owner" value="{{ old('whatsapp_owner', $settings['whatsapp_owner'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900" placeholder="+573001234567">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-bold text-slate-700 mb-2">Responder como</label>
+          <select name="whatsapp_user_id" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold">
+            <option value="">Elegir usuario administrador</option>
+            @foreach($whatsappAdmins ?? [] as $admin)
+              <option value="{{ $admin->id }}" {{ (string) old('whatsapp_user_id', $settings['whatsapp_user_id'] ?? '') === (string) $admin->id ? 'selected' : '' }}>{{ $admin->name }} · {{ $admin->email }}</option>
+            @endforeach
+          </select>
+          <p class="mt-2 text-sm text-slate-500">El asistente usa los permisos de este usuario y deja su actividad registrada a su nombre.</p>
+          @error('whatsapp_user_id')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+          @error('whatsapp_twilio_sid')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
+        <button type="submit" class="rounded-2xl bg-[#ecfe88] px-7 py-3 font-extrabold text-slate-950 hover:bg-[#d9ef60]">Guardar WhatsApp</button>
+      </div>
+    </form>
+
+    <form method="POST" action="{{ route('settings.ai.whatsapp.test') }}" class="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
+      @csrf
+      <p class="text-sm text-slate-600">Envía un mensaje de prueba a tu WhatsApp. Con el sandbox de Twilio, primero únete desde tu celular con el código "join" que te da Twilio.</p>
+      <button type="submit" class="rounded-2xl border border-slate-200 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-50">Enviar prueba</button>
+    </form>
+  </section>
+
   <script>
     const infocusAiModels = @json($modelOptions);
     const selectedAiModel = @json($selectedModel);
@@ -234,7 +300,7 @@
           panel.classList.toggle('hidden', panel.dataset.aiSettingsPanel !== tab);
         });
         const url = new URL(window.location.href);
-        if (tab === 'memoria') url.searchParams.set('tab', 'memoria');
+        if (tab === 'memoria' || tab === 'whatsapp') url.searchParams.set('tab', tab);
         else url.searchParams.delete('tab');
         window.history.replaceState({}, '', url.toString());
       });

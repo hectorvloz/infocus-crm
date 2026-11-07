@@ -47,6 +47,10 @@ class AiService
         try {
             if ($useTools) {
                 $messages[0]['content'] .= "\n\n" . $this->toolModePrompt();
+                if (($context['channel'] ?? '') === 'whatsapp') {
+                    $messages[0]['content'] .= "\n\nCanal: WhatsApp. Responde corto y directo (máximo unas 8 líneas), sin tablas ni encabezados. "
+                        . 'No propongas acciones con botones: aquí no se ven. Lo que no puedas hacer con herramientas, dile al usuario que lo haga en Infocus.';
+                }
                 $lastAssistant = (string) data_get(collect($history)->last(fn ($item) => ($item['role'] ?? '') === 'assistant'), 'content', '');
                 [$content, $toolsUsed] = $this->replyWithTools($provider, $messages, $settings, AiApproval::isExplicit($message), AiToolBridge::codesIn($lastAssistant));
             } else {
