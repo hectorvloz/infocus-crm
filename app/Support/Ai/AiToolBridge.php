@@ -51,6 +51,7 @@ class AiToolBridge
         Tools\ListarNotas::class,
         Tools\VerNota::class,
         Tools\VerCambiosRecientes::class,
+        Tools\VerTareasProgramadas::class,
     ];
 
     /** @var array<int, class-string<Tool>> */
@@ -70,6 +71,8 @@ class AiToolBridge
         Tools\CrearLead::class,
         Tools\ActualizarLead::class,
         Tools\RestaurarCambio::class,
+        Tools\ProgramarTarea::class,
+        Tools\EditarTareaProgramada::class,
         // Dos pasos (fase 3): preparan una vista previa con código; solo confirmar_accion ejecuta.
         Tools\PrepararCorreo::class,
         Tools\PrepararEnvioFactura::class,
@@ -83,6 +86,11 @@ class AiToolBridge
 
     /** @var array<string, Tool>|null */
     private ?array $tools = null;
+
+    /** Solo lectura: para las consultas programadas, que corren sin nadie que apruebe nada. */
+    public function __construct(private readonly bool $readOnly = false)
+    {
+    }
 
     /** @var array<int, string> */
     private array $writeNames = [];
@@ -219,7 +227,7 @@ class AiToolBridge
     {
         if ($this->tools === null) {
             $this->tools = [];
-            foreach ([...self::READ_TOOLS, ...self::WRITE_TOOLS] as $class) {
+            foreach ($this->readOnly ? self::READ_TOOLS : [...self::READ_TOOLS, ...self::WRITE_TOOLS] as $class) {
                 $tool = app($class);
                 $this->tools[$tool->name()] = $tool;
                 if (in_array($class, self::WRITE_TOOLS, true)) {

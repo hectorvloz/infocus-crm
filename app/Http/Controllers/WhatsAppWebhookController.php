@@ -122,6 +122,8 @@ class WhatsAppWebhookController extends Controller
             return false;
         }
         $chat['seen'] = array_slice([...$seen, $sid], -self::SEEN);
+        // Abre la ventana de 24 horas en la que se puede escribir sin plantilla.
+        $chat['last_inbound_at'] = now()->toISOString();
         $this->saveChat($store, $chat);
 
         return true;

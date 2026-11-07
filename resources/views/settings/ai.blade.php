@@ -232,6 +232,12 @@
           <input name="whatsapp_owner" value="{{ old('whatsapp_owner', $settings['whatsapp_owner'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900" placeholder="+573001234567">
         </div>
         <div class="md:col-span-2">
+          <label class="block text-sm font-bold text-slate-700 mb-2">Plantilla para avisos programados (opcional)</label>
+          <input name="whatsapp_template_sid" value="{{ old('whatsapp_template_sid', $settings['whatsapp_template_sid'] ?? '') }}" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900" placeholder="HX..." autocomplete="off">
+          <p class="mt-2 text-sm text-slate-500">WhatsApp solo deja escribirte libremente durante 24 horas después de tu último mensaje. Para los avisos programados fuera de ese tiempo, crea en Twilio (Content Template Builder) una plantilla de tipo utilidad con el texto "Aviso de Infocus: @{{1}}", espera la aprobación y pega aquí su Content SID. Sin plantilla, esos avisos llegan por correo.</p>
+          @error('whatsapp_template_sid')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+        </div>
+        <div class="md:col-span-2">
           <label class="block text-sm font-bold text-slate-700 mb-2">Responder como</label>
           <select name="whatsapp_user_id" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold">
             <option value="">Elegir usuario administrador</option>

@@ -25,7 +25,9 @@ class WhatsAppSettingsController extends Controller
             'whatsapp_from' => 'nullable|string|max:30',
             'whatsapp_owner' => 'nullable|string|max:30',
             'whatsapp_user_id' => 'nullable|string|max:40',
+            'whatsapp_template_sid' => ['nullable', 'string', 'max:64', 'regex:/^HX[a-zA-Z0-9]{32}$/'],
         ], [
+            'whatsapp_template_sid.regex' => 'El Content SID de la plantilla empieza por HX y tiene 34 caracteres.',
             'whatsapp_twilio_sid.regex' => 'El Account SID de Twilio empieza por AC y tiene 34 caracteres.',
         ]);
 
@@ -46,6 +48,7 @@ class WhatsAppSettingsController extends Controller
             'whatsapp_from' => TwilioWhatsApp::normalizeNumber((string) ($data['whatsapp_from'] ?? '')),
             'whatsapp_owner' => TwilioWhatsApp::normalizeNumber((string) ($data['whatsapp_owner'] ?? '')),
             'whatsapp_user_id' => (string) ($data['whatsapp_user_id'] ?? ''),
+            'whatsapp_template_sid' => trim((string) ($data['whatsapp_template_sid'] ?? '')),
         ];
 
         $current ? $store->update('settings', $payload) : $store->create(['id' => 'settings'] + $payload);

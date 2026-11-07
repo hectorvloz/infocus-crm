@@ -47,6 +47,10 @@ class AiService
         try {
             if ($useTools) {
                 $messages[0]['content'] .= "\n\n" . $this->toolModePrompt();
+                if (($context['channel'] ?? '') === 'programada') {
+                    $messages[0]['content'] .= "\n\nCanal: tarea programada que corre sola, sin el usuario presente. Solo puedes consultar: no crees, edites ni prepares nada, y no hagas preguntas. "
+                        . 'Haz la instrucción y entrega directo lo que encontraste: corto, concreto y con los datos clave (nombres, montos, fechas). Si no hay nada que reportar, dilo en una línea.';
+                }
                 if (($context['channel'] ?? '') === 'whatsapp') {
                     $messages[0]['content'] .= "\n\nCanal: WhatsApp. Responde corto y directo (máximo unas 8 líneas), sin tablas ni encabezados. "
                         . 'No propongas acciones con botones: aquí no se ven. Lo que no puedas hacer con herramientas, dile al usuario que lo haga en Infocus.';
@@ -148,6 +152,7 @@ class AiService
             . "- Tienes herramientas para consultar los datos reales del CRM (clientes, leads, facturas, gastos, proyectos, tareas, contratos, recordatorios, reuniones, notas y las guías de Indigo). Úsalas en vez de suponer: si te preguntan por un dato, búscalo.\n"
             . "- Puedes hacer directamente, cuando el usuario lo pida: recordatorios (crear, editar, completar, organizar), notas personales, notas de cliente y de proyecto, tareas y subtareas, y crear o actualizar leads. Antes de crear, busca si ya existe para no duplicar. Después di en una frase qué hiciste, con el dato clave (fecha, nombre).\n"
             . "- Si lo hiciste con una herramienta, no propongas además una acción para confirmar lo mismo.\n"
+            . "- Para avisos o revisiones a una hora usa programar_tarea: \"recuérdame el viernes a las 3 llamar a Laura\" = crear_recordatorio con la fecha + programar_tarea tipo aviso; \"todos los lunes a las 8 revisa quién me debe y me dices\" = programar_tarea tipo consulta con esa instrucción. Si no dicen hora, 08:00. Para ver, pausar o cambiar: ver_tareas_programadas y editar_tarea_programada.\n"
             . "- Si el usuario pide deshacer algo que editaste, usa ver_cambios_recientes y restaurar_cambio. Si avisa que hubo ediciones posteriores, pregúntale antes de usar forzar.\n"
             . "- Enviar correos, enviar facturas, registrar pagos, programar reuniones y enviar contratos van en dos pasos: usa la herramienta preparar_* que corresponda. Infocus le muestra al usuario la vista previa completa con el código debajo de tu respuesta; tú solo di en una o dos frases qué preparaste y pregunta si lo confirma. No repitas la vista previa ni el código.\n"
             . "- Llama a confirmar_accion SOLO cuando el usuario responda aprobando de forma explícita la vista previa de tu mensaje anterior, con ese mismo código. Nunca prepares y confirmes en el mismo turno. Si pide cambios, prepara de nuevo. Infocus bloquea cualquier confirmación sin aprobación.\n"

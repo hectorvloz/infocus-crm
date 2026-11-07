@@ -15,7 +15,7 @@ class TwilioWhatsApp
 {
     private const CHUNK = 1500;
 
-    /** @return array{enabled:bool, sid:string, token:string, from:string, owner:string, user_id:string} */
+    /** @return array{enabled:bool, sid:string, token:string, from:string, owner:string, user_id:string, template_sid:string} */
     public function settings(): array
     {
         $s = (new FileStore('settings.json'))->find('settings') ?: [];
@@ -27,7 +27,42 @@ class TwilioWhatsApp
             'from' => self::normalizeNumber((string) ($s['whatsapp_from'] ?? '')),
             'owner' => self::normalizeNumber((string) ($s['whatsapp_owner'] ?? '')),
             'user_id' => (string) ($s['whatsapp_user_id'] ?? ''),
+            'template_sid' => trim((string) ($s['whatsapp_template_sid'] ?? '')),
         ];
+    }
+
+    /**
+     * Fuera de las 24 horas desde el último mensaje del dueño, WhatsApp solo deja
+     * escribir con una plantilla aprobada. La plantilla de Infocus tiene una variable
+     * {{1}} con el aviso en una sola línea.
+     */
+    public function sendTemplate(string $to, string $text, ?array $settings = null): ?string
+    {
+        $s = $settings ?? $this->settings();
+        if (!$this->configured($s) || $s['template_sid'] === '') {
+            return 'No hay plantilla de WhatsApp configurada.';
+        }
+
+        $line = trim(preg_replace('/\s+/u', ' ', strip_tags(self::toWhatsAppText($text))) ?? '');
+        $line = mb_strlen($line) > 900 ? mb_substr($line, 0, 897) . '...' : $line;
+
+        try {
+            $response = Http::asForm()
+                ->withBasicAuth($s['sid'], $s['token'])
+                ->timeout(20)
+                ->post("https://api.twilio.com/2010-04-01/Accounts/{$s['sid']}/Messages.json", [
+                    'From' => 'whatsapp:' . $s['from'],
+                    'To' => 'whatsapp:' . self::normalizeNumber($to),
+                    'ContentSid' => $s['template_sid'],
+                    'ContentVariables' => json_encode(['1' => $line], JSON_UNESCAPED_UNICODE),
+                ]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return 'No se pudo conectar con Twilio.';
+        }
+
+        return $response->successful() ? null : (string) (data_get($response->json(), 'message') ?: 'Twilio respondió ' . $response->status());
     }
 
     public function configured(?array $settings = null): bool

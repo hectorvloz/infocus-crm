@@ -35,6 +35,7 @@ class RunScheduledCrmTasks extends Command
             'facturas:send-scheduled-issue' => [],
             'leads:send-agenda-reminders' => ['--minutes' => 30],
             'reuniones:send-reminders' => ['--minutes' => 30],
+            'asistente:run-scheduled' => [],
         ] as $command => $params) {
             $results[$command] = $this->runScheduledCommand($command, $params, $errors);
         }
