@@ -34,7 +34,8 @@
 - `App\Support\Ai\AiToolBridge` expone 21 herramientas de lectura del MCP al asistente interno como funciones. Se ejecutan dentro de Infocus con el usuario de la sesión, siempre con un `McpContext('asistente', 'lectura')` (si una herramienta intenta escribir, falla) y quedan en `mcp_activity.json` con conexión `asistente`.
 - `DeepSeekProvider` y `OpenAiProvider` implementan `AiToolCallingProvider::chatWithTools()` (formato OpenAI; en DeepSeek el modo pensar va apagado con herramientas). `AiService::reply()` hace el ciclo (máximo 6 vueltas) cuando `ai_tools_enabled` está activo en Configuración > IA. Gemini sigue con el asistente clásico.
 - Tests en `tests/Feature/AiToolModeTest.php`.
-- Siguiente: fase 2 (herramientas que escriben: recordatorios, notas, tareas, leads), fase 3 (dos pasos con confirmación protegida en el servidor y Gemini), fase 4 (canal de WhatsApp).
+- Fase 2 (hecha): 15 herramientas que escriben, de bajo riesgo e internas, con `McpContext('asistente', 'completo')` y los permisos del rol del usuario: recordatorios (crear, completar, editar, organizar), notas personales, notas de cliente y de proyecto, tareas y subtareas, crear y actualizar leads, más `ver_cambios_recientes` y `restaurar_cambio` para deshacer. Quedan fuera: clientes, proyectos, facturas, gastos, contratos, conversión de leads y todo lo de dos pasos. El chat guarda `tools_used` en cada respuesta.
+- Siguiente: fase 3 (dos pasos con confirmación protegida en el servidor y Gemini), fase 4 (canal de WhatsApp).
 
 ## Pendiente en este repo
 - Hacer "Update from Remote" en cPanel después del último push (Héctor).

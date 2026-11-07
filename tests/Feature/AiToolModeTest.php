@@ -68,7 +68,7 @@ class AiToolModeTest extends TestCase
         $this->assertCount(2, $requests);
         $toolNames = collect($requests[0][0]['tools'])->pluck('function.name');
         $this->assertTrue($toolNames->contains('buscar_clientes'));
-        $this->assertFalse($toolNames->contains('crear_cliente'), 'En la fase 1 no se exponen herramientas que escriben.');
+        $this->assertFalse($toolNames->contains('crear_cliente'), 'Crear clientes sigue fuera del asistente.');
         $this->assertSame('disabled', $requests[0][0]['thinking']['type']);
 
         $toolMessage = collect($requests[1][0]['messages'])->firstWhere('role', 'tool');
@@ -101,7 +101,7 @@ class AiToolModeTest extends TestCase
         Http::assertSentCount(6);
     }
 
-    public function test_bridge_rejects_tools_that_write_and_keeps_data_untouched(): void
+    public function test_bridge_does_not_expose_outbound_or_high_impact_tools(): void
     {
         $this->actingAs($this->admin);
         $bridge = new AiToolBridge();
@@ -110,7 +110,44 @@ class AiToolModeTest extends TestCase
 
         $this->assertStringStartsWith('ERROR', $result);
         $this->assertCount(1, (new FileStore('clientes.json'))->all());
-        $this->assertNotContains('confirmar_accion', $bridge->names());
+        foreach (['confirmar_accion', 'preparar_correo', 'preparar_envio_factura', 'preparar_pago', 'preparar_reunion', 'preparar_envio_contrato',
+            'crear_cliente', 'crear_factura_borrador', 'registrar_gasto', 'crear_proyecto', 'actualizar_proyecto', 'convertir_lead_cliente'] as $name) {
+            $this->assertNotContains($name, $bridge->names(), "{$name} no debe estar en el asistente todavía.");
+        }
+        $this->assertFalse($bridge->writes('buscar_clientes'));
+        $this->assertTrue($bridge->writes('crear_recordatorio'));
+    }
+
+    public function test_assistant_creates_a_reminder_when_asked(): void
+    {
+        $this->enableAi(true);
+        Http::fakeSequence('api.deepseek.com/*')
+            ->push($this->toolCall('crear_recordatorio', ['texto' => 'Llamar a Laura', 'fecha' => '2026-11-13', 'prioridad' => 'Atención']))
+            ->push(['choices' => [['message' => ['role' => 'assistant', 'content' => 'Listo: te recuerdo el viernes 13 llamar a Laura.']]]]);
+
+        $this->actingAs($this->admin);
+        $reply = (new AiService())->reply('Recuérdame el viernes llamar a Laura');
+
+        $this->assertSame(['crear_recordatorio'], $reply['tools_used']);
+        $this->assertStringContainsString('Llamar a Laura', (new AiToolBridge())->call('ver_recordatorios', []));
+        $toolMessage = collect(Http::recorded()[1][0]['messages'])->firstWhere('role', 'tool');
+        $this->assertStringNotContainsString('ERROR', $toolMessage['content']);
+        $log = collect((new FileStore('mcp_activity.json'))->all())->firstWhere('tool', 'crear_recordatorio');
+        $this->assertSame('asistente', $log['connection']);
+        $this->assertSame('ok', $log['result']);
+    }
+
+    public function test_write_tools_respect_the_user_role(): void
+    {
+        (new FileStore('roles.json'))->create(['id' => 'ia_solo_lectura', 'permissions' => ['leads.read']]);
+        $member = User::factory()->create(['role' => 'ia_solo_lectura']);
+        $this->actingAs($member);
+
+        $result = (new AiToolBridge())->call('crear_lead', ['nombre' => 'Pedro Ruiz', 'email' => 'pedro@ruiz.test']);
+
+        $this->assertStringStartsWith('ERROR', $result);
+        $this->assertStringContainsString('leads.create', $result);
+        $this->assertSame([], (new FileStore('leads.json'))->all());
     }
 
     public function test_bridge_runs_tools_read_only_logs_them_and_restores_the_context(): void
@@ -128,11 +165,11 @@ class AiToolModeTest extends TestCase
         $this->assertSame('buscar_clientes', $log['tool']);
     }
 
-    public function test_every_read_tool_has_a_valid_function_definition(): void
+    public function test_every_tool_has_a_valid_function_definition(): void
     {
         $definitions = (new AiToolBridge())->definitions();
 
-        $this->assertCount(21, $definitions);
+        $this->assertCount(37, $definitions);
         foreach ($definitions as $definition) {
             $this->assertSame('function', $definition['type']);
             $this->assertMatchesRegularExpression('/^[a-z_]+$/', $definition['function']['name']);

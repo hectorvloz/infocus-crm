@@ -158,6 +158,7 @@ class AiController extends Controller
             'provider' => $result['provider'] ?? null,
             'actions' => $this->normalizeResponseActions($result['actions'] ?? []),
             'skills' => array_values(array_slice(array_map('strval', (array) ($result['skills'] ?? [])), 0, 3)),
+            'tools_used' => array_values(array_unique(array_slice(array_map('strval', (array) ($result['tools_used'] ?? [])), 0, 12))),
         ];
 
         if ($supportScope !== '') {

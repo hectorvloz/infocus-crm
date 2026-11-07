@@ -15,8 +15,10 @@ use Throwable;
  * que el modelo puede llamar. Se ejecutan dentro de Infocus con el usuario de la
  * sesión, sus permisos y el mismo registro de uso que el MCP.
  *
- * Fase 1: solo herramientas de lectura, y siempre con un contexto de solo lectura
- * para que una herramienta que intente escribir falle aunque se agregue por error.
+ * Las de lectura corren con un contexto de solo lectura, para que si alguna intenta
+ * escribir falle. Las de escritura (fase 2) son solo las de bajo riesgo, internas y
+ * reversibles: recordatorios, notas, tareas y leads. Las que salen hacia afuera
+ * (correos, facturas, pagos, reuniones, contratos) siguen fuera del asistente.
  */
 class AiToolBridge
 {
@@ -47,10 +49,33 @@ class AiToolBridge
         Tools\VerPlantillasCorreo::class,
         Tools\ListarNotas::class,
         Tools\VerNota::class,
+        Tools\VerCambiosRecientes::class,
+    ];
+
+    /** @var array<int, class-string<Tool>> */
+    private const WRITE_TOOLS = [
+        Tools\CrearRecordatorio::class,
+        Tools\CompletarRecordatorio::class,
+        Tools\EditarRecordatorio::class,
+        Tools\OrganizarRecordatorios::class,
+        Tools\CrearNota::class,
+        Tools\EditarNota::class,
+        Tools\AgregarNotaCliente::class,
+        Tools\AgregarNotaProyecto::class,
+        Tools\CrearTarea::class,
+        Tools\ActualizarTarea::class,
+        Tools\AgregarSubtareas::class,
+        Tools\ActualizarSubtarea::class,
+        Tools\CrearLead::class,
+        Tools\ActualizarLead::class,
+        Tools\RestaurarCambio::class,
     ];
 
     /** @var array<string, Tool>|null */
     private ?array $tools = null;
+
+    /** @var array<int, string> */
+    private array $writeNames = [];
 
     /**
      * Definiciones en formato de funciones de OpenAI/DeepSeek.
@@ -79,6 +104,13 @@ class AiToolBridge
         return array_keys($this->tools());
     }
 
+    public function writes(string $name): bool
+    {
+        $this->tools();
+
+        return in_array($name, $this->writeNames, true);
+    }
+
     /**
      * Ejecuta una herramienta y devuelve su resultado como texto para el modelo.
      *
@@ -92,7 +124,7 @@ class AiToolBridge
         }
 
         $previous = app()->bound(McpContext::class) ? app(McpContext::class) : null;
-        app()->instance(McpContext::class, new McpContext(self::CONNECTION, 'lectura'));
+        app()->instance(McpContext::class, new McpContext(self::CONNECTION, $this->writes($name) ? 'completo' : 'lectura'));
 
         try {
             $response = $tool->handle(new Request($arguments));
@@ -137,9 +169,12 @@ class AiToolBridge
     {
         if ($this->tools === null) {
             $this->tools = [];
-            foreach (self::READ_TOOLS as $class) {
+            foreach ([...self::READ_TOOLS, ...self::WRITE_TOOLS] as $class) {
                 $tool = app($class);
                 $this->tools[$tool->name()] = $tool;
+                if (in_array($class, self::WRITE_TOOLS, true)) {
+                    $this->writeNames[] = $tool->name();
+                }
             }
         }
 
