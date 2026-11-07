@@ -7155,6 +7155,7 @@
     .infocus-ai-message-images img, .infocus-ai-image-preview img { width: 4.5rem; height: 4.5rem; border-radius: .65rem; object-fit: cover; border: 1px solid #dbe4f0; }
     .infocus-ai-image-preview { margin: 0 0 .48rem; }
     .infocus-ai-image-preview-item { position: relative; }
+    .infocus-ai-file-chip { display: flex; align-items: center; max-width: 11rem; height: 4.5rem; padding: 0 .7rem; border-radius: .65rem; border: 1px solid #dbe4f0; background: #f8fafc; font-size: .72rem; font-weight: 700; color: #334155; overflow: hidden; text-overflow: ellipsis; word-break: break-all; }
     .infocus-ai-image-preview-item button { position: absolute; top: -.3rem; right: -.3rem; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: #0f172a; color: #fff; font-size: .7rem; }
     .infocus-ai-attach { width: 2rem; height: 2rem; flex: none; border-radius: 50%; color: #64748b; display: grid; place-items: center; }
     .infocus-ai-attach:hover { color: #1e293b; background: #f1f5f9; }
@@ -7395,8 +7396,8 @@
       <div id="infocusAiImagePreview" class="infocus-ai-image-preview" aria-live="polite"></div>
       <div class="infocus-ai-input-shell">
         <div class="infocus-ai-input-inner">
-          <input id="infocusAiImages" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="hidden">
-          <button id="infocusAiAttach" type="button" class="infocus-ai-attach" aria-label="Adjuntar imágenes" title="Adjuntar imágenes (hasta 3)"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
+          <input id="infocusAiImages" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" multiple class="hidden">
+          <button id="infocusAiAttach" type="button" class="infocus-ai-attach" aria-label="Adjuntar archivos" title="Adjuntar imágenes o documentos (hasta 3)"><i class="fa-solid fa-paperclip" aria-hidden="true"></i></button>
           <textarea id="infocusAiInput" class="infocus-ai-input" rows="1" placeholder="Pregúntale algo a Infocus AI"></textarea>
           <button id="infocusAiSend" type="submit" class="infocus-ai-send" aria-label="Enviar">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8254,9 +8255,16 @@
         pendingImages.forEach((item, index) => {
           const wrapper = document.createElement('div');
           wrapper.className = 'infocus-ai-image-preview-item';
-          const image = document.createElement('img');
-          image.src = item.url;
-          image.alt = item.file.name;
+          let image;
+          if (item.file.type.startsWith('image/')) {
+            image = document.createElement('img');
+            image.src = item.url;
+            image.alt = item.file.name;
+          } else {
+            image = document.createElement('span');
+            image.className = 'infocus-ai-file-chip';
+            image.textContent = item.file.name;
+          }
           const remove = document.createElement('button');
           remove.type = 'button';
           remove.dataset.removeAiImage = String(index);
@@ -8268,7 +8276,12 @@
       }
 
       async function prepareAiImage(file) {
-        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Usa imágenes JPG, PNG, WebP o GIF.');
+        const documentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt'];
+        if (!file.type.startsWith('image/') && documentExtensions.includes((file.name.split('.').pop() || '').toLowerCase())) {
+          if (file.size > 10 * 1024 * 1024) throw new Error('El archivo supera 10 MB.');
+          return file;
+        }
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Usa imágenes (JPG, PNG, WebP, GIF), PDF, Word, Excel, CSV o TXT.');
         if (file.size <= 2 * 1024 * 1024) return file;
         if (file.type === 'image/gif' || !window.createImageBitmap) throw new Error('La imagen supera 2 MB. Elige una más pequeña.');
         const bitmap = await createImageBitmap(file);
@@ -8836,7 +8849,7 @@
           if (currentChatId) formData.append('chat_id', currentChatId);
           formData.append('message', messageText);
           appendAiFormValue(formData, 'context', pageContext(messageText));
-          sentImages.forEach((item) => formData.append('images[]', item.file));
+          sentImages.forEach((item) => formData.append(item.file.type.startsWith('image/') ? 'images[]' : 'files[]', item.file));
           const response = await fetch(endpoints.chat, {
             method: 'POST',
             headers: {
@@ -9044,7 +9057,7 @@
         if (sending) return;
         for (const original of files) {
           if (pendingImages.length >= 3) {
-            window.showNotification?.('Puedes adjuntar hasta 3 imágenes por mensaje.', 'error');
+            window.showNotification?.('Puedes adjuntar hasta 3 archivos por mensaje.', 'error');
             break;
           }
           try {

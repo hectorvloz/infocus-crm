@@ -116,9 +116,9 @@ class GeminiProvider implements AiProvider, AiToolCallingProvider
         foreach (is_array($content) ? $content : [['type' => 'text', 'text' => (string) $content]] as $part) {
             if (($part['type'] ?? '') === 'text') {
                 $parts[] = ['text' => (string) ($part['text'] ?? '')];
-            } elseif (($part['type'] ?? '') === 'image_url') {
-                $url = (string) data_get($part, 'image_url.url', '');
-                if (preg_match('/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s', $url, $match)) {
+            } elseif (in_array($part['type'] ?? '', ['image_url', 'file'], true)) {
+                $url = (string) (data_get($part, 'image_url.url') ?? data_get($part, 'file.file_data', ''));
+                if (preg_match('/^data:(image\/(?:jpeg|png|gif|webp)|application\/pdf);base64,(.+)$/s', $url, $match)) {
                     $parts[] = ['inlineData' => ['mimeType' => $match[1], 'data' => $match[2]]];
                 }
             }
@@ -171,9 +171,9 @@ class GeminiProvider implements AiProvider, AiToolCallingProvider
                 foreach (is_array($content) ? $content : [['type' => 'text', 'text' => (string) $content]] as $part) {
                     if (($part['type'] ?? '') === 'text') {
                         $parts[] = ['text' => (string) ($part['text'] ?? '')];
-                    } elseif (($part['type'] ?? '') === 'image_url') {
-                        $url = (string) data_get($part, 'image_url.url', '');
-                        if (preg_match('/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s', $url, $match)) {
+                    } elseif (in_array($part['type'] ?? '', ['image_url', 'file'], true)) {
+                        $url = (string) (data_get($part, 'image_url.url') ?? data_get($part, 'file.file_data', ''));
+                        if (preg_match('/^data:(image\/(?:jpeg|png|gif|webp)|application\/pdf);base64,(.+)$/s', $url, $match)) {
                             $parts[] = ['inlineData' => ['mimeType' => $match[1], 'data' => $match[2]]];
                         }
                     }

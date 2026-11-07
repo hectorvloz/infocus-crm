@@ -2,6 +2,8 @@
 
 namespace App\Mcp\Tools;
 
+use App\Support\Ai\AiAttachments;
+use Illuminate\Support\Facades\Storage;
 use App\Mcp\Support\McpContext;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Str;
@@ -26,6 +28,7 @@ class RegistrarGasto extends InfocusTool
             'categoria' => $schema->string(),
             'cliente_id' => $schema->string()->description('Si el gasto es de un cliente.'),
             'notas' => $schema->string(),
+            'comprobante_adjunto_id' => $schema->string()->description('Id ADJ... de una foto o PDF del recibo que el usuario subió (WhatsApp, chat de Infocus o subir_adjunto).'),
         ];
     }
 
@@ -35,15 +38,28 @@ class RegistrarGasto extends InfocusTool
         $d = $request->validate([
             'concepto' => 'required|string|max:255', 'monto' => 'required|numeric|gt:0', 'moneda' => 'required|in:' . implode(',', self::CURRENCIES),
             'fecha' => 'nullable|date', 'categoria' => 'nullable|string|max:80', 'cliente_id' => 'nullable|string', 'notas' => 'nullable|string|max:2000',
+            'comprobante_adjunto_id' => 'nullable|string|max:20',
         ]);
+
+        $receiptPath = null;
+        if (!empty($d['comprobante_adjunto_id'])) {
+            $attachments = new AiAttachments();
+            $file = $attachments->find($d['comprobante_adjunto_id']);
+            if (!$file || !(AiAttachments::isImage($file) || $file['mime'] === 'application/pdf')) {
+                return Response::error('No encontré ese comprobante (o no es una foto o PDF). Pídele al usuario que lo envíe de nuevo.');
+            }
+            $receiptPath = 'comprobantes/' . Str::lower((string) Str::ulid()) . '.' . AiAttachments::MIMES[$file['mime']];
+            Storage::disk('public')->put($receiptPath, $attachments->contents($file));
+        }
         $gasto = $this->store('gastos.json')->create([
             'id' => (string) Str::uuid(),
             'concepto' => $d['concepto'], 'monto' => (float) $d['monto'], 'moneda' => $d['moneda'],
             'fecha' => $d['fecha'] ?? now()->toDateString(), 'categoria' => $d['categoria'] ?? null,
             'cliente_id' => $d['cliente_id'] ?? null, 'proveedor_id' => null, 'notas' => $d['notas'] ?? null,
             'es_recurrente' => false,
+            'comprobante_path' => $receiptPath,
         ]);
 
-        return Response::text("Gasto registrado: {$gasto['concepto']} · " . $this->money($gasto['monto'], $gasto['moneda']) . " · {$gasto['fecha']}.");
+        return Response::text("Gasto registrado: {$gasto['concepto']} · " . $this->money($gasto['monto'], $gasto['moneda']) . " · {$gasto['fecha']}" . ($receiptPath ? ' · con comprobante adjunto.' : '.'));
     }
 }

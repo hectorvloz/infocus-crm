@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Support\Ai\AiAttachments;
 use App\Http\Controllers\CorreoController;
 use App\Mcp\Support\McpContext;
 use App\Mcp\Support\PendingActions;
@@ -28,6 +29,7 @@ class PrepararCorreo extends InfocusTool
             'asunto' => $schema->string()->description('Obligatorio si no usas plantilla.'),
             'mensaje' => $schema->string()->description('Cuerpo en HTML simple o texto con párrafos separados por línea en blanco.'),
             'plantilla_id' => $schema->string()->description('Usa una plantilla guardada en lugar de asunto y mensaje.'),
+            'adjuntos' => $schema->array()->items($schema->string())->description('Ids de archivos (ADJ...) que el usuario subió: por WhatsApp, en el chat de Infocus o con subir_adjunto. Máximo 5 y 20 MB en total.'),
         ];
     }
 
@@ -37,7 +39,20 @@ class PrepararCorreo extends InfocusTool
         $d = $request->validate([
             'para' => 'nullable|array|max:' . self::MAX_RECIPIENTS, 'para.*' => 'email', 'cliente_id' => 'nullable|string', 'lead_id' => 'nullable|string',
             'asunto' => 'nullable|string|max:180', 'mensaje' => 'nullable|string|max:20000', 'plantilla_id' => 'nullable|string',
+            'adjuntos' => 'nullable|array|max:5', 'adjuntos.*' => 'string|max:20',
         ]);
+
+        $files = [];
+        foreach (array_unique($d['adjuntos'] ?? []) as $attachmentId) {
+            $file = (new AiAttachments())->find($attachmentId);
+            if (!$file) {
+                return Response::error("No encontré el adjunto {$attachmentId}, o ya venció (duran 7 días). Pídele al usuario que lo envíe de nuevo.");
+            }
+            $files[] = $file;
+        }
+        if (array_sum(array_column($files, 'size')) > 20 * 1024 * 1024) {
+            return Response::error('Los adjuntos pasan de 20 MB en total.');
+        }
 
         $to = collect($d['para'] ?? []);
         if (!empty($d['cliente_id'])) {
@@ -70,11 +85,12 @@ class PrepararCorreo extends InfocusTool
         $subject = trim(preg_replace('/[\r\n\t]+/', ' ', TemplateMail::tokenReplace(strip_tags($subject), $vars)));
         $html = TemplateMail::tokenReplace(SafeRichText::sanitize(self::toHtml($body)), $vars);
 
-        $code = (new PendingActions())->create('enviar_correo', ['to' => $to, 'subject' => $subject, 'body' => $html], $ctx->connection);
+        $code = (new PendingActions())->create('enviar_correo', ['to' => $to, 'subject' => $subject, 'body' => $html, 'attachments' => array_column($files, 'id')], $ctx->connection);
+        $attachmentLine = $files ? "\nAdjuntos: " . implode(', ', array_map(fn ($f) => $f['name'] . ' (' . max(1, (int) round($f['size'] / 1024)) . ' KB)', $files)) : '';
 
         return Response::text(sprintf(
-            "VISTA PREVIA (no enviado)\nPara: %s\nAsunto: %s\n\n%s\n\nPara enviarlo, el usuario debe aprobarlo y tú llamas a confirmar_accion con el código %s (vence en %d minutos).",
-            implode(', ', $to), $subject, trim(html_entity_decode(strip_tags(str_replace(['</p>', '<br>', '</h1>', '</h2>', '<hr>'], ["\n\n", "\n", "\n\n", "\n\n", "\n———\n"], $html)))),
+            "VISTA PREVIA (no enviado)\nPara: %s\nAsunto: %s%s\n\n%s\n\nPara enviarlo, el usuario debe aprobarlo y tú llamas a confirmar_accion con el código %s (vence en %d minutos).",
+            implode(', ', $to), $subject, $attachmentLine, trim(html_entity_decode(strip_tags(str_replace(['</p>', '<br>', '</h1>', '</h2>', '<hr>'], ["\n\n", "\n", "\n\n", "\n\n", "\n———\n"], $html)))),
             $code, PendingActions::TTL_MINUTES
         ));
     }

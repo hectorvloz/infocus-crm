@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Repositories\FileStore;
+use App\Support\Ai\AiAttachments;
 use App\Support\Ai\AiService;
 use App\Support\WhatsApp\TwilioWhatsApp;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -45,7 +47,10 @@ class WhatsAppWebhookController extends Controller
             return $this->twiml();
         }
 
-        $media = (int) $request->post('NumMedia', 0);
+        $media = [];
+        for ($i = 0; $i < min(3, (int) $request->post('NumMedia', 0)); $i++) {
+            $media[] = ['url' => (string) $request->post("MediaUrl{$i}", ''), 'mime' => (string) $request->post("MediaContentType{$i}", '')];
+        }
         $done = false;
         app()->terminating(function () use (&$done, $whatsapp, $settings, $body, $media) {
             if ($done) {
@@ -58,14 +63,14 @@ class WhatsAppWebhookController extends Controller
         return $this->twiml();
     }
 
-    private function answer(TwilioWhatsApp $whatsapp, array $settings, string $body, int $media): void
+    private function answer(TwilioWhatsApp $whatsapp, array $settings, string $body, array $media): void
     {
         ignore_user_abort(true);
         @set_time_limit(180);
 
         $owner = $settings['owner'];
-        if ($body === '') {
-            $whatsapp->send($owner, $media > 0 ? 'Por ahora solo leo texto. Escríbeme lo que necesitas.' : 'No recibí texto.', $settings);
+        if ($body === '' && $media === []) {
+            $whatsapp->send($owner, 'No recibí texto.', $settings);
 
             return;
         }
@@ -85,12 +90,20 @@ class WhatsAppWebhookController extends Controller
         }
 
         Auth::setUser($user);
+        [$attachments, $skipped] = $this->downloadMedia($media, $settings);
+        if ($attachments === [] && $body === '') {
+            $whatsapp->send($owner, $skipped > 0 ? 'Por ahora leo texto, fotos y PDF (hasta 10 MB). Ese archivo no lo pude abrir.' : 'No recibí texto.', $settings);
+
+            return;
+        }
+        $visible = array_values(array_filter($attachments, fn ($a) => AiAttachments::isImage($a) || $a['mime'] === 'application/pdf'));
+        $prompt = $body !== '' ? $body : 'Te envío este archivo sin texto. Dime qué es y qué puedo hacer con él en Infocus.';
         $store = new FileStore('whatsapp_chats.json');
         $chat = $store->find('owner') ?: ['id' => 'owner', 'messages' => [], 'seen' => []];
         $history = array_values((array) ($chat['messages'] ?? []));
 
         try {
-            $result = app(AiService::class)->reply($body, $history, ['channel' => 'whatsapp']);
+            $result = app(AiService::class)->reply($prompt, $history, ['channel' => 'whatsapp', 'attachments' => $attachments, 'attachments_from' => 'WhatsApp'], $visible);
             $content = (string) ($result['content'] ?? '');
         } catch (Throwable $e) {
             report($e);
@@ -98,6 +111,9 @@ class WhatsAppWebhookController extends Controller
             $result = [];
         }
 
+        if ($skipped > 0) {
+            $content .= "\n\n(Uno de los archivos no lo pude abrir: por ahora leo fotos y PDF de hasta 10 MB.)";
+        }
         $error = $whatsapp->send($owner, TwilioWhatsApp::toWhatsAppText($content), $settings);
         if ($error !== null) {
             report(new \RuntimeException('WhatsApp: ' . $error));
@@ -106,10 +122,41 @@ class WhatsAppWebhookController extends Controller
         $chat = $store->find('owner') ?: $chat;
         $chat['messages'] = array_values(array_slice([
             ...$history,
-            ['role' => 'user', 'content' => $body, 'created_at' => now()->toISOString()],
+            ['role' => 'user', 'content' => $prompt, 'created_at' => now()->toISOString(), 'attachments' => $attachments],
             ['role' => 'assistant', 'content' => $content, 'created_at' => now()->toISOString(), 'tools_used' => $result['tools_used'] ?? []],
         ], -self::HISTORY));
         $this->saveChat($store, $chat);
+    }
+
+    /**
+     * Descarga los archivos del mensaje desde Twilio (solo de api.twilio.com) y los
+     * guarda como adjuntos del usuario. Devuelve [adjuntos, cantidad que no se pudo].
+     *
+     * @return array{0: array<int, array<string, mixed>>, 1: int}
+     */
+    private function downloadMedia(array $media, array $settings): array
+    {
+        $saved = [];
+        $skipped = 0;
+        foreach ($media as $index => $item) {
+            $url = (string) $item['url'];
+            if (parse_url($url, PHP_URL_SCHEME) !== 'https' || parse_url($url, PHP_URL_HOST) !== 'api.twilio.com' || !isset(AiAttachments::MIMES[strtolower($item['mime'])])) {
+                $skipped++;
+                continue;
+            }
+            try {
+                $response = Http::withBasicAuth($settings['sid'], $settings['token'])->timeout(30)->get($url);
+                $record = $response->successful()
+                    ? (new AiAttachments())->save($response->body(), 'whatsapp-' . now()->format('Ymd-His') . '-' . ($index + 1) . '.' . AiAttachments::MIMES[strtolower($item['mime'])], $item['mime'], 'whatsapp')
+                    : null;
+            } catch (Throwable $e) {
+                report($e);
+                $record = null;
+            }
+            $record ? $saved[] = $record : $skipped++;
+        }
+
+        return [$saved, $skipped];
     }
 
     /** Twilio reintenta si no responde a tiempo: un mismo MessageSid se atiende una sola vez. */

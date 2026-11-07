@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Artisan::command('ai:prune-chat-images', function () {
     $this->info((new \App\Support\Ai\AiChatImageStore())->pruneExpired() . ' imágenes temporales eliminadas.');
+    $this->info((new \App\Support\Ai\AiAttachments())->prune() . ' adjuntos del asistente vencidos eliminados.');
 })->purpose('Eliminar imágenes caducadas de los chats de IA');
 
 Artisan::command('documents:secure-storage', function () {

@@ -83,8 +83,10 @@ class AiChatImagesTest extends TestCase
 
         $this->get(route('api.ai.chats.image', [$chatId, $image['id']]))->assertNotFound();
         $this->postJson(route('api.ai.chat'), ['chat_id' => $chatId, 'message' => '¿Qué había en la imagen?'])->assertOk();
+        // Texto sin la imagen vencida (solo la nota con el id del adjunto, por si se quiere reenviar).
         Http::assertSent(fn ($request) => $request['model'] === 'deepseek-flash'
-            && data_get($request->data(), 'messages.1.content') === 'Mira esto');
+            && is_string(data_get($request->data(), 'messages.1.content'))
+            && str_starts_with(data_get($request->data(), 'messages.1.content'), 'Mira esto'));
     }
 
     public function test_cleanup_removes_old_cached_images(): void

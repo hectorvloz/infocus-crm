@@ -19,7 +19,7 @@ class DeepSeekProvider implements AiProvider, AiToolCallingProvider
             ->acceptJson()
             ->post('https://api.deepseek.com/chat/completions', [
                 'model' => 'deepseek-flash',
-                'messages' => $messages,
+                'messages' => self::withoutFiles($messages),
                 'tools' => $tools,
                 'tool_choice' => 'auto',
                 'thinking' => ['type' => 'disabled'],
@@ -43,7 +43,7 @@ class DeepSeekProvider implements AiProvider, AiToolCallingProvider
             ->acceptJson()
             ->post('https://api.deepseek.com/chat/completions', [
                 'model' => 'deepseek-flash',
-                'messages' => $messages,
+                'messages' => self::withoutFiles($messages),
                 'thinking' => ['type' => $thinking ? 'enabled' : 'disabled'],
                 'temperature' => (float) ($settings['temperature'] ?? 0.4),
                 'stream' => false,
@@ -51,5 +51,20 @@ class DeepSeekProvider implements AiProvider, AiToolCallingProvider
 
         $response->throw();
         return trim((string) data_get($response->json(), 'choices.0.message.content', ''));
+    }
+
+    /** DeepSeek no lee PDF: cambia cada archivo por una nota para que el modelo sepa que llegó. */
+    private static function withoutFiles(array $messages): array
+    {
+        return array_map(function (array $message) {
+            if (!is_array($message['content'] ?? null)) {
+                return $message;
+            }
+            $message['content'] = array_values(array_map(fn ($part) => ($part['type'] ?? '') === 'file'
+                ? ['type' => 'text', 'text' => '[PDF adjunto: ' . data_get($part, 'file.filename', 'documento') . '. Con DeepSeek no puedo leer su contenido; sí puedo adjuntarlo a un correo o como comprobante.]']
+                : $part, $message['content']));
+
+            return $message;
+        }, $messages);
     }
 }

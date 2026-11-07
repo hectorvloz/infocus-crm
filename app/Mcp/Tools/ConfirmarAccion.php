@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Support\Ai\AiAttachments;
 use App\Http\Controllers\FacturasController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\ReunionesController;
@@ -47,13 +48,22 @@ class ConfirmarAccion extends InfocusTool
     private function sendEmail(array $p, McpContext $ctx): Response
     {
         $ctx->allow('correo.create', write: true);
+        $files = [];
+        $store = new AiAttachments();
+        foreach ((array) ($p['attachments'] ?? []) as $attachmentId) {
+            $file = $store->find((string) $attachmentId);
+            if (!$file) {
+                return Response::error("El adjunto {$attachmentId} ya no está disponible. Prepara el correo de nuevo.");
+            }
+            $files[] = ['data' => $store->contents($file), 'name' => $file['name'], 'mime' => $file['mime']];
+        }
         TemplateMail::send($p['to'], $p['subject'], $p['body'], [
             'source' => 'mcp',
             'sent_by' => (string) (auth()->user()->email ?? 'sistema'),
             'sent_by_name' => (string) (auth()->user()->name ?? 'Sistema') . ' (MCP · ' . $ctx->connection . ')',
-        ]);
+        ], $files ?: null);
 
-        return Response::text('Correo enviado a ' . implode(', ', $p['to']) . '. Quedó en el historial de correos.');
+        return Response::text('Correo enviado a ' . implode(', ', $p['to']) . ($files ? ' con ' . count($files) . ' adjunto(s)' : '') . '. Quedó en el historial de correos.');
     }
 
     private function sendInvoice(array $p, McpContext $ctx): Response

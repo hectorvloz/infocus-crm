@@ -85,13 +85,16 @@ class GenericMail extends Mailable
      */
     public function attachments(): array
     {
-        if ($this->attachment) {
-            return [\Illuminate\Mail\Mailables\Attachment::fromData(
-                fn() => $this->attachment['data'],
-                $this->attachment['name']
-            )->withMime($this->attachment['mime'])];
+        if (!$this->attachment) {
+            return [];
         }
-        return [];
+        // Un adjunto ['data','name','mime'] o una lista de ellos.
+        $items = array_is_list($this->attachment) ? $this->attachment : [$this->attachment];
+
+        return array_map(fn (array $item) => \Illuminate\Mail\Mailables\Attachment::fromData(
+            fn () => $item['data'],
+            $item['name']
+        )->withMime($item['mime']), $items);
     }
 
     protected function formatContent(string $content): string

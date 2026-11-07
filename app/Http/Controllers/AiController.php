@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
 use App\Support\Ai\AiActionExecutor;
+use App\Support\Ai\AiAttachments;
 use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
 use App\Support\Ai\AiChatImageStore;
@@ -80,15 +81,17 @@ class AiController extends Controller
             'context' => 'nullable|array',
             'images' => 'nullable|array|max:3',
             'images.*' => 'image|mimes:jpeg,png,webp,gif|max:2048',
+            'files' => 'nullable|array|max:3',
+            'files.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,csv,txt|max:10240',
             'support_scope' => 'nullable|in:note',
             'support_entity_id' => 'nullable|string|max:100',
         ]);
 
         $message = trim((string) ($data['message'] ?? ''));
-        if ($message === '' && !$request->hasFile('images')) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['message' => 'Escribe un mensaje o adjunta una imagen.']);
+        if ($message === '' && !$request->hasFile('images') && !$request->hasFile('files')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['message' => 'Escribe un mensaje o adjunta un archivo.']);
         }
-        if ($message === '') $message = 'Analiza estas imágenes y dime qué observas.';
+        if ($message === '') $message = $request->hasFile('files') ? 'Revisa estos archivos y dime qué son y qué puedo hacer con ellos.' : 'Analiza estas imágenes y dime qué observas.';
 
         $userId = (string) Auth::id();
         $supportScope = (string) ($data['support_scope'] ?? '');
@@ -128,21 +131,35 @@ class AiController extends Controller
             : (is_array($chat['messages'] ?? null) ? $chat['messages'] : []);
         $imageStore = new AiChatImageStore();
         $images = [];
+        $attachments = [];
+        $attachmentStore = new AiAttachments();
         foreach ($request->file('images', []) as $file) {
             $images[] = $imageStore->save($file, (string) $chat['id']);
         }
+        // Copia de cada archivo como adjunto del asistente, para poder enviarlo por correo o usarlo de comprobante.
+        foreach ([...$request->file('images', []), ...$request->file('files', [])] as $file) {
+            $record = $attachmentStore->save((string) file_get_contents($file->getRealPath()), (string) $file->getClientOriginalName(), (string) $file->getMimeType(), 'chat');
+            if ($record) $attachments[] = $record;
+        }
+        $modelFiles = [...$images, ...array_values(array_filter($attachments, fn ($a) => $a['mime'] === 'application/pdf'))];
         $userMessage = [
             'role' => 'user',
             'content' => $message,
             'images' => $images,
+            'attachments' => array_map(fn ($a) => array_intersect_key($a, array_flip(['id', 'name', 'mime', 'size'])), $attachments),
             'created_at' => now()->toISOString(),
         ];
 
-        $preflight = $images ? null : $this->preflightAssistantReply($message, $data['context'] ?? []);
+        $preflight = ($images || $attachments) ? null : $this->preflightAssistantReply($message, $data['context'] ?? []);
         if ($preflight !== null) {
             $result = ['content' => $preflight, 'provider' => 'crm'];
         } else {
-            $result = $this->ai->reply($message, $history, $data['context'] ?? [], $images);
+            $aiContext = $data['context'] ?? [];
+            if ($attachments) {
+                $aiContext['attachments'] = $attachments;
+                $aiContext['attachments_from'] = 'el chat';
+            }
+            $result = $this->ai->reply($message, $history, $aiContext, $modelFiles);
             $memoryContext = $data['context'] ?? [];
             $memoryContext['last_user_message'] = $message;
             $this->memoryService->rememberAiCandidate(

@@ -114,7 +114,7 @@ class AiToolModeTest extends TestCase
 
         $this->assertStringStartsWith('ERROR', $result);
         $this->assertCount(1, (new FileStore('clientes.json'))->all());
-        foreach (['crear_cliente', 'crear_factura_borrador', 'registrar_gasto', 'crear_proyecto', 'actualizar_proyecto', 'convertir_lead_cliente'] as $name) {
+        foreach (['crear_cliente', 'crear_factura_borrador', 'crear_proyecto', 'actualizar_proyecto', 'convertir_lead_cliente'] as $name) {
             $this->assertNotContains($name, $bridge->names(), "{$name} no debe estar en el asistente todavía.");
         }
         $this->assertFalse($bridge->writes('buscar_clientes'));
@@ -172,7 +172,7 @@ class AiToolModeTest extends TestCase
     {
         $definitions = (new AiToolBridge())->definitions();
 
-        $this->assertCount(46, $definitions);
+        $this->assertCount(47, $definitions);
         foreach ($definitions as $definition) {
             $this->assertSame('function', $definition['type']);
             $this->assertMatchesRegularExpression('/^[a-z_]+$/', $definition['function']['name']);

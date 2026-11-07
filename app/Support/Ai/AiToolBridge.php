@@ -70,6 +70,7 @@ class AiToolBridge
         Tools\ActualizarSubtarea::class,
         Tools\CrearLead::class,
         Tools\ActualizarLead::class,
+        Tools\RegistrarGasto::class,
         Tools\RestaurarCambio::class,
         Tools\ProgramarTarea::class,
         Tools\EditarTareaProgramada::class,

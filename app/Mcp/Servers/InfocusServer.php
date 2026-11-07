@@ -87,6 +87,7 @@ class InfocusServer extends Server
         Tools\RestaurarCambio::class,
         Tools\ProgramarTarea::class,
         Tools\EditarTareaProgramada::class,
+        Tools\SubirAdjunto::class,
         // Dos pasos
         Tools\PrepararCorreo::class,
         Tools\PrepararEnvioFactura::class,
