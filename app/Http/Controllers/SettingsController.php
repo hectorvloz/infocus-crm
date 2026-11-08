@@ -1288,6 +1288,7 @@ class SettingsController extends Controller
         ];
         $settings['ai_api_key_preview'] = $settings['ai_api_key_previews'][$provider] ?? 'Sin configurar';
         $aiMemories = (new AiMemoryService())->groupedForUser();
+        $settings['ai_transcription_key_preview'] = $this->maskedSecret((string) ($settings['ai_transcription_api_key'] ?? ''));
         $settings['whatsapp_token_preview'] = $this->maskedSecret((string) ($settings['whatsapp_twilio_token'] ?? ''));
         $settings['whatsapp_meta_token_preview'] = $this->maskedSecret((string) ($settings['whatsapp_meta_token'] ?? ''));
         $settings['whatsapp_meta_app_secret_preview'] = $this->maskedSecret((string) ($settings['whatsapp_meta_app_secret'] ?? ''));
@@ -1309,6 +1310,8 @@ class SettingsController extends Controller
             'ai_send_visible_context' => 'nullable|boolean',
             'ai_tools_enabled' => 'nullable|boolean',
             'ai_system_prompt' => 'nullable|string|max:3000',
+            'ai_transcription_provider' => 'nullable|in:,openai,gemini',
+            'ai_transcription_api_key' => 'nullable|string|max:800',
         ]);
 
         $current = $this->store->find('settings') ?: [];
@@ -1320,6 +1323,7 @@ class SettingsController extends Controller
             'ai_temperature' => 0.4,
             'ai_send_visible_context' => $request->boolean('ai_send_visible_context', false),
             'ai_tools_enabled' => $request->boolean('ai_tools_enabled', false),
+            'ai_transcription_provider' => (string) ($data['ai_transcription_provider'] ?? ''),
             'ai_system_prompt' => trim((string) ($data['ai_system_prompt'] ?? '')),
         ];
 
@@ -1332,6 +1336,10 @@ class SettingsController extends Controller
             $apiKeys[$data['ai_provider']] = 'ENC:' . Crypt::encryptString($apiKey);
         }
         $payload['ai_api_keys'] = $apiKeys;
+        $transcriptionKey = trim((string) ($data['ai_transcription_api_key'] ?? ''));
+        $payload['ai_transcription_api_key'] = $transcriptionKey !== ''
+            ? 'ENC:' . Crypt::encryptString($transcriptionKey)
+            : (string) ($current['ai_transcription_api_key'] ?? '');
         $payload['ai_api_key'] = (string) ($apiKeys[$data['ai_provider']] ?? '');
 
         $this->saveSettings($payload);

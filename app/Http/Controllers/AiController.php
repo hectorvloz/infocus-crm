@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Repositories\FileStore;
 use App\Support\Ai\AiActionExecutor;
 use App\Support\Ai\AiAttachments;
+use App\Support\Ai\AiTranscriber;
 use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
 use App\Support\Ai\AiChatImageStore;
@@ -82,7 +83,7 @@ class AiController extends Controller
             'images' => 'nullable|array|max:3',
             'images.*' => 'image|mimes:jpeg,png,webp,gif|max:2048',
             'files' => 'nullable|array|max:3',
-            'files.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,csv,txt|max:10240',
+            'files.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,csv,txt,ogg,oga,opus,mp3,m4a,aac,wav,webm,amr|max:10240',
             'support_scope' => 'nullable|in:note',
             'support_entity_id' => 'nullable|string|max:100',
         ]);
@@ -91,7 +92,10 @@ class AiController extends Controller
         if ($message === '' && !$request->hasFile('images') && !$request->hasFile('files')) {
             throw \Illuminate\Validation\ValidationException::withMessages(['message' => 'Escribe un mensaje o adjunta un archivo.']);
         }
-        if ($message === '') $message = $request->hasFile('files') ? 'Revisa estos archivos y dime qué son y qué puedo hacer con ellos.' : 'Analiza estas imágenes y dime qué observas.';
+        $onlyAudio = $request->hasFile('files') && collect($request->file('files', []))->every(fn ($f) => str_starts_with((string) $f->getMimeType(), 'audio/') || str_starts_with((string) $f->getMimeType(), 'video/webm'));
+        if ($message === '' && !$onlyAudio) $message = $request->hasFile('files') ? 'Revisa estos archivos y dime qué son y qué puedo hacer con ellos.' : 'Analiza estas imágenes y dime qué observas.';
+        $userTyped = $message !== '';
+        if ($message === '') $message = 'Audio';
 
         $userId = (string) Auth::id();
         $supportScope = (string) ($data['support_scope'] ?? '');
@@ -159,7 +163,9 @@ class AiController extends Controller
                 $aiContext['attachments'] = $attachments;
                 $aiContext['attachments_from'] = 'el chat';
             }
-            $result = $this->ai->reply($message, $history, $aiContext, $modelFiles);
+            // Si solo mandó el audio, el asistente resume y propone; no toma el audio como órdenes.
+            $aiMessage = (new AiTranscriber())->promptWithAudio($onlyAudio && !$userTyped ? '' : $message, $attachments);
+            $result = $this->ai->reply($aiMessage, $history, $aiContext, $modelFiles);
             $memoryContext = $data['context'] ?? [];
             $memoryContext['last_user_message'] = $message;
             $this->memoryService->rememberAiCandidate(

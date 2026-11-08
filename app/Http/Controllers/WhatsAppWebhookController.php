@@ -7,6 +7,7 @@ use App\Repositories\FileStore;
 use App\Support\Ai\AiAttachments;
 use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
+use App\Support\Ai\AiTranscriber;
 use App\Support\WhatsApp\MetaWhatsApp;
 use App\Support\WhatsApp\TextMeBotWhatsApp;
 use App\Support\WhatsApp\TwilioWhatsApp;
@@ -192,12 +193,14 @@ class WhatsAppWebhookController extends Controller
         Auth::setUser($user);
         [$attachments, $skipped] = $this->downloadMedia($channel, $media, $settings);
         if ($attachments === [] && $body === '') {
-            $channel->send($owner, $skipped > 0 ? 'Por ahora leo texto, fotos y PDF (hasta 10 MB). Ese archivo no lo pude abrir.' : 'No recibí texto.', $settings);
+            $channel->send($owner, $skipped > 0 ? 'Por ahora leo texto, fotos, PDF y audios (hasta 10 MB). Ese archivo no lo pude abrir.' : 'No recibí texto.', $settings);
 
             return;
         }
         $visible = array_values(array_filter($attachments, fn ($a) => AiAttachments::isImage($a) || $a['mime'] === 'application/pdf'));
-        $prompt = $body !== '' ? $body : 'Te envío este archivo sin texto. Dime qué es y qué puedo hacer con él en Infocus.';
+        $hasAudio = collect($attachments)->contains(fn ($a) => AiAttachments::isAudio($a));
+        $prompt = $body !== '' || $hasAudio ? $body : 'Te envío este archivo sin texto. Dime qué es y qué puedo hacer con él en Infocus.';
+        $prompt = (new AiTranscriber())->promptWithAudio($prompt, $attachments);
         $store = new FileStore('whatsapp_chats.json');
         $chat = $store->find('owner') ?: ['id' => 'owner', 'messages' => [], 'seen' => []];
         $history = array_values((array) ($chat['messages'] ?? []));
@@ -213,7 +216,7 @@ class WhatsAppWebhookController extends Controller
         }
 
         if ($skipped > 0) {
-            $content .= "\n\n(Uno de los archivos no lo pude abrir: por ahora leo fotos y PDF de hasta 10 MB.)";
+            $content .= "\n\n(Uno de los archivos no lo pude abrir: por ahora leo fotos, PDF y audios de hasta 10 MB.)";
         }
         $error = $channel->send($owner, WhatsAppChannel::toWhatsAppText($content), $settings);
         if ($error !== null) {

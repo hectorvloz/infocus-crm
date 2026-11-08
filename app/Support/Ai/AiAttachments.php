@@ -30,7 +30,15 @@ class AiAttachments
         'application/vnd.ms-excel' => 'xls',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
         'text/csv' => 'csv', 'text/plain' => 'txt',
+        // Notas de voz y audios (WhatsApp manda audio/ogg con códec opus).
+        'audio/ogg' => 'ogg', 'audio/mpeg' => 'mp3', 'audio/mp4' => 'm4a', 'audio/x-m4a' => 'm4a', 'audio/aac' => 'aac',
+        'audio/wav' => 'wav', 'audio/x-wav' => 'wav', 'audio/webm' => 'webm', 'audio/amr' => 'amr',
     ];
+
+    public static function isAudio(array $item): bool
+    {
+        return str_starts_with((string) ($item['mime'] ?? ''), 'audio/');
+    }
 
     /** @return array<string, mixed>|null registro guardado, o null si el tipo o el tamaño no se aceptan */
     public function save(string $contents, string $name, string $mime, string $source): ?array

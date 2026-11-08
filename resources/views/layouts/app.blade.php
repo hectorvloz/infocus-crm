@@ -7396,8 +7396,8 @@
       <div id="infocusAiImagePreview" class="infocus-ai-image-preview" aria-live="polite"></div>
       <div class="infocus-ai-input-shell">
         <div class="infocus-ai-input-inner">
-          <input id="infocusAiImages" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" multiple class="hidden">
-          <button id="infocusAiAttach" type="button" class="infocus-ai-attach" aria-label="Adjuntar archivos" title="Adjuntar imágenes o documentos (hasta 3)"><i class="fa-solid fa-paperclip" aria-hidden="true"></i></button>
+          <input id="infocusAiImages" type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,audio/*,.ogg,.opus,.mp3,.m4a,.aac,.wav,.amr" multiple class="hidden">
+          <button id="infocusAiAttach" type="button" class="infocus-ai-attach" aria-label="Adjuntar archivos" title="Adjuntar imágenes, documentos o audios (hasta 3)"><i class="fa-solid fa-paperclip" aria-hidden="true"></i></button>
           <textarea id="infocusAiInput" class="infocus-ai-input" rows="1" placeholder="Pregúntale algo a Infocus AI"></textarea>
           <button id="infocusAiSend" type="submit" class="infocus-ai-send" aria-label="Enviar">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8276,12 +8276,12 @@
       }
 
       async function prepareAiImage(file) {
-        const documentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt'];
+        const documentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'ogg', 'oga', 'opus', 'mp3', 'm4a', 'aac', 'wav', 'webm', 'amr'];
         if (!file.type.startsWith('image/') && documentExtensions.includes((file.name.split('.').pop() || '').toLowerCase())) {
           if (file.size > 10 * 1024 * 1024) throw new Error('El archivo supera 10 MB.');
           return file;
         }
-        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Usa imágenes (JPG, PNG, WebP, GIF), PDF, Word, Excel, CSV o TXT.');
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Usa imágenes (JPG, PNG, WebP, GIF), PDF, Word, Excel, CSV, TXT o audios.');
         if (file.size <= 2 * 1024 * 1024) return file;
         if (file.type === 'image/gif' || !window.createImageBitmap) throw new Error('La imagen supera 2 MB. Elige una más pequeña.');
         const bitmap = await createImageBitmap(file);

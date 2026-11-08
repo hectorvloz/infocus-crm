@@ -136,6 +136,28 @@
       </label>
     </div>
 
+    <div class="rounded-2xl border border-slate-200 px-5 py-4 space-y-4">
+      <div>
+        <span class="block font-extrabold text-slate-900">Transcripción de audios</span>
+        <span class="block text-sm text-slate-500">Para que el asistente entienda notas de voz y audios (por WhatsApp o en el chat). DeepSeek no lee audio: se usa OpenAI o Gemini solo para pasarlos a texto. Si dejas la llave vacía, usa la que ya guardaste para ese proveedor.</span>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">Servicio</label>
+          <select name="ai_transcription_provider" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold">
+            @foreach(\App\Support\Ai\AiTranscriber::PROVIDERS as $value => $label)
+              <option value="{{ $value }}" {{ (string) old('ai_transcription_provider', $settings['ai_transcription_provider'] ?? '') === (string) $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">API key para transcribir (opcional)</label>
+          <input name="ai_transcription_api_key" type="password" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-mono text-sm" placeholder="Dejar vacío para mantener la actual" autocomplete="new-password">
+          <p class="mt-2 text-sm text-slate-500">Estado: <span class="font-bold text-slate-700">{{ $settings['ai_transcription_key_preview'] ?? 'Sin configurar' }}</span></p>
+        </div>
+      </div>
+    </div>
+
     <div>
       <label class="block text-sm font-bold text-slate-700 mb-2">Instrucción interna</label>
       <textarea name="ai_system_prompt" rows="5" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 leading-relaxed" placeholder="Ej: Responde con tono cercano, prioriza pasos cortos, no hagas cambios sin confirmación.">{{ old('ai_system_prompt', $settings['ai_system_prompt'] ?? '') }}</textarea>
