@@ -161,6 +161,15 @@
           <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{{ count($items) }}</span>
         </div>
 
+        @if(in_array($scope, ['user', 'company'], true))
+          <form method="POST" action="{{ route('settings.ai.memory.store') }}" class="mb-4 flex flex-col gap-2 sm:flex-row">
+            @csrf
+            <input type="hidden" name="scope" value="{{ $scope }}">
+            <input name="text" maxlength="700" required class="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900" placeholder="{{ $scope === 'user' ? 'Ej: Háblame de tú, corto y con emojis' : 'Ej: En Indigo cobramos el 50% al iniciar' }}">
+            <button type="submit" class="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-extrabold text-white hover:bg-slate-700">Agregar</button>
+          </form>
+        @endif
+
         @forelse($items as $memory)
           <div class="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 last:mb-0">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">

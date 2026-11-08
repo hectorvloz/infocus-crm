@@ -196,6 +196,7 @@ class AiService
 
         $prompt = "Decide si este mensaje contiene una memoria durable útil para un asistente CRM.\n"
             . "Guarda memoria solo si es una preferencia estable, regla de trabajo o dato operativo recurrente del proyecto actual, de su cliente, del usuario o de la empresa.\n"
+            . "Cuenta como preferencia estable del usuario cómo quiere que el asistente le hable: tono, tuteo, emojis, largo de las respuestas, formato (listas, tablas, cifras). Redáctala como regla, por ejemplo \"Escribirle con emojis\" o \"Respuestas de máximo 3 líneas\".\n"
             . "No guardes instrucciones temporales, tareas puntuales, datos sensibles, secretos, tokens, contraseñas, precios únicos sin recurrencia ni contenido accidental.\n"
             . "Responde SOLO JSON válido con este formato: {\"remember\":true|false,\"memory\":\"frase breve en español\"}.\n"
             . "Si remember=false, memory debe ser cadena vacía.\n"

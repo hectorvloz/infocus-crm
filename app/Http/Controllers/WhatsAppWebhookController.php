@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Repositories\FileStore;
 use App\Support\Ai\AiAttachments;
+use App\Support\Ai\AiMemoryService;
 use App\Support\Ai\AiService;
 use App\Support\WhatsApp\MetaWhatsApp;
 use App\Support\WhatsApp\TextMeBotWhatsApp;
@@ -227,6 +228,17 @@ class WhatsAppWebhookController extends Controller
             ['role' => 'assistant', 'content' => $content, 'created_at' => now()->toISOString(), 'tools_used' => $result['tools_used'] ?? []],
         ], -self::HISTORY));
         $this->saveChat($store, $chat);
+
+        // Después de responder, para no demorar la respuesta. Igual que en el chat de Infocus: si el mensaje trae una preferencia durable ("escríbeme con emojis"),
+        // queda en Configuración > IA > Memoria y se usa en adelante.
+        if ($body !== '') {
+            try {
+                $memoryContext = ['channel' => 'whatsapp', 'last_user_message' => $body];
+                (new AiMemoryService())->rememberAiCandidate(app(AiService::class)->extractMemoryCandidate($body, $memoryContext), $memoryContext);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
     }
 
     /**

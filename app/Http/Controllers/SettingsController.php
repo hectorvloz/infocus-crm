@@ -1353,6 +1353,20 @@ class SettingsController extends Controller
         return redirect()->route('settings.ai', ['tab' => 'memoria'])->with('success', 'Memoria actualizada.');
     }
 
+    public function storeAiMemory(Request $request)
+    {
+        $data = $request->validate([
+            'text' => 'required|string|max:700',
+            'scope' => 'required|in:user,company',
+        ]);
+
+        if (!(new AiMemoryService())->addManual((string) $data['text'], (string) $data['scope'])) {
+            return redirect()->route('settings.ai', ['tab' => 'memoria'])->with('error', 'No pude guardar esa memoria. Revisa que no tenga datos sensibles.');
+        }
+
+        return redirect()->route('settings.ai', ['tab' => 'memoria'])->with('success', 'Memoria agregada.');
+    }
+
     public function deleteAiMemory(string $id)
     {
         (new AiMemoryService())->delete($id);

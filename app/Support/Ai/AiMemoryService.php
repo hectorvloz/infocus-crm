@@ -77,7 +77,10 @@ class AiMemoryService
                     && (string) ($memory['entity_id'] ?? '') === $clientId;
             })
             ->sortByDesc(fn ($memory) => (string) ($memory['updated_at'] ?? $memory['created_at'] ?? ''))
-            ->take($limit)
+            // Las del usuario y la empresa (cómo hablarle, reglas generales) siempre entran;
+            // las de proyectos y clientes, hasta completar el límite.
+            ->partition(fn ($memory) => in_array((string) ($memory['scope'] ?? 'user'), ['user', 'company'], true))
+            ->pipe(fn ($parts) => $parts[0]->take(20)->concat($parts[1]->take($limit)))
             ->map(function ($memory) {
                 $scope = (string) ($memory['scope'] ?? 'user');
                 $name = trim((string) ($memory['entity_name'] ?? ''));
@@ -116,6 +119,19 @@ class AiMemoryService
             'user' => $items->filter(fn ($memory) => ($memory['scope'] ?? 'user') === 'user')->values()->all(),
             'company' => $items->where('scope', 'company')->values()->all(),
         ];
+    }
+
+    /** Memoria escrita a mano en Configuración > IA > Memoria (De mí o Mi empresa). */
+    public function addManual(string $text, string $scope = 'user'): bool
+    {
+        $clean = Str::limit($this->filter->cleanText($text), 700, '');
+        if (mb_strlen($clean) < 3 || $this->looksSensitive(Str::lower(Str::ascii($clean)))) {
+            return false;
+        }
+        $scope = $scope === 'company' ? 'company' : 'user';
+        $this->upsert($clean, $scope, $scope === 'company' ? 'company' : '', $scope === 'company' ? 'Mi empresa' : '', 'manual');
+
+        return true;
     }
 
     public function update(string $id, string $text): ?array

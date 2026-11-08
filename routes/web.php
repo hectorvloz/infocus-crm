@@ -264,6 +264,7 @@ Route::middleware('auth.session')->group(function () {
     Route::delete('/ajustes/mcp/oauth/{clientId}', [McpSettingsController::class, 'revokeOauth'])->name('settings.mcp.oauth.revoke');
     Route::get('/ajustes/ia', [SettingsController::class, 'ai'])->name('settings.ai');
     Route::put('/ajustes/ia', [SettingsController::class, 'updateAi'])->name('settings.ai.update');
+    Route::post('/ajustes/ia/memoria', [SettingsController::class, 'storeAiMemory'])->name('settings.ai.memory.store');
     Route::put('/ajustes/ia/memoria/{id}', [SettingsController::class, 'updateAiMemory'])->name('settings.ai.memory.update');
     Route::delete('/ajustes/ia/memoria/{id}', [SettingsController::class, 'deleteAiMemory'])->name('settings.ai.memory.delete');
     Route::put('/ajustes/ia/whatsapp', [\App\Http\Controllers\WhatsAppSettingsController::class, 'update'])->name('settings.ai.whatsapp.update');
