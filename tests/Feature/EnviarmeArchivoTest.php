@@ -29,9 +29,10 @@ class EnviarmeArchivoTest extends TestCase
         Storage::fake('public');
         foreach (['mcp_activity.json', 'clientes.json', 'leads.json', 'facturas.json', 'gastos.json', 'proyectos.json', 'reuniones.json',
             'contratos.json', 'settings.json', 'roles.json', 'mis_notas.json', 'header_reminders.json', 'ai_memories.json', 'ai_action_logs.json',
-            'timeline.json', 'users.json', 'whatsapp_chats.json', 'ai_attachments.json'] as $file) {
+            'timeline.json', 'users.json', 'whatsapp_chats.json', 'ai_attachments.json', 'whatsapp_textmebot_rate.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
+        \Illuminate\Support\Sleep::fake();
         $this->admin = User::factory()->create(['role' => 'admin', 'name' => 'Héctor']);
         $this->settings('textmebot');
         Http::fake(function ($request) {

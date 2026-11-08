@@ -40,10 +40,11 @@ class WhatsAppProvidersTest extends TestCase
         foreach (['mcp_activity.json', 'clientes.json', 'leads.json', 'facturas.json', 'gastos.json', 'proyectos.json', 'reuniones.json',
             'contratos.json', 'settings.json', 'roles.json', 'mis_notas.json', 'header_reminders.json', 'ai_memories.json', 'ai_action_logs.json',
             'timeline.json', 'users.json', 'mcp_pending_actions.json', 'email_templates.json', 'email_history.json', 'mcp_history.json',
-            'whatsapp_chats.json', 'ai_attachments.json', 'ai_scheduled_tasks.json', 'whatsapp_events.json'] as $file) {
+            'whatsapp_chats.json', 'ai_attachments.json', 'ai_scheduled_tasks.json', 'whatsapp_events.json', 'whatsapp_textmebot_rate.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
         Mail::fake();
+        \Illuminate\Support\Sleep::fake();
         $this->admin = User::factory()->create(['role' => 'admin', 'name' => 'Héctor']);
 
         Http::fake(function ($request) {
@@ -311,16 +312,35 @@ class WhatsAppProvidersTest extends TestCase
 
     public function test_textmebot_retries_after_a_pause_and_logs_its_real_error(): void
     {
-        \Illuminate\Support\Sleep::fake();
         $this->settings('textmebot');
         $channel = new \App\Support\WhatsApp\TextMeBotWhatsApp();
 
         $this->textmebotReplies = [Http::response(['status' => 'error', 'message' => 'Wait 5 seconds between messages'])];
         $this->assertNull($channel->send('+573001112233', 'Hola'));
-        \Illuminate\Support\Sleep::assertSleptTimes(1);
+        \Illuminate\Support\Sleep::assertSlept(fn ($duration) => (int) $duration->totalSeconds === \App\Support\WhatsApp\TextMeBotWhatsApp::RETRY_SECONDS, 1);
 
         $this->textmebotReplies = array_fill(0, 3, Http::response('Error: the number is not connected', 200));
         $error = $channel->send('+573001112233', 'Hola');
         $this->assertSame('TextMeBot respondió (200): Error: the number is not connected', $error);
+    }
+
+    public function test_textmebot_waits_between_messages_and_stops_at_the_hourly_cap(): void
+    {
+        $this->settings('textmebot');
+        $channel = new \App\Support\WhatsApp\TextMeBotWhatsApp();
+
+        $this->assertNull($channel->send('+573001112233', 'Uno'));
+        $this->assertNull($channel->send('+573001112233', 'Dos'));
+        \Illuminate\Support\Sleep::assertSlept(fn ($duration) => $duration->totalSeconds > 0 && $duration->totalSeconds <= \App\Support\WhatsApp\TextMeBotWhatsApp::MIN_GAP_SECONDS, 1);
+
+        (new FileStore('whatsapp_textmebot_rate.json'))->update('rate', ['count' => \App\Support\WhatsApp\TextMeBotWhatsApp::MAX_PER_HOUR]);
+        $before = count($this->sent('api.textmebot.com'));
+        $error = $channel->send('+573001112233', 'Tres');
+
+        $this->assertStringContainsString('Tope de seguridad', $error);
+        $this->assertCount($before, $this->sent('api.textmebot.com'), 'Con el tope no sale nada.');
+
+        $this->travel(1)->hours();
+        $this->assertNull($channel->send('+573001112233', 'Cuatro'), 'En la hora siguiente se puede volver a enviar.');
     }
 }

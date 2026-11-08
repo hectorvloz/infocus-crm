@@ -75,7 +75,7 @@ class TextMeBotWhatsApp extends WhatsAppChannel
             return 'Falta configurar TextMeBot (API key y tu número).';
         }
 
-        foreach (self::chunks($text) as $chunk) {
+        foreach (self::chunks($text, self::CHUNK) as $chunk) {
             // Como en su ejemplo: con el + y el indicativo del país.
             $error = $this->request(['recipient' => self::normalizeNumber($to), 'apikey' => $s['apikey'], 'text' => $chunk, 'json' => 'yes']);
             if ($error !== null) {
@@ -131,12 +131,53 @@ class TextMeBotWhatsApp extends WhatsAppChannel
 
     private const ATTEMPTS = 3;
 
+    /** Recomendaciones de TextMeBot para no ser bloqueado: mínimo 5 segundos entre mensajes y nada de ráfagas. */
+    public const MIN_GAP_SECONDS = 6;
+
+    public const MAX_PER_HOUR = 30;
+
+    /** WhatsApp admite unos 4.000 caracteres: con TextMeBot se parte menos para mandar menos mensajes. */
+    private const CHUNK = 3500;
+
+    private const RATE_FILE = 'whatsapp_textmebot_rate.json';
+
+    /**
+     * Espera lo necesario para dejar MIN_GAP_SECONDS desde el último envío y cuenta el
+     * mensaje. Si ya se mandaron MAX_PER_HOUR en esta hora, no deja enviar más.
+     */
+    private function pace(): ?string
+    {
+        $store = new \App\Repositories\FileStore(self::RATE_FILE);
+        $rate = $store->find('rate') ?: ['id' => 'rate', 'hour' => '', 'count' => 0, 'last_at' => null];
+        $hour = now()->format('YmdH');
+        $count = ($rate['hour'] ?? '') === $hour ? (int) ($rate['count'] ?? 0) : 0;
+        if ($count >= self::MAX_PER_HOUR) {
+            return 'Tope de seguridad: ya se enviaron ' . self::MAX_PER_HOUR . ' mensajes por TextMeBot en esta hora. Se frena para que WhatsApp no bloquee el número.';
+        }
+
+        if (!empty($rate['last_at'])) {
+            $wait = self::MIN_GAP_SECONDS - (int) floor(\Illuminate\Support\Carbon::parse($rate['last_at'])->diffInSeconds(now(), true));
+            if ($wait > 0) {
+                Sleep::for($wait)->seconds();
+            }
+        }
+
+        $data = ['hour' => $hour, 'count' => $count + 1, 'last_at' => now()->toISOString()];
+        $store->find('rate') ? $store->update('rate', $data) : $store->create(['id' => 'rate'] + $data);
+
+        return null;
+    }
+
     private function request(array $params): ?string
     {
         $error = null;
         for ($attempt = 1; $attempt <= self::ATTEMPTS; $attempt++) {
             if ($attempt > 1) {
                 Sleep::for(self::RETRY_SECONDS)->seconds();
+            }
+            $blocked = $this->pace();
+            if ($blocked !== null) {
+                return $blocked;
             }
             try {
                 $response = Http::timeout(30)->get('https://api.textmebot.com/send.php', $params);

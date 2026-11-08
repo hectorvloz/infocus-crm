@@ -159,10 +159,10 @@ abstract class WhatsAppChannel
     }
 
     /** @return array<int, string> */
-    public static function chunks(string $text): array
+    public static function chunks(string $text, int $size = self::CHUNK): array
     {
         $text = trim($text);
-        if (mb_strlen($text) <= self::CHUNK) {
+        if (mb_strlen($text) <= $size) {
             return [$text];
         }
 
@@ -170,16 +170,16 @@ abstract class WhatsAppChannel
         $current = '';
         foreach (preg_split("/(\n\n)/", $text) as $paragraph) {
             $candidate = $current === '' ? $paragraph : $current . "\n\n" . $paragraph;
-            if (mb_strlen($candidate) <= self::CHUNK) {
+            if (mb_strlen($candidate) <= $size) {
                 $current = $candidate;
                 continue;
             }
             if ($current !== '') {
                 $chunks[] = $current;
             }
-            while (mb_strlen($paragraph) > self::CHUNK) {
-                $chunks[] = mb_substr($paragraph, 0, self::CHUNK);
-                $paragraph = mb_substr($paragraph, self::CHUNK);
+            while (mb_strlen($paragraph) > $size) {
+                $chunks[] = mb_substr($paragraph, 0, $size);
+                $paragraph = mb_substr($paragraph, $size);
             }
             $current = $paragraph;
         }
