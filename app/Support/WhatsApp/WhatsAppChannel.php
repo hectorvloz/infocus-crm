@@ -69,15 +69,43 @@ abstract class WhatsAppChannel
      */
     abstract public function download(array $media, array $settings): ?array;
 
-    /** @return array{provider:string, enabled:bool, owner:string, user_id:string} */
+    /** @return array{provider:string, enabled:bool, owner:string, owner_ids:array<int, string>, user_id:string} */
     protected function baseSettings(array $s): array
     {
         return [
             'provider' => $this->provider(),
             'enabled' => (bool) ($s['whatsapp_enabled'] ?? false),
             'owner' => self::normalizeNumber((string) ($s['whatsapp_owner'] ?? '')),
+            // Identificadores internos de WhatsApp (…@lid) que el dueño confirmó como suyos.
+            'owner_ids' => array_values(array_filter(array_map([self::class, 'normalizeId'], (array) ($s['whatsapp_owner_ids'] ?? [])))),
             'user_id' => (string) ($s['whatsapp_user_id'] ?? ''),
         ];
+    }
+
+    /** WhatsApp ya no siempre manda el número: a veces manda un id interno como 221019033841877@lid. */
+    public static function isInternalId(string $from): bool
+    {
+        return (bool) preg_match('/^\d{5,25}@lid$/', self::normalizeId($from));
+    }
+
+    public static function normalizeId(string $id): string
+    {
+        return strtolower(trim($id));
+    }
+
+    /** El remitente es el dueño: por número o por un id interno que el dueño confirmó. */
+    public static function isOwner(array $settings, string ...$ids): bool
+    {
+        foreach ($ids as $id) {
+            if ($id === '') {
+                continue;
+            }
+            if (self::isInternalId($id) ? in_array(self::normalizeId($id), $settings['owner_ids'] ?? [], true) : self::normalizeNumber($id) === $settings['owner']) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function stored(): array

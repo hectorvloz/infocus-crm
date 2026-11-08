@@ -262,10 +262,45 @@ class WhatsAppProvidersTest extends TestCase
         $results = collect(\App\Support\WhatsApp\WhatsAppEvents::latest(20))->pluck('result')->reverse()->values()->all();
         $this->assertSame(['rechazado: clave de la URL inválida', 'llegó', 'ignorado: no es tu número', 'llegó', 'aceptado', 'respondido'], $results);
         $ignored = collect(\App\Support\WhatsApp\WhatsAppEvents::latest(20))->firstWhere('result', 'ignorado: no es tu número');
-        $this->assertStringContainsString('+573001112233', $ignored['detail']);
-        $this->assertStringContainsString('+123456789', $ignored['detail']);
+        $this->assertSame('123456789@lid', $ignored['from']);
+        $this->assertStringContainsString('identificador interno', $ignored['detail']);
 
         $this->actingAs($this->admin)->get(route('settings.ai', ['tab' => 'whatsapp']))
             ->assertOk()->assertSee('Últimos mensajes recibidos')->assertSee('ignorado: no es tu número')->assertDontSee('clave-vieja');
+    }
+
+    public function test_owner_can_confirm_whatsapp_internal_id_with_soy_yo(): void
+    {
+        $this->settings('textmebot');
+        $payload = ['type' => 'text', 'from' => '221019033841877@lid', 'from_name' => 'Héctor', 'to' => '573203947291', 'message' => 'hola', 'from_lid' => '221019033841877@lid', 'origin' => 'whatsapp'];
+
+        $this->postJson('/webhooks/whatsapp/textmebot/clave-secreta-de-prueba', $payload)->assertOk();
+        $this->assertCount(0, $this->sent('api.textmebot.com'), 'Sin confirmar, no se responde.');
+        $ignored = collect(\App\Support\WhatsApp\WhatsAppEvents::latest())->firstWhere('result', 'ignorado: no es tu número');
+        $this->assertSame('221019033841877@lid', $ignored['from']);
+
+        $this->actingAs($this->admin)->get(route('settings.ai', ['tab' => 'whatsapp']))->assertSee('Soy yo');
+        $this->actingAs($this->admin)->post(route('settings.ai.whatsapp.trust', $ignored['id']))->assertSessionHas('success');
+        $this->assertSame(['221019033841877@lid'], (new FileStore('settings.json'))->find('settings')['whatsapp_owner_ids']);
+
+        $this->aiReplies = [$this->text('Hola, ya te reconozco.')];
+        $this->postJson('/webhooks/whatsapp/textmebot/clave-secreta-de-prueba', ['message' => 'hola otra vez'] + $payload)->assertOk();
+        $sent = $this->sent('api.textmebot.com');
+        $this->assertCount(1, $sent);
+        parse_str((string) parse_url($sent[0]->url(), PHP_URL_QUERY), $query);
+        $this->assertSame('+573001112233', $query['recipient'], 'La respuesta va a tu número, no al id interno.');
+
+        $this->actingAs($this->admin)->post(route('settings.ai.whatsapp.untrust'), ['id' => '221019033841877@lid'])->assertSessionHas('success');
+        $this->assertSame([], (new FileStore('settings.json'))->find('settings')['whatsapp_owner_ids']);
+    }
+
+    public function test_soy_yo_only_accepts_internal_ids_from_the_log(): void
+    {
+        $this->settings('textmebot');
+        $this->postJson('/webhooks/whatsapp/textmebot/clave-secreta-de-prueba', ['type' => 'text', 'from' => '573009998877', 'message' => 'hola'])->assertOk();
+        $ignored = collect(\App\Support\WhatsApp\WhatsAppEvents::latest())->firstWhere('result', 'ignorado: no es tu número');
+
+        $this->actingAs($this->admin)->post(route('settings.ai.whatsapp.trust', $ignored['id']))->assertSessionHas('error');
+        $this->assertArrayNotHasKey('whatsapp_owner_ids', (new FileStore('settings.json'))->find('settings'));
     }
 }

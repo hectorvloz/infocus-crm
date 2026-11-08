@@ -225,6 +225,8 @@ class RoleAccess
         'settings.integrations.google.disconnect' => 'ajustes.update',
         'settings.ai.whatsapp.update' => 'ajustes.update',
         'settings.ai.whatsapp.test' => 'ajustes.update',
+        'settings.ai.whatsapp.trust' => 'ajustes.update',
+        'settings.ai.whatsapp.untrust' => 'ajustes.update',
         'settings.mcp.store' => 'ajustes.update',
         'settings.mcp.activate' => 'ajustes.update',
         'settings.mcp.destroy' => 'ajustes.update',

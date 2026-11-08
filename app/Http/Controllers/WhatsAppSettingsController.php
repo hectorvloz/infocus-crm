@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Repositories\FileStore;
 use App\Support\WhatsApp\MetaWhatsApp;
 use App\Support\WhatsApp\WhatsAppChannel;
+use App\Support\WhatsApp\WhatsAppEvents;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
@@ -85,6 +86,33 @@ class WhatsAppSettingsController extends Controller
         $current ? $store->update('settings', $payload) : $store->create(['id' => 'settings'] + $payload);
 
         return redirect()->route('settings.ai', ['tab' => 'whatsapp'])->with('success', 'WhatsApp actualizado.');
+    }
+
+    /** "Soy yo": reconoce como del dueño el id interno de WhatsApp (…@lid) de un mensaje ignorado. */
+    public function trust(string $eventId)
+    {
+        $event = collect((new FileStore(WhatsAppEvents::FILE))->all())->firstWhere('id', $eventId);
+        $id = WhatsAppChannel::normalizeId((string) ($event['from'] ?? ''));
+        if (!$event || !WhatsAppChannel::isInternalId($id)) {
+            return redirect()->route('settings.ai', ['tab' => 'whatsapp'])->with('error', 'Ese mensaje no trae un identificador de WhatsApp para reconocer.');
+        }
+
+        $store = new FileStore('settings.json');
+        $ids = array_values(array_unique([...((array) (($store->find('settings') ?: [])['whatsapp_owner_ids'] ?? [])), $id]));
+        $store->update('settings', ['whatsapp_owner_ids' => array_slice($ids, -5)]);
+        WhatsAppEvents::record('infocus', 'reconocido como tuyo', $id, 'Desde ahora los mensajes con este identificador se responden.');
+
+        return redirect()->route('settings.ai', ['tab' => 'whatsapp'])->with('success', 'Listo: ' . $id . ' quedó reconocido como tu WhatsApp. Escríbele de nuevo.');
+    }
+
+    public function untrust(Request $request)
+    {
+        $id = WhatsAppChannel::normalizeId((string) $request->input('id', ''));
+        $store = new FileStore('settings.json');
+        $ids = array_values(array_filter((array) (($store->find('settings') ?: [])['whatsapp_owner_ids'] ?? []), fn ($v) => WhatsAppChannel::normalizeId((string) $v) !== $id));
+        $store->update('settings', ['whatsapp_owner_ids' => $ids]);
+
+        return redirect()->route('settings.ai', ['tab' => 'whatsapp'])->with('success', 'Identificador quitado.');
     }
 
     public function test()

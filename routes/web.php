@@ -267,6 +267,8 @@ Route::middleware('auth.session')->group(function () {
     Route::put('/ajustes/ia/memoria/{id}', [SettingsController::class, 'updateAiMemory'])->name('settings.ai.memory.update');
     Route::delete('/ajustes/ia/memoria/{id}', [SettingsController::class, 'deleteAiMemory'])->name('settings.ai.memory.delete');
     Route::put('/ajustes/ia/whatsapp', [\App\Http\Controllers\WhatsAppSettingsController::class, 'update'])->name('settings.ai.whatsapp.update');
+    Route::post('/ajustes/ia/whatsapp/soy-yo/{eventId}', [\App\Http\Controllers\WhatsAppSettingsController::class, 'trust'])->name('settings.ai.whatsapp.trust');
+    Route::post('/ajustes/ia/whatsapp/quitar-id', [\App\Http\Controllers\WhatsAppSettingsController::class, 'untrust'])->name('settings.ai.whatsapp.untrust');
     Route::post('/ajustes/ia/whatsapp/prueba', [\App\Http\Controllers\WhatsAppSettingsController::class, 'test'])->middleware('throttle:6,1')->name('settings.ai.whatsapp.test');
     Route::get('/pagos', [PagosController::class, 'index'])->name('pagos.index');
     Route::delete('/pagos/{facturaId}/{pagoIndex}', [PagosController::class, 'destroy'])->name('pagos.destroy');

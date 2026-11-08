@@ -128,15 +128,18 @@ class WhatsAppWebhookController extends Controller
         $media = ($type !== 'text' && $file !== '' && $file !== 'null') ? [['url' => $file, 'mime' => '']] : [];
         // Sin id de mensaje: un reenvío con el mismo contenido en 2 minutos se ignora.
         $id = 'tmb:' . sha1(implode('|', [$data['from'] ?? '', $type, $text, $file, intdiv(time(), 120)]));
-        $this->accept($channel, $settings, (string) ($data['from'] ?? ''), $type === 'text' || $media !== [] ? $text : '', $id, $media);
+        $this->accept($channel, $settings, (string) ($data['from'] ?? ''), $type === 'text' || $media !== [] ? $text : '', $id, $media, (string) ($data['from_lid'] ?? ''));
 
         return response('OK', 200);
     }
 
-    private function accept(WhatsAppChannel $channel, array $settings, string $from, string $body, string $messageId, array $media): void
+    private function accept(WhatsAppChannel $channel, array $settings, string $from, string $body, string $messageId, array $media, string $altId = ''): void
     {
-        if (WhatsAppChannel::normalizeNumber($from) !== $settings['owner']) {
-            WhatsAppEvents::record($channel->provider(), 'ignorado: no es tu número', $from, 'En Infocus está guardado ' . $settings['owner'] . ' y llegó ' . (WhatsAppChannel::normalizeNumber($from) ?: '(vacío)') . '.');
+        if (!WhatsAppChannel::isOwner($settings, $from, $altId)) {
+            $internal = WhatsAppChannel::isInternalId($from) ? $from : (WhatsAppChannel::isInternalId($altId) ? $altId : '');
+            WhatsAppEvents::record($channel->provider(), 'ignorado: no es tu número', $internal !== '' ? WhatsAppChannel::normalizeId($internal) : $from, $internal !== ''
+                ? 'Llegó un identificador interno de WhatsApp en vez del número. Si este mensaje lo mandaste tú, toca "Soy yo" para reconocerlo.'
+                : 'En Infocus está guardado ' . $settings['owner'] . ' y llegó ' . (WhatsAppChannel::normalizeNumber($from) ?: '(vacío)') . '.');
 
             return;
         }

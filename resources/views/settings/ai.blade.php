@@ -358,6 +358,19 @@
         <a href="{{ route('settings.ai', ['tab' => 'whatsapp']) }}" class="text-sm font-bold text-slate-500 hover:text-slate-900">Actualizar</a>
       </div>
       <p class="mt-1 text-sm text-slate-500">Si le escribes al número y no responde, aquí se ve si el mensaje llegó a Infocus y qué pasó con él.</p>
+      @if(!empty($settings['whatsapp_owner_ids']))
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+          <span class="font-bold">Identificadores reconocidos como tuyos:</span>
+          @foreach((array) $settings['whatsapp_owner_ids'] as $ownerId)
+            <form method="POST" action="{{ route('settings.ai.whatsapp.untrust') }}" class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
+              @csrf
+              <input type="hidden" name="id" value="{{ $ownerId }}">
+              <code class="font-mono text-xs">{{ $ownerId }}</code>
+              <button type="submit" class="text-xs font-bold text-rose-600 hover:text-rose-800" aria-label="Quitar {{ $ownerId }}">Quitar</button>
+            </form>
+          @endforeach
+        </div>
+      @endif
       @if(empty($whatsappEvents))
         <p class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-400">Todavía no ha llegado ningún mensaje. Si ya le escribiste, el proveedor no está llamando al webhook.</p>
       @else
@@ -373,7 +386,15 @@
                   <td class="py-2 pr-4 text-slate-600">{{ $event['provider'] }}</td>
                   <td class="py-2 pr-4 font-bold {{ str_starts_with($event['result'], 'respondido') || $event['result'] === 'aceptado' || $event['result'] === 'llegó' ? 'text-emerald-700' : 'text-rose-700' }}">{{ $event['result'] }}</td>
                   <td class="py-2 pr-4 font-mono text-xs text-slate-600">{{ $event['from'] }}</td>
-                  <td class="py-2 text-slate-600">{{ $event['detail'] }}</td>
+                  <td class="py-2 text-slate-600">
+                    {{ $event['detail'] }}
+                    @if($event['result'] === 'ignorado: no es tu número' && \App\Support\WhatsApp\WhatsAppChannel::isInternalId((string) $event['from']) && !in_array(\App\Support\WhatsApp\WhatsAppChannel::normalizeId((string) $event['from']), (array) ($settings['whatsapp_owner_ids'] ?? []), true))
+                      <form method="POST" action="{{ route('settings.ai.whatsapp.trust', $event['id']) }}" class="mt-2" onsubmit="return confirm('¿Este mensaje lo mandaste tú? Desde ahora Infocus le responderá a este identificador.')">
+                        @csrf
+                        <button type="submit" class="rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-slate-700">Soy yo</button>
+                      </form>
+                    @endif
+                  </td>
                 </tr>
               @endforeach
             </tbody>
