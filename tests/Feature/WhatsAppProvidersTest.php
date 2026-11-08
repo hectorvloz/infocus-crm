@@ -30,6 +30,9 @@ class WhatsAppProvidersTest extends TestCase
 
     private array $aiReplies = [];
 
+    /** Respuestas de TextMeBot en orden; vacío = todo sale bien. */
+    private array $textmebotReplies = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -55,7 +58,9 @@ class WhatsAppProvidersTest extends TestCase
                 return Http::response(base64_decode(self::PNG), 200, ['Content-Type' => 'image/png']);
             }
             if (str_contains($url, 'api.textmebot.com')) {
-                return Http::response(['status' => 'ok']);
+                $next = array_shift($this->textmebotReplies);
+
+                return $next ?? Http::response(['status' => 'ok']);
             }
             $next = array_shift($this->aiReplies);
 
@@ -302,5 +307,20 @@ class WhatsAppProvidersTest extends TestCase
 
         $this->actingAs($this->admin)->post(route('settings.ai.whatsapp.trust', $ignored['id']))->assertSessionHas('error');
         $this->assertArrayNotHasKey('whatsapp_owner_ids', (new FileStore('settings.json'))->find('settings'));
+    }
+
+    public function test_textmebot_retries_after_a_pause_and_logs_its_real_error(): void
+    {
+        \Illuminate\Support\Sleep::fake();
+        $this->settings('textmebot');
+        $channel = new \App\Support\WhatsApp\TextMeBotWhatsApp();
+
+        $this->textmebotReplies = [Http::response(['status' => 'error', 'message' => 'Wait 5 seconds between messages'])];
+        $this->assertNull($channel->send('+573001112233', 'Hola'));
+        \Illuminate\Support\Sleep::assertSleptTimes(1);
+
+        $this->textmebotReplies = array_fill(0, 3, Http::response('Error: the number is not connected', 200));
+        $error = $channel->send('+573001112233', 'Hola');
+        $this->assertSame('TextMeBot respondió (200): Error: the number is not connected', $error);
     }
 }

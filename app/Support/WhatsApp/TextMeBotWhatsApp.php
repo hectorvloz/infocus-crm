@@ -3,6 +3,7 @@
 namespace App\Support\WhatsApp;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Throwable;
 
 /**
@@ -125,28 +126,51 @@ class TextMeBotWhatsApp extends WhatsAppChannel
         return true;
     }
 
+    /** Pausa antes de reintentar: TextMeBot rechaza mensajes enviados muy seguidos. */
+    public const RETRY_SECONDS = 7;
+
+    private const ATTEMPTS = 3;
+
     private function request(array $params): ?string
     {
-        try {
-            $response = Http::timeout(30)->get('https://api.textmebot.com/send.php', $params);
-        } catch (Throwable $e) {
-            report($e);
-
-            return 'No se pudo conectar con TextMeBot.';
+        $error = null;
+        for ($attempt = 1; $attempt <= self::ATTEMPTS; $attempt++) {
+            if ($attempt > 1) {
+                Sleep::for(self::RETRY_SECONDS)->seconds();
+            }
+            try {
+                $response = Http::timeout(30)->get('https://api.textmebot.com/send.php', $params);
+            } catch (Throwable $e) {
+                report($e);
+                $error = 'No se pudo conectar con TextMeBot.';
+                continue;
+            }
+            $error = $this->errorFrom($response->status(), $response->body());
+            if ($error === null) {
+                return null;
+            }
         }
 
-        return $this->errorFrom($response->status(), $response->body());
+        return $error;
     }
 
-    /** Su API no documenta las respuestas: un estado no 2xx o un texto con "error" se toma como fallo. */
+    /**
+     * Su API no documenta las respuestas: un estado no 2xx o un texto con "error" se
+     * toma como fallo, y se devuelve la respuesta completa para ver la causa.
+     */
     private function errorFrom(int $status, string $body): ?string
     {
         $json = json_decode($body, true);
         $text = is_array($json) ? (string) ($json['message'] ?? $json['error'] ?? $json['status'] ?? '') : $body;
-        if ($status < 200 || $status >= 300 || (is_array($json) && isset($json['error'])) || stripos($text, 'error') !== false) {
-            return 'TextMeBot respondió: ' . mb_substr(trim(strip_tags($text)) ?: (string) $status, 0, 200);
+        $failed = $status < 200 || $status >= 300
+            || (is_array($json) && !empty($json['error']))
+            || (is_array($json) && in_array(strtolower((string) ($json['status'] ?? '')), ['error', 'failed', 'fail'], true))
+            || (!is_array($json) && stripos($body, 'error') !== false);
+        if (!$failed) {
+            return null;
         }
+        $detail = trim(preg_replace('/\s+/', ' ', strip_tags($body)) ?? '');
 
-        return null;
+        return 'TextMeBot respondió (' . $status . '): ' . mb_substr($detail !== '' ? $detail : $text, 0, 250);
     }
 }
