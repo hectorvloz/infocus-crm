@@ -57,7 +57,8 @@ class TextMeBotWhatsApp extends WhatsAppChannel
         foreach (self::chunks($text) as $chunk) {
             try {
                 $response = Http::timeout(30)->get('https://api.textmebot.com/send.php', [
-                    'recipient' => ltrim(self::normalizeNumber($to), '+'),
+                    // Como en su ejemplo: con el + y el indicativo del país.
+                    'recipient' => self::normalizeNumber($to),
                     'apikey' => $s['apikey'],
                     'text' => $chunk,
                     'json' => 'yes',

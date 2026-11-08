@@ -191,7 +191,7 @@ class WhatsAppProvidersTest extends TestCase
         $sent = $this->sent('api.textmebot.com');
         $this->assertCount(1, $sent, 'Solo el dueño, una vez.');
         parse_str((string) parse_url($sent[0]->url(), PHP_URL_QUERY), $query);
-        $this->assertSame('573001112233', $query['recipient']);
+        $this->assertSame('+573001112233', $query['recipient']);
         $this->assertSame('tmb-key', $query['apikey']);
         $this->assertSame('Listo.', $query['text']);
     }
