@@ -22,7 +22,7 @@ class PendingActions
         $this->store = new FileStore('mcp_pending_actions.json');
     }
 
-    public function create(string $action, array $payload, string $connection): string
+    public function create(string $action, array $payload, string $connection, int $minutes = self::TTL_MINUTES): string
     {
         $this->purge();
         $code = Str::upper(Str::random(3) . '-' . Str::random(3));
@@ -32,7 +32,7 @@ class PendingActions
             'payload' => $payload,
             'user_id' => (string) Auth::id(),
             'connection' => $connection,
-            'expires_at' => now()->addMinutes(self::TTL_MINUTES)->toISOString(),
+            'expires_at' => now()->addMinutes($minutes)->toISOString(),
         ]);
 
         return $code;

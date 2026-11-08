@@ -44,6 +44,9 @@ class WhatsAppSettingsController extends Controller
             'whatsapp_meta_template_lang' => ['nullable', 'string', 'max:10', 'regex:/^[a-z]{2}(_[A-Z]{2})?$/'],
             // TextMeBot
             'whatsapp_textmebot_apikey' => 'nullable|string|max:200',
+            'whatsapp_alerts' => 'nullable|array',
+            'whatsapp_alerts.*' => 'nullable|boolean',
+            'whatsapp_client_invoice' => 'nullable|in:' . implode(',', array_keys(\App\Support\WhatsApp\ClientInvoiceWhatsApp::MODES)),
         ], [
             'whatsapp_twilio_sid.regex' => 'El Account SID de Twilio empieza por AC y tiene 34 caracteres.',
             'whatsapp_template_sid.regex' => 'El Content SID de la plantilla empieza por HX y tiene 34 caracteres.',
@@ -75,6 +78,10 @@ class WhatsAppSettingsController extends Controller
             // Se generan una vez: el de Meta se pega en Meta, la clave de TextMeBot va en la URL del webhook.
             'whatsapp_meta_verify_token' => (string) ($current['whatsapp_meta_verify_token'] ?? '') ?: Str::random(32),
             'whatsapp_textmebot_webhook_key' => (string) ($current['whatsapp_textmebot_webhook_key'] ?? '') ?: Str::random(40),
+            'whatsapp_alerts' => array_key_exists('whatsapp_alerts', $data)
+                ? collect(array_keys(\App\Support\WhatsApp\WhatsAppAlerts::TYPES))->mapWithKeys(fn ($type) => [$type => (bool) ($data['whatsapp_alerts'][$type] ?? false)])->all()
+                : ($current['whatsapp_alerts'] ?? []),
+            'whatsapp_client_invoice' => (string) ($data['whatsapp_client_invoice'] ?? ($current['whatsapp_client_invoice'] ?? 'off')),
         ];
         foreach (self::SECRETS as $field) {
             $value = trim((string) ($data[$field] ?? ''));

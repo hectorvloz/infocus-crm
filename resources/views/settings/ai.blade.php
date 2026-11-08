@@ -158,6 +158,13 @@
       </div>
     </div>
 
+    <div class="rounded-2xl border border-slate-200 px-5 py-4">
+      <label class="block text-sm font-bold text-slate-700 mb-2">Tope diario de consultas a la IA</label>
+      <input name="ai_daily_limit" type="number" min="20" max="5000" value="{{ old('ai_daily_limit', $settings['ai_daily_limit'] ?? \App\Support\Ai\AiUsage::DEFAULT_LIMIT) }}" class="w-40 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold">
+      @php $aiUsageToday = \App\Support\Ai\AiUsage::today(); @endphp
+      <p class="mt-2 text-sm text-slate-500">Cada respuesta usa una o más consultas (más si consulta varias cosas del CRM). Hoy van {{ $aiUsageToday['modelo'] }} consultas y {{ $aiUsageToday['transcripcion'] }} transcripciones. Al llegar al tope, la IA deja de responder hasta el día siguiente.</p>
+    </div>
+
     <div>
       <label class="block text-sm font-bold text-slate-700 mb-2">Instrucción interna</label>
       <textarea name="ai_system_prompt" rows="5" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 leading-relaxed" placeholder="Ej: Responde con tono cercano, prioriza pasos cortos, no hagas cambios sin confirmación.">{{ old('ai_system_prompt', $settings['ai_system_prompt'] ?? '') }}</textarea>
@@ -271,6 +278,31 @@
             @endforeach
           </select>
           @error('whatsapp_user_id')<p class="mt-2 text-sm font-bold text-rose-600">{{ $message }}</p>@enderror
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 px-5 py-4 space-y-4">
+        <div>
+          <span class="block font-extrabold text-slate-900">Avisos a tu WhatsApp</span>
+          <span class="block text-sm text-slate-500">Te escribe apenas pasa algo en Infocus.</span>
+        </div>
+        <div class="grid gap-2 md:grid-cols-2">
+          @foreach(\App\Support\WhatsApp\WhatsAppAlerts::TYPES as $type => $label)
+            <label class="flex items-center gap-3 cursor-pointer text-sm text-slate-700">
+              <input type="hidden" name="whatsapp_alerts[{{ $type }}]" value="0">
+              <input type="checkbox" name="whatsapp_alerts[{{ $type }}]" value="1" class="rounded text-lime-500 focus:ring-lime-300" {{ (($settings['whatsapp_alerts'] ?? [])[$type] ?? true) ? 'checked' : '' }}>
+              <span>{{ $label }}</span>
+            </label>
+          @endforeach
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-slate-700 mb-2">Al enviar una factura al cliente por correo</label>
+          <select name="whatsapp_client_invoice" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 font-semibold">
+            @foreach(\App\Support\WhatsApp\ClientInvoiceWhatsApp::MODES as $value => $label)
+              <option value="{{ $value }}" {{ ($settings['whatsapp_client_invoice'] ?? 'off') === $value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+          </select>
+          <p class="mt-2 text-sm text-slate-500">Le escribe al teléfono de contacto del cliente avisando que se le envió la factura. Con "Preguntarme" te llega la propuesta a tu WhatsApp y solo se envía si respondes "sí". Con TextMeBot necesitas el plan que permite escribirle a otros números; con Meta o Twilio, el cliente debe haberte escrito en las últimas 24 horas o usar una plantilla.</p>
         </div>
       </div>
 

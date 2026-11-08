@@ -1311,6 +1311,7 @@ class SettingsController extends Controller
             'ai_tools_enabled' => 'nullable|boolean',
             'ai_system_prompt' => 'nullable|string|max:3000',
             'ai_transcription_provider' => 'nullable|in:,openai,gemini',
+            'ai_daily_limit' => 'nullable|integer|min:20|max:5000',
             'ai_transcription_api_key' => 'nullable|string|max:800',
         ]);
 
@@ -1324,6 +1325,7 @@ class SettingsController extends Controller
             'ai_send_visible_context' => $request->boolean('ai_send_visible_context', false),
             'ai_tools_enabled' => $request->boolean('ai_tools_enabled', false),
             'ai_transcription_provider' => (string) ($data['ai_transcription_provider'] ?? ''),
+            'ai_daily_limit' => (int) ($data['ai_daily_limit'] ?? \App\Support\Ai\AiUsage::DEFAULT_LIMIT),
             'ai_system_prompt' => trim((string) ($data['ai_system_prompt'] ?? '')),
         ];
 

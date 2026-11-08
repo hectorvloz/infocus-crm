@@ -17,7 +17,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 
 #[Name('confirmar_accion')]
-#[Description('Ejecuta una acción preparada (enviar correo, enviar factura, registrar pago, programar reunión o enviar contrato) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
+#[Description('Ejecuta una acción preparada (enviar correo, WhatsApp a un cliente, enviar factura, registrar pago, programar reunión o enviar contrato) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
 #[IsDestructive]
 class ConfirmarAccion extends InfocusTool
 {
@@ -37,12 +37,28 @@ class ConfirmarAccion extends InfocusTool
 
         return match ($action['action']) {
             'enviar_correo' => $this->sendEmail($p, $ctx),
+            'whatsapp_cliente' => $this->sendClientWhatsApp($p, $ctx),
             'enviar_factura' => $this->sendInvoice($p, $ctx),
             'registrar_pago' => $this->registerPayment($p, $ctx),
             'programar_reunion' => $this->scheduleMeeting($p, $ctx),
             'enviar_contrato' => $this->sendContract($p, $ctx),
             default => Response::error('Acción desconocida.'),
         };
+    }
+
+    private function sendClientWhatsApp(array $p, McpContext $ctx): Response
+    {
+        $ctx->allow('correo.create', write: true);
+        $channel = \App\Support\WhatsApp\WhatsAppChannel::current();
+        $settings = $channel->settings();
+        $error = $settings['enabled'] && $channel->configured($settings)
+            ? $channel->send((string) $p['phone'], (string) $p['text'], $settings)
+            : 'WhatsApp no está activo en Infocus.';
+        \App\Support\WhatsApp\WhatsAppEvents::record($channel->provider(), $error === null ? 'WhatsApp a cliente enviado' : 'WhatsApp a cliente no enviado', (string) $p['phone'], $error ?? (string) ($p['name'] ?? ''));
+
+        return $error === null
+            ? Response::text('WhatsApp enviado a ' . ($p['name'] ?? $p['phone']) . ' (' . $p['phone'] . ').')
+            : Response::error('No se pudo enviar el WhatsApp: ' . $error);
     }
 
     private function sendEmail(array $p, McpContext $ctx): Response

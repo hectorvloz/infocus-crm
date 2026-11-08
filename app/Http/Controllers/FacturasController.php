@@ -1003,6 +1003,7 @@ class FacturasController extends Controller
             TemplateMail::send($data['to'], $subject, $body, $invoiceMeta, $invoiceAttachment);
 
             $markInvoiceSent(['last_sent_mode' => 'attached_pdf']);
+            \App\Support\WhatsApp\ClientInvoiceWhatsApp::afterEmailed($factura, (string) $data['to']);
 
             return response()->json(['ok' => true]);
         } catch (\Throwable $e) {

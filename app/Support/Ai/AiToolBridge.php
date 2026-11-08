@@ -72,6 +72,7 @@ class AiToolBridge
         Tools\ActualizarLead::class,
         Tools\RegistrarGasto::class,
         Tools\EnviarmeArchivo::class,
+        Tools\Temporizador::class,
         Tools\RestaurarCambio::class,
         Tools\ProgramarTarea::class,
         Tools\EditarTareaProgramada::class,
@@ -81,6 +82,7 @@ class AiToolBridge
         Tools\PrepararPago::class,
         Tools\PrepararReunion::class,
         Tools\PrepararEnvioContrato::class,
+        Tools\PrepararWhatsappCliente::class,
         Tools\ConfirmarAccion::class,
     ];
 

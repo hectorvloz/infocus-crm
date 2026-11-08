@@ -1452,6 +1452,8 @@ class PortalController extends Controller
         $updated = $this->facturas->update($invoiceId, ['estado' => 'Pagada', 'pagos' => $pagos]);
         $this->timeline->add($client['id'], 'pago', ['monto' => $pago['monto'], 'metodo' => 'Wompi']);
         $this->sendInvoicePaidEmail($updated, $client, $pago);
+        \App\Support\WhatsApp\WhatsAppAlerts::send('pago', sprintf('Pago recibido: %s pagó %s %s de la factura %s por Wompi.',
+            (string) ($client['empresa'] ?? 'Un cliente'), (string) ($invoice['moneda'] ?? ''), number_format((float) $pago['monto'], 0, ',', '.'), (string) ($invoice['numero'] ?? $invoiceId)));
     }
 
     private function markInvoicePaidByPaypal(string $invoiceId, array $client, ?string $orderId): void

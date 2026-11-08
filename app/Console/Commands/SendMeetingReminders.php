@@ -78,6 +78,8 @@ class SendMeetingReminders extends Command
                     'target_names' => collect($meeting['responsables'] ?? [])->map(fn ($name) => Str::lower(trim((string) $name)))->filter()->values()->all(),
                 ]);
                 $notified++;
+                \App\Support\WhatsApp\WhatsAppAlerts::deliver('reunion', 'Reunión en ' . $minutesBefore . ' minutos: "' . (string) ($meeting['titulo'] ?? 'Reunión') . '" a las ' . $startAt->format('H:i') . '.'
+                    . (!empty($meeting['meet_link']) ? ' Enlace: ' . $meeting['meet_link'] : ''));
             }
 
             $meetingsStore->update($meetingId, [

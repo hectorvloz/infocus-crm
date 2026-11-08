@@ -172,7 +172,7 @@ class AiToolModeTest extends TestCase
     {
         $definitions = (new AiToolBridge())->definitions();
 
-        $this->assertCount(48, $definitions);
+        $this->assertCount(50, $definitions);
         foreach ($definitions as $definition) {
             $this->assertSame('function', $definition['type']);
             $this->assertMatchesRegularExpression('/^[a-z_]+$/', $definition['function']['name']);

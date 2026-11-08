@@ -133,6 +133,17 @@ abstract class WhatsAppChannel
         return mb_strlen($line) > 900 ? mb_substr($line, 0, 897) . '...' : $line;
     }
 
+    /** Teléfono de un cliente o lead: un celular colombiano de 10 dígitos sin indicativo recibe el +57. */
+    public static function clientPhone(?string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone) ?? '';
+        if (strlen($digits) === 10 && str_starts_with($digits, '3')) {
+            $digits = '57' . $digits;
+        }
+
+        return strlen($digits) >= 10 && strlen($digits) <= 15 ? '+' . $digits : '';
+    }
+
     public static function normalizeNumber(string $number): string
     {
         $digits = preg_replace('/\D+/', '', str_ireplace('whatsapp:', '', $number)) ?? '';

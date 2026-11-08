@@ -96,6 +96,9 @@ class LeadsWebhookController extends Controller
 
         $this->notify($created, $data, $agendaItem, true);
         $this->confirmToLead($data, $agendaItem);
+        \App\Support\WhatsApp\WhatsAppAlerts::send('lead', trim(sprintf("Lead nuevo: %s (%s%s), desde %s.%s\nSi quieres, pídeme que le redacte la primera respuesta.",
+            (string) $created['nombre'], $email, !empty($data['telefono']) ? ', ' . $data['telefono'] : '', (string) ($created['origen'] ?? 'la web'),
+            $agendaItem ? ' Agendó reunión: ' . trim((string) (($agendaItem['fecha'] ?? '') . ' ' . ($agendaItem['hora'] ?? ''))) . '.' : '')));
 
         return response()->json(['ok' => true, 'lead_id' => $created['id'], 'nuevo' => true], 201);
     }

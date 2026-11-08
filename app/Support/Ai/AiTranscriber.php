@@ -51,6 +51,10 @@ class AiTranscriber
         if ($s['provider'] === '' || $s['api_key'] === '') {
             return ['text' => '', 'error' => 'La transcripción de audios no está activada (Configuración > IA > Conexión).'];
         }
+        if (AiUsage::reached()) {
+            return ['text' => '', 'error' => AiUsage::limitMessage()];
+        }
+        AiUsage::count('transcripcion');
         if ($contents === '' || strlen($contents) > self::MAX_BYTES) {
             return ['text' => '', 'error' => 'El audio está vacío o es demasiado largo para transcribirlo.'];
         }

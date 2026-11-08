@@ -50,9 +50,38 @@ class RunAssistantScheduledTasks extends Command
             $ran++;
         }
 
+        $this->dailyInvoiceAlert($now);
+
         $this->info("Tareas del asistente ejecutadas: {$ran}");
 
         return self::SUCCESS;
+    }
+
+    /** Una vez al día, desde las 8:00, avisa por WhatsApp las facturas que vencen hoy o ya vencieron. */
+    private function dailyInvoiceAlert(CarbonImmutable $now): void
+    {
+        if ((int) $now->format('H') < 8 || !\App\Support\WhatsApp\WhatsAppAlerts::enabled('facturas')) {
+            return;
+        }
+        $state = new FileStore('whatsapp_alerts_state.json');
+        $today = $now->toDateString();
+        if ((($state->find('state') ?: [])['facturas_date'] ?? '') === $today) {
+            return;
+        }
+        $state->find('state') ? $state->update('state', ['facturas_date' => $today]) : $state->create(['id' => 'state', 'facturas_date' => $today]);
+
+        $open = collect((new FileStore('facturas.json'))->all())
+            ->filter(fn ($f) => !in_array((string) ($f['estado'] ?? ''), ['Pagada', 'En borrador', 'Anulada'], true) && !empty($f['vencimiento']) && (string) $f['vencimiento'] <= $today)
+            ->sortBy('vencimiento');
+        if ($open->isEmpty()) {
+            return;
+        }
+        $line = fn ($f) => sprintf('- %s · %s · %s %s · %s', $f['numero'] ?? $f['id'], $f['cliente'] ?? 'Sin cliente', $f['moneda'] ?? '', number_format((float) ($f['saldo'] ?? $f['total'] ?? 0), 0, ',', '.'),
+            (string) $f['vencimiento'] === $today ? 'vence hoy' : 'vencida desde ' . $f['vencimiento']);
+        $text = 'Facturas por cobrar (' . $open->count() . "):\n" . $open->take(8)->map($line)->implode("\n")
+            . ($open->count() > 8 ? "\n- y " . ($open->count() - 8) . ' más en Infocus.' : '')
+            . "\nSi quieres, pídeme los recordatorios de cobro.";
+        \App\Support\WhatsApp\WhatsAppAlerts::deliver('facturas', $text);
     }
 
     private function runTask(array $task, AssistantNotifier $notifier): string

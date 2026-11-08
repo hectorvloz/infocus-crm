@@ -89,12 +89,14 @@ class InfocusServer extends Server
         Tools\EditarTareaProgramada::class,
         Tools\SubirAdjunto::class,
         Tools\EnviarmeArchivo::class,
+        Tools\Temporizador::class,
         // Dos pasos
         Tools\PrepararCorreo::class,
         Tools\PrepararEnvioFactura::class,
         Tools\PrepararPago::class,
         Tools\PrepararReunion::class,
         Tools\PrepararEnvioContrato::class,
+        Tools\PrepararWhatsappCliente::class,
         Tools\ConfirmarAccion::class,
     ];
 }
