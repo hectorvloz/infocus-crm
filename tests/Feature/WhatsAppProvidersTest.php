@@ -196,6 +196,19 @@ class WhatsAppProvidersTest extends TestCase
         $this->assertSame('Listo.', $query['text']);
     }
 
+    public function test_textmebot_body_is_read_even_without_json_content_type(): void
+    {
+        $this->settings('textmebot');
+        $this->aiReplies = [$this->text('Recibido.')];
+
+        $this->call('POST', '/webhooks/whatsapp/textmebot/clave-secreta-de-prueba', [], [], [], ['CONTENT_TYPE' => 'text/plain'],
+            json_encode(['type' => 'text', 'from' => '573001112233', 'file' => 'null', 'message' => 'Hola sin cabecera']))->assertOk();
+
+        $sent = $this->sent('api.textmebot.com');
+        $this->assertCount(1, $sent);
+        $this->assertStringContainsString('Hola sin cabecera', json_encode(Http::recorded()->map(fn ($p) => $p[0])->first(fn ($r) => str_contains($r->url(), 'deepseek'))['messages'], JSON_UNESCAPED_UNICODE));
+    }
+
     public function test_textmebot_does_not_download_from_private_addresses(): void
     {
         $this->assertFalse(\App\Support\WhatsApp\TextMeBotWhatsApp::publicHost('127.0.0.1'));

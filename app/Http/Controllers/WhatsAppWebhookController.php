@@ -111,13 +111,15 @@ class WhatsAppWebhookController extends Controller
             return response('Clave inválida.', 403);
         }
 
-        $type = (string) $request->input('type', 'text');
-        $text = trim((string) $request->input('message', ''));
-        $file = (string) $request->input('file', '');
+        // Su ejemplo lee el JSON del cuerpo crudo: no siempre manda Content-Type de JSON.
+        $data = $request->all() ?: (json_decode($request->getContent(), true) ?: []);
+        $type = (string) ($data['type'] ?? 'text');
+        $text = trim((string) ($data['message'] ?? ''));
+        $file = (string) ($data['file'] ?? '');
         $media = ($type !== 'text' && $file !== '' && $file !== 'null') ? [['url' => $file, 'mime' => '']] : [];
         // Sin id de mensaje: un reenvío con el mismo contenido en 2 minutos se ignora.
-        $id = 'tmb:' . sha1(implode('|', [$request->input('from'), $type, $text, $file, intdiv(time(), 120)]));
-        $this->accept($channel, $settings, (string) $request->input('from', ''), $type === 'text' || $media !== [] ? $text : '', $id, $media);
+        $id = 'tmb:' . sha1(implode('|', [$data['from'] ?? '', $type, $text, $file, intdiv(time(), 120)]));
+        $this->accept($channel, $settings, (string) ($data['from'] ?? ''), $type === 'text' || $media !== [] ? $text : '', $id, $media);
 
         return response('OK', 200);
     }
