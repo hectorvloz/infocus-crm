@@ -47,6 +47,26 @@ class TextMeBotWhatsApp extends WhatsAppChannel
         return $this->send($to, self::toWhatsAppText($text), $settings);
     }
 
+    public function needsWindow(): bool
+    {
+        return false;
+    }
+
+    /** Imágenes con file=, documentos con document= y filename=, como en su documentación. */
+    public function sendFile(string $to, string $url, string $name, string $mime, string $caption, ?array $settings = null): ?string
+    {
+        $s = $settings ?? $this->settings();
+        if (!$this->configured($s)) {
+            return 'Falta configurar TextMeBot (API key y tu número).';
+        }
+        $params = ['recipient' => self::normalizeNumber($to), 'apikey' => $s['apikey'], 'json' => 'yes'];
+        $params += str_starts_with($mime, 'image/')
+            ? ['text' => $caption !== '' ? $caption : $name, 'file' => $url]
+            : ['document' => $url, 'filename' => $name, 'text' => $caption];
+
+        return $this->request($params);
+    }
+
     public function send(string $to, string $text, ?array $settings = null): ?string
     {
         $s = $settings ?? $this->settings();
@@ -55,20 +75,8 @@ class TextMeBotWhatsApp extends WhatsAppChannel
         }
 
         foreach (self::chunks($text) as $chunk) {
-            try {
-                $response = Http::timeout(30)->get('https://api.textmebot.com/send.php', [
-                    // Como en su ejemplo: con el + y el indicativo del país.
-                    'recipient' => self::normalizeNumber($to),
-                    'apikey' => $s['apikey'],
-                    'text' => $chunk,
-                    'json' => 'yes',
-                ]);
-            } catch (Throwable $e) {
-                report($e);
-
-                return 'No se pudo conectar con TextMeBot.';
-            }
-            $error = $this->errorFrom($response->status(), $response->body());
+            // Como en su ejemplo: con el + y el indicativo del país.
+            $error = $this->request(['recipient' => self::normalizeNumber($to), 'apikey' => $s['apikey'], 'text' => $chunk, 'json' => 'yes']);
             if ($error !== null) {
                 return $error;
             }
@@ -115,6 +123,19 @@ class TextMeBotWhatsApp extends WhatsAppChannel
         }
 
         return true;
+    }
+
+    private function request(array $params): ?string
+    {
+        try {
+            $response = Http::timeout(30)->get('https://api.textmebot.com/send.php', $params);
+        } catch (Throwable $e) {
+            report($e);
+
+            return 'No se pudo conectar con TextMeBot.';
+        }
+
+        return $this->errorFrom($response->status(), $response->body());
     }
 
     /** Su API no documenta las respuestas: un estado no 2xx o un texto con "error" se toma como fallo. */

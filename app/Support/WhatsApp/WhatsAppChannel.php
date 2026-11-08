@@ -42,6 +42,23 @@ abstract class WhatsAppChannel
     /** Envía la plantilla aprobada con el aviso en su variable. Devuelve el error o null. */
     abstract public function sendTemplate(string $to, string $text, ?array $settings = null): ?string;
 
+    /** Envía un archivo que el proveedor descarga de $url (enlace firmado temporal). Devuelve el error o null. */
+    abstract public function sendFile(string $to, string $url, string $name, string $mime, string $caption, ?array $settings = null): ?string;
+
+    /** Los proveedores oficiales solo dejan escribir libremente 24 horas después del último mensaje del dueño. */
+    public function needsWindow(): bool
+    {
+        return true;
+    }
+
+    /** El dueño escribió en las últimas 24 horas (con un margen de 10 minutos). */
+    public static function windowOpen(): bool
+    {
+        $chat = (new FileStore('whatsapp_chats.json'))->find('owner') ?: [];
+
+        return !empty($chat['last_inbound_at']) && now()->subHours(23)->subMinutes(50)->lessThan($chat['last_inbound_at']);
+    }
+
     /** Tiene plantilla configurada para escribir fuera de las 24 horas. */
     abstract public function hasTemplate(array $settings): bool;
 

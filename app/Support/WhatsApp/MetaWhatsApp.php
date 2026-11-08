@@ -66,6 +66,19 @@ class MetaWhatsApp extends WhatsAppChannel
         return null;
     }
 
+    public function sendFile(string $to, string $url, string $name, string $mime, string $caption, ?array $settings = null): ?string
+    {
+        $s = $settings ?? $this->settings();
+        if (!$this->configured($s)) {
+            return 'Falta configurar Meta (Phone Number ID, token, App Secret y tu número).';
+        }
+        $media = str_starts_with($mime, 'image/')
+            ? ['type' => 'image', 'image' => ['link' => $url, 'caption' => $caption]]
+            : ['type' => 'document', 'document' => ['link' => $url, 'filename' => $name, 'caption' => $caption]];
+
+        return $this->post($s, $to, $media);
+    }
+
     /** Plantilla aprobada en WhatsApp Manager con una variable {{1}} en el cuerpo. */
     public function sendTemplate(string $to, string $text, ?array $settings = null): ?string
     {

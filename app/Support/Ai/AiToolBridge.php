@@ -71,6 +71,7 @@ class AiToolBridge
         Tools\CrearLead::class,
         Tools\ActualizarLead::class,
         Tools\RegistrarGasto::class,
+        Tools\EnviarmeArchivo::class,
         Tools\RestaurarCambio::class,
         Tools\ProgramarTarea::class,
         Tools\EditarTareaProgramada::class,

@@ -58,6 +58,16 @@ class TwilioWhatsApp extends WhatsAppChannel
         return null;
     }
 
+    public function sendFile(string $to, string $url, string $name, string $mime, string $caption, ?array $settings = null): ?string
+    {
+        $s = $settings ?? $this->settings();
+        if (!$this->configured($s)) {
+            return 'Falta configurar Twilio (SID, token y números).';
+        }
+
+        return $this->post($s, ['To' => 'whatsapp:' . self::normalizeNumber($to), 'Body' => $caption !== '' ? $caption : $name, 'MediaUrl' => $url]);
+    }
+
     /** Plantilla de Twilio (Content SID HX...) con una variable {{1}}. */
     public function sendTemplate(string $to, string $text, ?array $settings = null): ?string
     {

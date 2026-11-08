@@ -375,6 +375,8 @@ Route::post('/webhooks/leads', [LeadsWebhookController::class, 'store'])->middle
 Route::post('/webhooks/whatsapp', [\App\Http\Controllers\WhatsAppWebhookController::class, 'handle'])->middleware('throttle:60,1')->name('webhooks.whatsapp');
 Route::get('/webhooks/whatsapp/meta', [\App\Http\Controllers\WhatsAppWebhookController::class, 'metaVerify'])->middleware('throttle:30,1')->name('webhooks.whatsapp.meta.verify');
 Route::post('/webhooks/whatsapp/meta', [\App\Http\Controllers\WhatsAppWebhookController::class, 'meta'])->middleware('throttle:120,1')->name('webhooks.whatsapp.meta');
+// Archivos que el asistente envía por WhatsApp: enlace firmado que vence en minutos.
+Route::get('/adjuntos/temporal/{id}/{name}', \App\Http\Controllers\AiAttachmentDownloadController::class)->middleware(['signed:relative', 'throttle:30,1'])->where('name', '[^/]+')->name('ai.attachments.temporary');
 Route::post('/webhooks/whatsapp/textmebot/{key}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'textmebot'])->middleware('throttle:60,1')->name('webhooks.whatsapp.textmebot');
 
 // Admin: mensajes del portal

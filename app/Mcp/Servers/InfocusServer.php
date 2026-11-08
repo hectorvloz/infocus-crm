@@ -88,6 +88,7 @@ class InfocusServer extends Server
         Tools\ProgramarTarea::class,
         Tools\EditarTareaProgramada::class,
         Tools\SubirAdjunto::class,
+        Tools\EnviarmeArchivo::class,
         // Dos pasos
         Tools\PrepararCorreo::class,
         Tools\PrepararEnvioFactura::class,

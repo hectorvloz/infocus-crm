@@ -69,6 +69,29 @@ class AiAttachments
         return Storage::disk('local')->exists((string) $item['path']) ? $item : null;
     }
 
+    /**
+     * Para el enlace temporal firmado que usan los proveedores de WhatsApp al
+     * descargar un archivo que el asistente envía: no hay sesión, la firma autoriza.
+     */
+    public function findForSignedDownload(string $id): ?array
+    {
+        $item = (new FileStore(self::FILE))->find(strtoupper(trim($id)));
+        if (!$item || now()->greaterThan($item['expires_at'] ?? 'now') || !Storage::disk('local')->exists((string) $item['path'])) {
+            return null;
+        }
+
+        return $item;
+    }
+
+    /** Enlace público que vence en $minutes minutos, solo para este archivo. */
+    public static function temporaryUrl(array $item, int $minutes = 15): string
+    {
+        // Se firma solo la ruta: así no importa si detrás del hosting la petición llega por http o https.
+        $path = \Illuminate\Support\Facades\URL::temporarySignedRoute('ai.attachments.temporary', now()->addMinutes($minutes), ['id' => $item['id'], 'name' => $item['name']], false);
+
+        return rtrim((string) config('app.url'), '/') . $path;
+    }
+
     public function contents(array $item): string
     {
         return (string) Storage::disk('local')->get((string) $item['path']);
