@@ -10,6 +10,7 @@ use App\Support\WhatsApp\MetaWhatsApp;
 use App\Support\WhatsApp\TextMeBotWhatsApp;
 use App\Support\WhatsApp\TwilioWhatsApp;
 use App\Support\WhatsApp\WhatsAppChannel;
+use App\Support\WhatsApp\WhatsAppEvents;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
@@ -40,6 +41,8 @@ class WhatsAppWebhookController extends Controller
         $params = $request->post();
         $urls = array_unique([$request->fullUrl(), preg_replace('/^http:/', 'https:', $request->fullUrl()), url('/webhooks/whatsapp')]);
         if (!collect($urls)->contains(fn ($url) => TwilioWhatsApp::validSignature($settings['token'], $url, $params, $signature))) {
+            WhatsAppEvents::record('twilio', 'rechazado: firma inválida', (string) $request->post('From', ''), 'Revisa que la URL en Twilio sea exactamente ' . url('/webhooks/whatsapp'));
+
             return response('Firma inválida.', 403);
         }
 
@@ -73,6 +76,8 @@ class WhatsAppWebhookController extends Controller
             return response('WhatsApp por Meta no está activo.', 404);
         }
         if (!MetaWhatsApp::validSignature($settings['app_secret'], $request->getContent(), (string) $request->header('X-Hub-Signature-256', ''))) {
+            WhatsAppEvents::record('meta', 'rechazado: firma inválida', '', 'Revisa el App Secret guardado en Infocus.');
+
             return response('Firma inválida.', 403);
         }
 
@@ -105,14 +110,18 @@ class WhatsAppWebhookController extends Controller
         $channel = WhatsAppChannel::current();
         $settings = $channel->settings();
         if (!$channel instanceof TextMeBotWhatsApp || !$settings['enabled'] || !$channel->configured($settings)) {
+            WhatsAppEvents::record('textmebot', 'rechazado: TextMeBot no está activo en Infocus', '', 'Revisa que el proveedor sea TextMeBot, que WhatsApp esté activado y que tengan API key y tu número.');
+
             return response('WhatsApp por TextMeBot no está activo.', 404);
         }
-        if (!hash_equals($settings['webhook_key'], $key)) {
-            return response('Clave inválida.', 403);
-        }
-
         // Su ejemplo lee el JSON del cuerpo crudo: no siempre manda Content-Type de JSON.
         $data = $request->all() ?: (json_decode($request->getContent(), true) ?: []);
+        if (!hash_equals($settings['webhook_key'], $key)) {
+            WhatsAppEvents::record('textmebot', 'rechazado: clave de la URL inválida', (string) ($data['from'] ?? ''), 'La URL del webhook en TextMeBot no coincide con la de Infocus. Cópiala de nuevo.');
+
+            return response('Clave inválida.', 403);
+        }
+        WhatsAppEvents::record('textmebot', 'llegó', (string) ($data['from'] ?? ''), 'Campos: ' . implode(', ', array_keys((array) $data)) . ' · tipo: ' . (string) ($data['type'] ?? '?'));
         $type = (string) ($data['type'] ?? 'text');
         $text = trim((string) ($data['message'] ?? ''));
         $file = (string) ($data['file'] ?? '');
@@ -126,9 +135,17 @@ class WhatsAppWebhookController extends Controller
 
     private function accept(WhatsAppChannel $channel, array $settings, string $from, string $body, string $messageId, array $media): void
     {
-        if (WhatsAppChannel::normalizeNumber($from) !== $settings['owner'] || $messageId === '' || !$this->markSeen($messageId)) {
+        if (WhatsAppChannel::normalizeNumber($from) !== $settings['owner']) {
+            WhatsAppEvents::record($channel->provider(), 'ignorado: no es tu número', $from, 'En Infocus está guardado ' . $settings['owner'] . ' y llegó ' . (WhatsAppChannel::normalizeNumber($from) ?: '(vacío)') . '.');
+
             return;
         }
+        if ($messageId === '' || !$this->markSeen($messageId)) {
+            WhatsAppEvents::record($channel->provider(), 'ignorado: repetido', $from);
+
+            return;
+        }
+        WhatsAppEvents::record($channel->provider(), 'aceptado', $from, $media !== [] ? count($media) . ' archivo(s)' : '');
 
         $done = false;
         app()->terminating(function () use (&$done, $channel, $settings, $body, $media) {
@@ -154,6 +171,7 @@ class WhatsAppWebhookController extends Controller
 
         $user = User::find($settings['user_id']);
         if (!$user) {
+            WhatsAppEvents::record($channel->provider(), 'error: falta el usuario', '');
             $channel->send($owner, 'Falta elegir en Infocus el usuario con el que respondo (Configuración > IA > WhatsApp).', $settings);
 
             return;
@@ -161,6 +179,7 @@ class WhatsAppWebhookController extends Controller
 
         $aiSettings = (new FileStore('settings.json'))->find('settings') ?: [];
         if (empty($aiSettings['ai_tools_enabled'])) {
+            WhatsAppEvents::record($channel->provider(), 'error: asistente con herramientas apagado', '');
             $channel->send($owner, 'Activa "Asistente con herramientas" en Configuración > IA para que pueda trabajar desde WhatsApp.', $settings);
 
             return;
@@ -184,6 +203,7 @@ class WhatsAppWebhookController extends Controller
             $content = (string) ($result['content'] ?? '');
         } catch (Throwable $e) {
             report($e);
+            WhatsAppEvents::record($channel->provider(), 'error de la IA', '', $e->getMessage());
             $content = 'No pude procesar tu mensaje. Intenta de nuevo en un momento.';
             $result = [];
         }
@@ -195,6 +215,7 @@ class WhatsAppWebhookController extends Controller
         if ($error !== null) {
             report(new \RuntimeException('WhatsApp: ' . $error));
         }
+        WhatsAppEvents::record($channel->provider(), $error === null ? 'respondido' : 'error al responder', '', $error ?? implode(', ', (array) ($result['tools_used'] ?? [])));
 
         $chat = $store->find('owner') ?: $chat;
         $chat['messages'] = array_values(array_slice([

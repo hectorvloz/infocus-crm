@@ -37,7 +37,7 @@ class WhatsAppProvidersTest extends TestCase
         foreach (['mcp_activity.json', 'clientes.json', 'leads.json', 'facturas.json', 'gastos.json', 'proyectos.json', 'reuniones.json',
             'contratos.json', 'settings.json', 'roles.json', 'mis_notas.json', 'header_reminders.json', 'ai_memories.json', 'ai_action_logs.json',
             'timeline.json', 'users.json', 'mcp_pending_actions.json', 'email_templates.json', 'email_history.json', 'mcp_history.json',
-            'whatsapp_chats.json', 'ai_attachments.json', 'ai_scheduled_tasks.json'] as $file) {
+            'whatsapp_chats.json', 'ai_attachments.json', 'ai_scheduled_tasks.json', 'whatsapp_events.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
         Mail::fake();
@@ -248,5 +248,24 @@ class WhatsAppProvidersTest extends TestCase
 
         $this->actingAs($this->admin)->post(route('settings.ai.whatsapp.test'))->assertSessionHas('success');
         $this->assertSame('573001112233', $this->sent('/messages')[0]['to']);
+    }
+
+    public function test_webhook_events_explain_why_a_message_was_not_answered(): void
+    {
+        $this->settings('textmebot');
+        $this->aiReplies = [$this->text('Hola.')];
+
+        $this->postJson('/webhooks/whatsapp/textmebot/clave-vieja', ['type' => 'text', 'from' => '573001112233', 'message' => 'Hola'])->assertForbidden();
+        $this->postJson('/webhooks/whatsapp/textmebot/clave-secreta-de-prueba', ['type' => 'text', 'from' => '123456789@lid', 'message' => 'Hola'])->assertOk();
+        $this->postJson('/webhooks/whatsapp/textmebot/clave-secreta-de-prueba', ['type' => 'text', 'from' => '573001112233', 'message' => 'Hola'])->assertOk();
+
+        $results = collect(\App\Support\WhatsApp\WhatsAppEvents::latest(20))->pluck('result')->reverse()->values()->all();
+        $this->assertSame(['rechazado: clave de la URL inválida', 'llegó', 'ignorado: no es tu número', 'llegó', 'aceptado', 'respondido'], $results);
+        $ignored = collect(\App\Support\WhatsApp\WhatsAppEvents::latest(20))->firstWhere('result', 'ignorado: no es tu número');
+        $this->assertStringContainsString('+573001112233', $ignored['detail']);
+        $this->assertStringContainsString('+123456789', $ignored['detail']);
+
+        $this->actingAs($this->admin)->get(route('settings.ai', ['tab' => 'whatsapp']))
+            ->assertOk()->assertSee('Últimos mensajes recibidos')->assertSee('ignorado: no es tu número')->assertDontSee('clave-vieja');
     }
 }

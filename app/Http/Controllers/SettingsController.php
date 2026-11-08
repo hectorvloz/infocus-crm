@@ -1294,7 +1294,9 @@ class SettingsController extends Controller
         $settings['whatsapp_textmebot_apikey_preview'] = $this->maskedSecret((string) ($settings['whatsapp_textmebot_apikey'] ?? ''));
         $whatsappAdmins = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('settings.ai', compact('settings', 'aiMemories', 'whatsappAdmins'));
+        $whatsappEvents = \App\Support\WhatsApp\WhatsAppEvents::latest(10);
+
+        return view('settings.ai', compact('settings', 'aiMemories', 'whatsappAdmins', 'whatsappEvents'));
     }
 
     public function updateAi(Request $request)

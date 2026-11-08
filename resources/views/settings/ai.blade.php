@@ -351,6 +351,36 @@
       <p class="text-sm text-slate-600">Envía un mensaje de prueba a tu WhatsApp con el proveedor guardado.</p>
       <button type="submit" class="rounded-2xl border border-slate-200 px-5 py-2.5 font-bold text-slate-700 hover:bg-slate-50">Enviar prueba</button>
     </form>
+
+    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-lg font-black text-slate-900">Últimos mensajes recibidos</h2>
+        <a href="{{ route('settings.ai', ['tab' => 'whatsapp']) }}" class="text-sm font-bold text-slate-500 hover:text-slate-900">Actualizar</a>
+      </div>
+      <p class="mt-1 text-sm text-slate-500">Si le escribes al número y no responde, aquí se ve si el mensaje llegó a Infocus y qué pasó con él.</p>
+      @if(empty($whatsappEvents))
+        <p class="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-400">Todavía no ha llegado ningún mensaje. Si ya le escribiste, el proveedor no está llamando al webhook.</p>
+      @else
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="text-xs uppercase tracking-wide text-slate-400">
+              <tr><th class="py-2 pr-4">Hora</th><th class="py-2 pr-4">Proveedor</th><th class="py-2 pr-4">Resultado</th><th class="py-2 pr-4">De</th><th class="py-2">Detalle</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              @foreach($whatsappEvents as $event)
+                <tr class="align-top">
+                  <td class="py-2 pr-4 whitespace-nowrap text-slate-500">{{ \Illuminate\Support\Carbon::parse($event['at'])->setTimezone('America/Bogota')->format('d/m H:i:s') }}</td>
+                  <td class="py-2 pr-4 text-slate-600">{{ $event['provider'] }}</td>
+                  <td class="py-2 pr-4 font-bold {{ str_starts_with($event['result'], 'respondido') || $event['result'] === 'aceptado' || $event['result'] === 'llegó' ? 'text-emerald-700' : 'text-rose-700' }}">{{ $event['result'] }}</td>
+                  <td class="py-2 pr-4 font-mono text-xs text-slate-600">{{ $event['from'] }}</td>
+                  <td class="py-2 text-slate-600">{{ $event['detail'] }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      @endif
+    </div>
   </section>
 
   <script>
