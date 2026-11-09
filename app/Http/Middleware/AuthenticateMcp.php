@@ -27,7 +27,12 @@ class AuthenticateMcp
             : $this->fromOAuth();
 
         if (!$user) {
-            return response()->json(['error' => 'unauthorized', 'message' => 'Token inválido, vencido o revocado.'], 401);
+            return response()->json(['error' => 'unauthorized', 'message' => 'Token inválido, vencido o revocado.'], 401)
+                ->header('WWW-Authenticate', sprintf(
+                    'Bearer resource_metadata="%s", scope="%s"',
+                    url('/.well-known/oauth-protected-resource/mcp'),
+                    Registrar::OAUTH_SCOPE,
+                ));
         }
         if (!in_array(strtolower((string) $user->role), self::ADMIN_ROLES, true)) {
             return response()->json(['error' => 'forbidden', 'message' => 'El MCP de Infocus es solo para administradores.'], 403);

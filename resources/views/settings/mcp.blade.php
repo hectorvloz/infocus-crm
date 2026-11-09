@@ -5,17 +5,19 @@
 @section('content')
 @php
     $tok = $newToken['token'] ?? 'TU_TOKEN';
+    $domainInput = old('domains', implode("\n", $extraDomains));
     $setups = [
         ['Claude Code', 'Terminal o pestaña Code de la app de Claude.', "claude mcp add --transport http infocus {$endpoint} --header \"Authorization: Bearer {$tok}\""],
         ['Codex', 'Agrega esto a ~/.codex/config.toml y guarda el token en la variable INFOCUS_MCP_TOKEN.', "[mcp_servers.infocus]\nurl = \"{$endpoint}\"\nbearer_token_env_var = \"INFOCUS_MCP_TOKEN\"\n\n# En tu terminal (o en ~/.zshrc):\nexport INFOCUS_MCP_TOKEN=\"{$tok}\""],
         ['Gemini CLI', 'Agrega esto a ~/.gemini/settings.json.', json_encode(['mcpServers' => ['infocus' => ['httpUrl' => $endpoint, 'headers' => ['Authorization' => "Bearer {$tok}"]]]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)],
         ['Claude Desktop (chat)', 'Configuración → Desarrollador → Editar configuración (claude_desktop_config.json). Requiere Node.js.', json_encode(['mcpServers' => ['infocus' => ['command' => 'npx', 'args' => ['-y', 'mcp-remote', $endpoint, '--header', 'Authorization:${AUTH}'], 'env' => ['AUTH' => "Bearer {$tok}"]]]], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)],
+        ['OpenClaw', 'Ejecuta estos comandos en el equipo donde corre el gateway. Al iniciar sesión, autoriza Infocus en el navegador.', "openclaw mcp add infocus --url {$endpoint} --transport streamable-http --auth oauth --oauth-scope mcp:use\nopenclaw mcp login infocus\nopenclaw mcp probe infocus"],
     ];
 @endphp
 
 <div class="mb-8">
     <h2 class="text-2xl font-bold text-slate-900">MCP · Asistentes de IA</h2>
-    <p class="text-slate-500">Conecta Claude, Codex, Gemini o ChatGPT a tu Infocus para consultar y trabajar desde el chat.</p>
+    <p class="text-slate-500">Conecta Claude, Codex, Gemini, ChatGPT u OpenClaw a tu Infocus para consultar y trabajar desde el chat.</p>
 </div>
 
 @if (!($setup['packages'] && $setup['tables'] && $setup['keys']))
@@ -91,6 +93,20 @@
         </div>
         <p class="mt-3 text-sm text-slate-500">Se abrirá Infocus para que autorices. Las conexiones OAuth tienen acceso completo.</p>
     </div>
+</div>
+
+<div class="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+    <h3 class="font-semibold text-slate-900">Dominios adicionales para OAuth</h3>
+    <p id="mcp-domains-help" class="mt-1 text-sm text-slate-500">Agrega el origen HTTPS de la URL de retorno de un gateway de confianza, uno por línea. Los callbacks HTTP de localhost, 127.0.0.1 y [::1] ya están permitidos.</p>
+    <form method="POST" action="{{ route('settings.mcp.domains') }}" class="mt-4 space-y-3">
+        @csrf
+        <label for="mcp-domains" class="block text-sm font-medium text-slate-700">Dominios de retorno</label>
+        <textarea id="mcp-domains" name="domains" rows="3" maxlength="2000" placeholder="https://gateway.ejemplo.com" aria-describedby="mcp-domains-help @error('domains') mcp-domains-error @enderror" @error('domains') aria-invalid="true" @enderror class="block w-full rounded-xl border border-slate-300 px-3 py-2.5 font-mono text-sm">{{ is_string($domainInput) ? $domainInput : '' }}</textarea>
+        @error('domains')
+            <p id="mcp-domains-error" class="text-sm text-red-700">{{ $message }}</p>
+        @enderror
+        <button class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Guardar dominios</button>
+    </form>
 </div>
 
 <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

@@ -260,6 +260,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/ajustes/mcp', [McpSettingsController::class, 'index'])->name('settings.mcp');
     Route::post('/ajustes/mcp', [McpSettingsController::class, 'store'])->name('settings.mcp.store');
     Route::post('/ajustes/mcp/activar', [McpSettingsController::class, 'activate'])->name('settings.mcp.activate');
+    Route::post('/ajustes/mcp/dominios', [McpSettingsController::class, 'saveDomains'])->name('settings.mcp.domains');
     Route::delete('/ajustes/mcp/{id}', [McpSettingsController::class, 'destroy'])->name('settings.mcp.destroy');
     Route::delete('/ajustes/mcp/oauth/{clientId}', [McpSettingsController::class, 'revokeOauth'])->name('settings.mcp.oauth.revoke');
     Route::get('/ajustes/ia', [SettingsController::class, 'ai'])->name('settings.ai');

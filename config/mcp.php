@@ -25,10 +25,12 @@ return [
         'https://oauth-redirect.googleusercontent.com',
         'https://oauth-redirect-sandbox.googleusercontent.com',
         'https://oauth-redirect-test.googleusercontent.com',
+        // Clientes locales (Claude Code, OpenClaw en el mismo equipo, mcp-remote): callback de loopback.
         'http://localhost',
         'http://127.0.0.1',
-        // 'https://example.com',
-        // 'http://localhost',
+        'http://[::1]',
+        // Otros asistentes (ej. el gateway de OpenClaw) se agregan en Configuración → MCP,
+        // se guardan en settings.json (mcp_redirect_domains) y se suman aquí al arrancar.
     ],
 
     /*

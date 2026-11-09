@@ -56,6 +56,7 @@ class McpSettingsController extends Controller
             'newToken' => session('mcp_new_token'),
             'oauthReady' => $oauthReady,
             'setup' => $this->setupStatus(),
+            'extraDomains' => (array) ((new FileStore('settings.json'))->find('settings')['mcp_redirect_domains'] ?? []),
         ]);
     }
 
@@ -79,6 +80,58 @@ class McpSettingsController extends Controller
         abort_unless((new McpTokens())->revoke($id, Auth::id()), 404);
 
         return redirect()->route('settings.mcp')->with('success', 'Conexión revocada.');
+    }
+
+    /**
+     * Dominios extra a los que el MCP puede devolver una autorización OAuth (ej. el gateway de
+     * OpenClaw o de otro asistente). Uno por línea; solo https (o http en el propio equipo).
+     */
+    public function saveDomains(Request $request)
+    {
+        $this->ensureAdmin();
+        $request->validate(['domains' => 'nullable|string|max:2000']);
+
+        $domains = [];
+        $invalid = [];
+        foreach (preg_split('/[\s,]+/', (string) $request->input('domains', ''), -1, PREG_SPLIT_NO_EMPTY) as $line) {
+            $normalized = self::normalizeRedirectDomain($line);
+            $normalized === null ? $invalid[] = $line : $domains[] = $normalized;
+        }
+        if ($invalid !== []) {
+            return back()->withInput()->withErrors(['domains' => 'Estos dominios no son válidos (usa https://dominio): ' . implode(', ', $invalid)]);
+        }
+
+        $store = new FileStore('settings.json');
+        $domains = array_values(array_unique($domains));
+        $store->find('settings')
+            ? $store->update('settings', ['mcp_redirect_domains' => $domains])
+            : $store->create(['id' => 'settings', 'mcp_redirect_domains' => $domains]);
+
+        return redirect()->route('settings.mcp')->with('success', 'Dominios del MCP guardados.');
+    }
+
+    /** "https://gateway.ejemplo.com/oauth/mcp/callback" → "https://gateway.ejemplo.com". */
+    private static function normalizeRedirectDomain(string $value): ?string
+    {
+        $value = trim($value);
+        if (!preg_match('#^[a-z]+://#i', $value)) {
+            $value = 'https://' . $value;
+        }
+        $parts = parse_url($value);
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if ($host === '' || isset($parts['user']) || isset($parts['pass']) || str_contains($host, '*')) {
+            return null;
+        }
+        $isLoopback = in_array($host, ['localhost', '127.0.0.1', '[::1]'], true);
+        if ($scheme !== 'https' && !($scheme === 'http' && $isLoopback)) {
+            return null;
+        }
+        if (!$isLoopback && (!filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) || !str_contains($host, '.'))) {
+            return null;
+        }
+
+        return $scheme . '://' . $host . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
     }
 
     public function revokeOauth(string $clientId)

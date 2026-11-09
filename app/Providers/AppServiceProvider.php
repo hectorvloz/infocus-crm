@@ -50,6 +50,14 @@ class AppServiceProvider extends ServiceProvider
             $store = new FileStore('settings.json');
             $settings = $store->find('settings');
 
+            $extraDomains = $settings['mcp_redirect_domains'] ?? [];
+            if (is_array($extraDomains) && $extraDomains !== []) {
+                Config::set('mcp.redirect_domains', array_values(array_unique(array_merge(
+                    config('mcp.redirect_domains', []),
+                    array_filter($extraDomains, 'is_string'),
+                ))));
+            }
+
             $timezone = $settings['company_timezone'] ?? 'America/Bogota';
             if (is_string($timezone) && in_array($timezone, \DateTimeZone::listIdentifiers(), true)) {
                 Config::set('app.timezone', $timezone);
