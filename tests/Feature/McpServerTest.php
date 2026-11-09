@@ -100,6 +100,44 @@ class McpServerTest extends TestCase
         $this->assertStringContainsString('Café Laurel (id: c1)', $res['text']);
     }
 
+    public function test_latest_invoice_lookup_tolerates_a_typo_and_preserves_the_period(): void
+    {
+        $store = new FileStore('facturas.json');
+        foreach ([
+            ['id' => 'older', 'numero' => 'INV-0067', 'fecha' => '2026-11-02'],
+            ['id' => 'latest', 'numero' => 'INV-0068', 'fecha' => '2026-11-04'],
+            ['id' => 'outside', 'numero' => 'INV-0069', 'fecha' => '2026-12-01'],
+        ] as $invoice) {
+            $store->create($invoice + ['cliente_id' => 'c2', 'cliente' => 'Mohamed Baaou Boujadar']);
+        }
+
+        $args = [
+            'texto' => 'Mohammed', 'desde' => '2026-11-01', 'hasta' => '2026-11-30',
+            'ultima_con_pdf' => true,
+        ];
+        $token = $this->token('lectura');
+        $response = $this->tool('buscar_facturas', $args, $token);
+        $result = json_decode($response['text'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('INV-0068', $result['numero']);
+        $this->assertSame(route('facturas.public.pdf', ['id' => 'latest']), $result['pdf_url']);
+
+        $store->create([
+            'id' => 'other', 'numero' => 'INV-0070', 'fecha' => '2026-11-05',
+            'cliente_id' => 'c3', 'cliente' => 'Mohammad Ali',
+        ]);
+        $ambiguous = json_decode($this->tool('buscar_facturas', $args, $token)['text'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('cliente_ambiguo', $ambiguous['estado']);
+        $this->assertArrayNotHasKey('pdf_url', $ambiguous);
+        $this->assertCount(2, $ambiguous['clientes']);
+
+        $store->create([
+            'id' => 'exact-outside', 'numero' => 'INV-0071', 'fecha' => '2026-12-02',
+            'cliente_id' => 'c4', 'cliente' => 'Mohammed Hassan',
+        ]);
+        $outside = json_decode($this->tool('buscar_facturas', $args, $token)['text'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['estado' => 'sin_resultados'], $outside);
+    }
+
     public function test_read_only_connection_cannot_write(): void
     {
         $res = $this->tool('crear_lead', ['nombre' => 'Pedro'], $this->token('lectura'));
