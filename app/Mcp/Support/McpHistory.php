@@ -21,6 +21,7 @@ class McpHistory
         'mis_notas.json' => ['nota', 'mis-notas.update'],
         'proyectos.json' => ['proyecto', 'proyectos.update'],
         'leads.json' => ['lead', 'leads.update'],
+        'productos.json' => ['producto o servicio', 'productos.update'],
         'contratos.json' => ['contrato', 'contratos.update'],
         'header_reminders.json' => ['recordatorios', null],
     ];

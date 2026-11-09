@@ -2,7 +2,7 @@
 @section('title','Nuevo Producto')
 @section('content')
 @php
-  $allCurrencies = ['USD','EUR','MXN','COP','ARS','CLP','PEN','GBP','CAD','JPY','AUD','BRL','CHF'];
+  $allCurrencies = \App\Http\Controllers\ProductosController::CURRENCIES;
   $otherCurrencies = array_values(array_filter($allCurrencies, fn($c) => $c !== $base));
 @endphp
 

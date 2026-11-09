@@ -5,8 +5,10 @@ namespace App\Mcp\Tools;
 use App\Support\Ai\AiAttachments;
 use App\Http\Controllers\FacturasController;
 use App\Http\Controllers\LeadsController;
+use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\ReunionesController;
 use App\Mcp\Support\McpContext;
+use App\Mcp\Support\McpDenied;
 use App\Mcp\Support\PendingActions;
 use App\Support\TemplateMail;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,7 +19,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 
 #[Name('confirmar_accion')]
-#[Description('Ejecuta una acción preparada (enviar correo, WhatsApp a un cliente, enviar factura, registrar pago, programar reunión o enviar contrato) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
+#[Description('Ejecuta una acción preparada (enviar correo, WhatsApp a un cliente, enviar factura, registrar pago, programar reunión, enviar contrato o guardar un producto o servicio) con su código. Úsala SOLO después de que el usuario haya aprobado explícitamente la vista previa en esta conversación. El código sirve una vez y vence en 5 minutos.')]
 #[IsDestructive]
 class ConfirmarAccion extends InfocusTool
 {
@@ -29,6 +31,9 @@ class ConfirmarAccion extends InfocusTool
     protected function run(Request $request, McpContext $ctx): Response
     {
         $code = (string) $request->validate(['codigo' => 'required|string|max:20'])['codigo'];
+        if (!$ctx->canWrite()) {
+            throw new McpDenied('Esta conexión es de solo lectura.');
+        }
         $action = (new PendingActions())->consume($code);
         if (!$action) {
             return Response::error('Código inválido, vencido o ya usado. Prepara la acción de nuevo.');
@@ -41,9 +46,46 @@ class ConfirmarAccion extends InfocusTool
             'enviar_factura' => $this->sendInvoice($p, $ctx),
             'registrar_pago' => $this->registerPayment($p, $ctx),
             'programar_reunion' => $this->scheduleMeeting($p, $ctx),
+            'guardar_producto' => $this->saveProduct($p, $ctx),
             'enviar_contrato' => $this->sendContract($p, $ctx),
             default => Response::error('Acción desconocida.'),
         };
+    }
+
+    private function saveProduct(array $payload, McpContext $ctx): Response
+    {
+        $id = $payload['id'];
+        $ctx->allow($id === null ? 'productos.create' : 'productos.update', write: true);
+
+        return ProductosController::writeLocked(function () use ($id, $payload) {
+            if (ProductosController::baseCurrency() !== $payload['moneda']) {
+                return Response::error('Cambió la moneda base del catálogo. Prepara el cambio de nuevo.');
+            }
+
+            $store = $this->store('productos.json');
+            $data = $payload['data'];
+            if ($id === null) {
+                if (PrepararProducto::duplicate($store->all(), $data)) {
+                    return Response::error('Ya hay un registro con ese SKU o nombre y tipo. Revisa el catálogo.');
+                }
+                $product = $store->create($data);
+                $status = 'creado';
+            } else {
+                if ($store->find($id) !== $payload['before']) {
+                    return Response::error('El registro cambió desde la vista previa. Prepara los cambios de nuevo.');
+                }
+                $product = $this->tracked('productos.json', $id, 'Editó el producto o servicio', fn () => $store->update($id, $data));
+                $status = 'actualizado';
+            }
+
+            return Response::json([
+                'estado' => $status,
+                'id' => $product['id'],
+                'nombre' => $this->external($product['nombre']),
+                'tipo' => $product['tipo'],
+                'url' => route('productos.edit', ['id' => $product['id']]),
+            ]);
+        });
     }
 
     private function sendClientWhatsApp(array $p, McpContext $ctx): Response

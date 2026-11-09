@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Repositories\FileStore;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ProductosController extends Controller
 {
+    public const CURRENCIES = ['USD', 'EUR', 'MXN', 'COP', 'ARS', 'CLP', 'PEN', 'GBP', 'CAD', 'JPY', 'AUD', 'BRL', 'CHF'];
+
     protected FileStore $store;
     protected FileStore $facturasStore;
 
@@ -23,7 +26,7 @@ class ProductosController extends Controller
         return (string) $text;
     }
 
-    protected function getBase(): string
+    public static function baseCurrency(): string
     {
         $settings = (new FileStore('settings.json'))->find('settings') ?: [];
         return strtoupper($settings['base_currency'] ?? 'USD');
@@ -88,44 +91,59 @@ class ProductosController extends Controller
         })->all();
 
         $totalItems = count($productos);
-        $base = $this->getBase();
+        $base = self::baseCurrency();
             
         return view('ventas.productos.index', compact('productos', 'q', 'totalItems', 'base'));
     }
 
     public function create()
     {
-        $base = $this->getBase();
+        $base = self::baseCurrency();
         return view('ventas.productos.create', compact('base'));
     }
 
-    public function store(Request $request)
+    public static function rules(): array
     {
-        $data = $request->validate([
-            'nombre'    => 'required|string',
+        return [
+            'nombre' => 'required|string',
             'descripcion' => 'nullable|string',
-            'precio'    => 'required|numeric|min:0',
-            'sku'       => 'nullable|string',
-            'tipo'      => 'required|in:Producto,Servicio',
-            'stock'     => 'nullable|numeric',
+            'precio' => 'required|numeric|min:0',
+            'sku' => 'nullable|string',
+            'tipo' => 'required|in:Producto,Servicio',
+            'stock' => 'nullable|numeric',
             'service_expiry_reminder_enabled' => 'nullable|boolean',
             'service_expiry_reminder_days_before' => 'nullable|integer|min:1|max:90',
-            'precios'   => 'nullable|array',
+            'precios' => 'nullable|array',
             'precios.*' => 'nullable|numeric|min:0',
-        ]);
+        ];
+    }
 
+    public static function normalizeFields(array $data): array
+    {
         if (!empty($data['precios'])) {
-            $data['precios'] = array_filter($data['precios'], fn($v) => $v !== null && $v !== '');
+            $data['precios'] = array_filter($data['precios'], fn ($v) => $v !== null && $v !== '');
         } else {
             unset($data['precios']);
         }
 
-        $data['service_expiry_reminder_enabled'] = $request->boolean('service_expiry_reminder_enabled');
+        $data['service_expiry_reminder_enabled'] = (bool) ($data['service_expiry_reminder_enabled'] ?? false);
         $data['service_expiry_reminder_days_before'] = $data['service_expiry_reminder_enabled']
             ? (int) ($data['service_expiry_reminder_days_before'] ?? 7)
             : null;
 
-        $this->store->create($data);
+        return $data;
+    }
+
+    public static function writeLocked(callable $write): mixed
+    {
+        return Cache::store('file')->lock('productos:write', 30)->block(5, $write);
+    }
+
+    public function store(Request $request)
+    {
+        $data = self::normalizeFields($request->validate(self::rules()));
+        self::writeLocked(fn () => $this->store->create($data));
+
         return redirect()->route('productos.index')->with('success', 'Producto creado correctamente.');
     }
 
@@ -133,43 +151,20 @@ class ProductosController extends Controller
     {
         $producto = $this->store->find($id);
         abort_if(!$producto, 404);
-        $base = $this->getBase();
+        $base = self::baseCurrency();
         return view('ventas.productos.edit', compact('producto', 'base'));
     }
 
     public function update(Request $request, $id)
     {
-        $data = $request->validate([
-            'nombre'    => 'required|string',
-            'descripcion' => 'nullable|string',
-            'precio'    => 'required|numeric|min:0',
-            'sku'       => 'nullable|string',
-            'tipo'      => 'required|in:Producto,Servicio',
-            'stock'     => 'nullable|numeric',
-            'service_expiry_reminder_enabled' => 'nullable|boolean',
-            'service_expiry_reminder_days_before' => 'nullable|integer|min:1|max:90',
-            'precios'   => 'nullable|array',
-            'precios.*' => 'nullable|numeric|min:0',
-        ]);
-
-        if (!empty($data['precios'])) {
-            $data['precios'] = array_filter($data['precios'], fn($v) => $v !== null && $v !== '');
-        } else {
-            unset($data['precios']);
-        }
-
-        $data['service_expiry_reminder_enabled'] = $request->boolean('service_expiry_reminder_enabled');
-        $data['service_expiry_reminder_days_before'] = $data['service_expiry_reminder_enabled']
-            ? (int) ($data['service_expiry_reminder_days_before'] ?? 7)
-            : null;
-
-        $this->store->update($id, $data);
+        $data = self::normalizeFields($request->validate(self::rules()));
+        self::writeLocked(fn () => $this->store->update($id, $data));
         return redirect()->route('productos.index');
     }
 
     public function destroy($id)
     {
-        $this->store->delete($id);
+        self::writeLocked(fn () => $this->store->delete($id));
         return redirect()->route('productos.index');
     }
 

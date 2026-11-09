@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Http\Controllers\ProductosController;
 use App\Mcp\Support\McpContext;
 use App\Mcp\Support\McpDenied;
 use App\Mcp\Support\McpHistory;
@@ -13,7 +14,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 
 #[Name('restaurar_cambio')]
-#[Description('Deja una nota, proyecto, lead o tus recordatorios exactamente como estaban antes de una edición del MCP. Usa ver_cambios_recientes para el cambio_id. Si alguien lo editó después, la herramienta avisa: solo usa forzar=true cuando el usuario acepte perder esos cambios posteriores. La restauración también se puede deshacer.')]
+#[Description('Deja una nota, proyecto, lead, producto, servicio o tus recordatorios exactamente como estaban antes de una edición del MCP. Usa ver_cambios_recientes para el cambio_id. Si alguien lo editó después, la herramienta avisa: solo usa forzar=true cuando el usuario acepte perder esos cambios posteriores. La restauración también se puede deshacer.')]
 class RestaurarCambio extends InfocusTool
 {
     public function schema(JsonSchema $schema): array
@@ -48,12 +49,16 @@ class RestaurarCambio extends InfocusTool
                 return Response::error('Ya no tienes permiso para editar esa nota.');
             }
         }
-        if ($history->changedSince($entry) && empty($d['forzar'])) {
-            return Response::error("Después de ese cambio alguien volvió a editar este {$type}. Si restauro, también se pierden esas ediciones posteriores. Pregúntale al usuario y, si acepta, llama de nuevo con forzar=true.");
-        }
+        $restore = function () use ($history, $entry, $d, $type, $ctx) {
+            if ($history->changedSince($entry) && empty($d['forzar'])) {
+                return Response::error("Después de ese cambio alguien volvió a editar este {$type}. Si restauro, también se pierden esas ediciones posteriores. Pregúntale al usuario y, si acepta, llama de nuevo con forzar=true.");
+            }
 
-        $history->restore($entry, $ctx->connection);
+            $history->restore($entry, $ctx->connection);
 
-        return Response::text("Listo: restauré el {$type} a como estaba antes de «{$entry['label']}». Si fue un error, aparece en ver_cambios_recientes y también se puede restaurar.");
+            return Response::text("Listo: restauré el {$type} a como estaba antes de «{$entry['label']}». Si fue un error, aparece en ver_cambios_recientes y también se puede restaurar.");
+        };
+
+        return $entry['file'] === 'productos.json' ? ProductosController::writeLocked($restore) : $restore();
     }
 }

@@ -22,7 +22,7 @@ class McpServerTest extends TestCase
         parent::setUp();
         config(['filesystems.disks.local.root' => storage_path('framework/testing/disks/local')]);
         foreach (['mcp_tokens.json', 'mcp_activity.json', 'mcp_pending_actions.json', 'clientes.json', 'leads.json', 'facturas.json',
-            'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json', 'mis_notas.json', 'mcp_history.json', 'header_reminders.json'] as $file) {
+            'productos.json', 'gastos.json', 'proyectos.json', 'reuniones.json', 'contratos.json', 'email_templates.json', 'email_history.json', 'settings.json', 'roles.json', 'mis_notas.json', 'mcp_history.json', 'header_reminders.json'] as $file) {
             Storage::disk('local')->put($file, '[]');
         }
         Mail::fake();
@@ -170,6 +170,57 @@ class McpServerTest extends TestCase
         $this->assertSame('factura_ambigua', $ambiguous['estado']);
         $this->assertArrayNotHasKey('pdf_url', $ambiguous);
         $this->assertSame(['INV-0066', 'INV-0064'], array_column($ambiguous['facturas'], 'numero'));
+    }
+
+    public function test_product_changes_require_approval_and_preserve_omitted_fields(): void
+    {
+        $token = $this->token();
+        $store = new FileStore('productos.json');
+        $fields = [
+            'nombre' => 'Hosting', 'tipo' => 'Servicio', 'precio' => 150,
+            'descripcion' => 'Plan anual', 'sku' => 'HOST-01', 'stock' => 0,
+            'precios' => ['COP' => 500000, 'EUR' => 130],
+            'service_expiry_reminder_enabled' => true,
+            'service_expiry_reminder_days_before' => 12,
+        ];
+        $missing = $this->tool('preparar_producto', ['nombre' => 'Hosting'], $token);
+        $this->assertStringContainsString('precio', $missing['text']);
+        $this->assertStringNotContainsString('Código de confirmación:', $missing['text']);
+
+        $preview = $this->tool('preparar_producto', $fields, $token);
+        $this->assertFalse($preview['error'], $preview['text']);
+        $this->assertSame([], $store->all());
+        preg_match('/Código de confirmación: ([A-Z0-9-]+)/', $preview['text'], $match);
+        $this->assertTrue($this->tool('confirmar_accion', ['codigo' => $match[1]], $this->token('lectura'))['error']);
+        $otherAdmin = User::factory()->create(['role' => 'admin']);
+        $this->assertTrue($this->tool('confirmar_accion', ['codigo' => $match[1]], $this->token('completo', $otherAdmin))['error']);
+        $this->assertFalse($this->tool('confirmar_accion', ['codigo' => $match[1]], $token)['error']);
+        $this->assertTrue($this->tool('confirmar_accion', ['codigo' => $match[1]], $token)['error']);
+        $product = $store->all()[0];
+        foreach ($fields as $field => $value) {
+            $this->assertSame($value, $product[$field], $field);
+        }
+        $this->assertStringContainsString($product['id'], $this->tool('buscar_productos', ['texto' => 'HOST-01'], $token)['text']);
+
+        $changes = ['producto_id' => $product['id'], 'precio' => 175, 'sku' => null, 'precios' => ['EUR' => null]];
+        $preview = $this->tool('preparar_producto', $changes, $token);
+        preg_match('/Código de confirmación: ([A-Z0-9-]+)/', $preview['text'], $match);
+        $store->update($product['id'], ['stock' => 5]);
+        $this->assertTrue($this->tool('confirmar_accion', ['codigo' => $match[1]], $token)['error']);
+        $preview = $this->tool('preparar_producto', $changes, $token);
+        preg_match('/Código de confirmación: ([A-Z0-9-]+)/', $preview['text'], $match);
+        $this->assertFalse($this->tool('confirmar_accion', ['codigo' => $match[1]], $token)['error']);
+        $updated = $store->find($product['id']);
+        $this->assertSame(175, $updated['precio']);
+        $this->assertNull($updated['sku']);
+        $this->assertSame(['COP' => 500000], $updated['precios']);
+        $this->assertSame(12, $updated['service_expiry_reminder_days_before']);
+        $this->assertSame(5, $updated['stock']);
+        $this->assertStringContainsString('producto', $this->tool('ver_cambios_recientes', [], $token)['text']);
+        $this->assertTrue($this->tool('preparar_producto', $fields, $token)['error']);
+        $physical = $this->tool('preparar_producto', ['nombre' => 'Teclado', 'tipo' => 'Producto', 'precio' => 0], $token);
+        $this->assertFalse($physical['error'], $physical['text']);
+        $this->assertStringContainsString('SKU: sin indicar', $physical['text']);
     }
 
     public function test_read_only_connection_cannot_write(): void
