@@ -138,6 +138,40 @@ class McpServerTest extends TestCase
         $this->assertSame(['estado' => 'sin_resultados'], $outside);
     }
 
+    public function test_invoice_lookup_matches_a_domain_in_the_concept_with_a_typo(): void
+    {
+        $store = new FileStore('facturas.json');
+        $store->create([
+            'id' => 'hosting', 'numero' => 'INV-0064', 'fecha' => '2026-11-03',
+            'cliente_id' => 'c1', 'cliente' => 'Valentina Ramirez',
+            'items' => [['descripcion' => 'Renovación Hosting dhprosuplementos.com']],
+        ]);
+        $store->create([
+            'id' => 'unrelated', 'numero' => 'INV-0065', 'fecha' => '2026-11-04',
+            'cliente_id' => 'c1', 'cliente' => 'Valentina Ramirez',
+            'items' => [['descripcion' => 'Otro servicio']],
+        ]);
+        $args = ['texto' => 'dhsuplementos', 'ultima_con_pdf' => true];
+        $token = $this->token('lectura');
+        $result = json_decode($this->tool('buscar_facturas', $args, $token)['text'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('INV-0064', $result['numero']);
+        $this->assertSame('dominio_similar', $result['coincidencia']);
+        $this->assertSame(route('facturas.public.pdf', ['id' => 'hosting']), $result['pdf_url']);
+
+        $outside = json_decode($this->tool('buscar_facturas', $args + ['desde' => '2026-11-04'], $token)['text'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['estado' => 'sin_resultados'], $outside);
+
+        $store->create([
+            'id' => 'other-hosting', 'numero' => 'INV-0066', 'fecha' => '2026-11-05',
+            'cliente_id' => 'c2', 'cliente' => 'Otro cliente',
+            'items' => [['descripcion' => 'Hosting dhmaxsuplementos.com']],
+        ]);
+        $ambiguous = json_decode($this->tool('buscar_facturas', $args, $token)['text'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('factura_ambigua', $ambiguous['estado']);
+        $this->assertArrayNotHasKey('pdf_url', $ambiguous);
+        $this->assertSame(['INV-0066', 'INV-0064'], array_column($ambiguous['facturas'], 'numero'));
+    }
+
     public function test_read_only_connection_cannot_write(): void
     {
         $res = $this->tool('crear_lead', ['nombre' => 'Pedro'], $this->token('lectura'));

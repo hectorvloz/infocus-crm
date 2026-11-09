@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('buscar_facturas')]
-#[Description('Busca facturas por cliente, número, estado o rango de fechas. Usa ultima_con_pdf para resolver en una llamada la última factura de un cliente y su PDF, incluso con una errata. Para "¿quién me debe?" usa estado Pendiente o Vencida.')]
+#[Description('Busca facturas por cliente, número, concepto, dominio, estado o fechas. Usa ultima_con_pdf para encontrar la factura y su PDF, incluso con una errata en el cliente o dominio. Para "¿quién me debe?" usa estado Pendiente o Vencida.')]
 #[IsReadOnly]
 class BuscarFacturas extends InfocusTool
 {
@@ -22,12 +22,12 @@ class BuscarFacturas extends InfocusTool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'texto' => $schema->string()->description('Número de factura o nombre del cliente.'),
+            'texto' => $schema->string()->description('Número, nombre del cliente, concepto o dominio que aparece en la factura.'),
             'cliente_id' => $schema->string()->description('Id del cliente.'),
             'estado' => $schema->string()->enum(self::ESTADOS),
             'desde' => $schema->string()->description('Fecha AAAA-MM-DD.'),
             'hasta' => $schema->string()->description('Fecha AAAA-MM-DD.'),
-            'ultima_con_pdf' => $schema->boolean()->description('Devuelve solo la última factura y su PDF. Usa texto o cliente_id para identificar al cliente.'),
+            'ultima_con_pdf' => $schema->boolean()->description('Devuelve solo la última factura y su PDF. Usa texto para buscar por cliente, concepto o dominio, o cliente_id si ya lo tienes.'),
         ];
     }
 
@@ -49,14 +49,15 @@ class BuscarFacturas extends InfocusTool
 
         if (!empty($d['ultima_con_pdf'])) {
             if (trim($text) === '' && empty($d['cliente_id'])) {
-                return Response::error('Indica el cliente o el número de la factura para obtener el PDF.');
+                return Response::error('Indica el cliente, número, concepto o dominio para obtener el PDF.');
             }
 
             return $this->latestWithPdf($invoices, $rows, trim($text));
         }
 
         $rows = $rows
-            ->filter(fn ($f) => $this->matches(($f['numero'] ?? '') . ' ' . ($f['cliente'] ?? ''), $text))
+            ->filter(fn ($f) => $this->matches(($f['numero'] ?? '') . ' ' . ($f['cliente'] ?? ''), $text)
+                || $this->conceptDistance($f, $text) === 0)
             ->sortByDesc('fecha')
             ->take(30)
             ->map(fn ($f) => sprintf('- %s · %s · %s · total %s · saldo %s · %s · vence %s (id: %s)',
@@ -76,13 +77,34 @@ class BuscarFacturas extends InfocusTool
             $terms = $this->nameWords($text);
             $matches = $invoices->filter(fn ($invoice) => $this->matchesClientName($terms, (string) ($invoice['cliente'] ?? '')));
         }
+        $matchType = null;
         if ($matches->isEmpty()) {
-            return Response::json(['estado' => 'sin_resultados']);
+            $scores = $period->map(fn ($invoice) => $this->conceptDistance($invoice, $text))
+                ->filter(fn ($score) => $score !== null);
+            if ($scores->isEmpty()) {
+                return Response::json(['estado' => 'sin_resultados']);
+            }
+            $best = $scores->min();
+            $matches = $period->intersectByKeys($scores->filter(fn ($score) => $score === $best));
+            $matchType = $best === 0 ? 'concepto' : 'dominio_similar';
         }
 
         $clients = $matches->groupBy(fn ($invoice) => !empty($invoice['cliente_id'])
             ? 'id:' . $invoice['cliente_id']
             : 'nombre:' . implode(' ', $this->nameWords((string) ($invoice['cliente'] ?? ''))));
+        $ordered = $period->intersectByKeys($matches)->sortByDesc(fn ($row) => [
+            $row['fecha'] ?? '', $row['created_at'] ?? '', $row['numero'] ?? '',
+        ]);
+        if ($matchType !== null && ($clients->count() > 1 || ($matchType === 'dominio_similar' && $ordered->count() > 1))) {
+            return Response::json([
+                'estado' => 'factura_ambigua',
+                'facturas' => $ordered->take(5)->map(fn ($row) => [
+                    'numero' => $row['numero'] ?? $row['id'],
+                    'cliente' => $row['cliente'] ?? '',
+                    'fecha' => $row['fecha'] ?? '',
+                ])->values()->all(),
+            ]);
+        }
         if ($clients->count() > 1) {
             return Response::json([
                 'estado' => 'cliente_ambiguo',
@@ -93,9 +115,7 @@ class BuscarFacturas extends InfocusTool
             ]);
         }
 
-        $invoice = $period->intersectByKeys($matches)->sortByDesc(fn ($row) => [
-            $row['fecha'] ?? '', $row['created_at'] ?? '', $row['numero'] ?? '',
-        ])->first();
+        $invoice = $ordered->first();
         if ($invoice === null) {
             return Response::json(['estado' => 'sin_resultados']);
         }
@@ -106,7 +126,46 @@ class BuscarFacturas extends InfocusTool
             'cliente' => $invoice['cliente'] ?? '',
             'fecha' => $invoice['fecha'] ?? '',
             'pdf_url' => route('facturas.public.pdf', ['id' => $invoice['id']]),
-        ]);
+        ] + ($matchType === null ? [] : ['coincidencia' => $matchType]));
+    }
+
+    private function conceptDistance(array $invoice, string $text): ?int
+    {
+        $query = Str::lower(Str::ascii(trim($text)));
+        if ($query === '') {
+            return null;
+        }
+
+        $best = null;
+        foreach ($invoice['items'] ?? [] as $item) {
+            foreach (['descripcion', 'detalle'] as $field) {
+                $concept = (string) ($item[$field] ?? '');
+                if ($this->matches($concept, $text)) {
+                    return 0;
+                }
+
+                preg_match_all('/\b([a-z0-9-]+)\.(?:com|co|net|org|io|edu|gov|info|biz|online|shop|store|site|app|dev|me|es)(?=\b)/i', $concept, $domains);
+                foreach ($domains[1] as $label) {
+                    $label = strtolower($label);
+                    if ($label === $query) {
+                        return 0;
+                    }
+
+                    // A longer brand can omit a short segment, but must keep distinctive edges.
+                    if (strlen($query) < 8 || !ctype_alnum($query)
+                        || substr($label, 0, 2) !== substr($query, 0, 2)
+                        || substr($label, -4) !== substr($query, -4)) {
+                        continue;
+                    }
+                    $distance = levenshtein($query, $label);
+                    if ($distance <= min(3, intdiv(strlen($query), 4))) {
+                        $best = $best === null ? $distance : min($best, $distance);
+                    }
+                }
+            }
+        }
+
+        return $best;
     }
 
     private function nameWords(string $value): array
