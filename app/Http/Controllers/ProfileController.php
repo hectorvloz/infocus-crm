@@ -456,7 +456,9 @@ class ProfileController extends Controller
                 if ($link) {
                     $link = [
                         'type' => Str::limit((string) ($link['type'] ?? ''), 40, ''),
-                        'id' => Str::limit((string) ($link['id'] ?? ''), 100, ''),
+                        'id' => ($link['type'] ?? '') === 'list'
+                            ? (string) ($link['id'] ?? '')
+                            : Str::limit((string) ($link['id'] ?? ''), 100, ''),
                         'projectId' => Str::limit((string) ($link['projectId'] ?? ''), 100, ''),
                         'taskId' => Str::limit((string) ($link['taskId'] ?? ''), 100, ''),
                         'title' => Str::limit((string) ($link['title'] ?? ''), 180, ''),

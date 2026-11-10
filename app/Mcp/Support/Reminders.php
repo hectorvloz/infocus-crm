@@ -3,6 +3,7 @@
 namespace App\Mcp\Support;
 
 use App\Repositories\FileStore;
+use App\Support\ProjectBoard;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
@@ -28,6 +29,44 @@ class Reminders
         $payload = self::row()['payload'] ?? null;
 
         return is_array($payload) ? $payload : ['categories' => [], 'sections' => [], 'items' => []];
+    }
+
+    public static function projectLink(McpContext $ctx, string $projectId, ?string $taskId, ?string $column): array
+    {
+        $ctx->allow('proyectos.read');
+        $project = (new FileStore('proyectos.json'))->find($projectId);
+        abort_if(!$project || !empty($project['archived']), 404);
+        $projectTitle = (string) ($project['titulo'] ?? 'Proyecto');
+
+        if ($taskId !== null && $taskId !== '') {
+            $task = collect($project['tareas'] ?? [])->firstWhere('id', $taskId);
+            abort_if(!$task, 404);
+
+            return ['type' => 'task', 'id' => $taskId, 'projectId' => $projectId, 'taskId' => $taskId,
+                'title' => (string) ($task['texto'] ?? 'Tarea'), 'subtitle' => $projectTitle];
+        }
+
+        if ($column !== null && trim($column) !== '') {
+            $stage = collect(ProjectBoard::stages($project))->first(fn ($name) => $name === trim($column));
+            abort_if($stage === null, 404);
+
+            return ['type' => 'list', 'id' => $stage, 'projectId' => $projectId, 'title' => $stage, 'subtitle' => $projectTitle];
+        }
+
+        return ['type' => 'project', 'id' => $projectId, 'projectId' => $projectId, 'title' => $projectTitle, 'subtitle' => 'Proyecto'];
+    }
+
+    public static function linkUrl(array $link): string
+    {
+        $id = (string) ($link['id'] ?? '');
+        $projectId = (string) ($link['projectId'] ?? '');
+        $query = match ($link['type'] ?? '') {
+            'task' => ['view' => 'kanban', 'open_project' => $projectId, 'open_task' => $id ?: ($link['taskId'] ?? '')],
+            'list' => ['open_project' => $projectId, 'open_list' => $id],
+            default => ['open_project' => $projectId ?: $id],
+        };
+
+        return url('/proyectos') . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     }
 
     private static function same(string $a, string $b): bool

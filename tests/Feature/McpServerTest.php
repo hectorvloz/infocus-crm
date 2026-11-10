@@ -588,6 +588,36 @@ class McpServerTest extends TestCase
         $this->assertStringNotContainsString('Escribirle a Laura', $this->tool('ver_recordatorios', [], $token)['text']);
     }
 
+    public function test_reminder_links_to_a_project_column_and_can_be_changed(): void
+    {
+        $project = $this->project();
+        (new FileStore('proyectos.json'))->update($project['id'], ['task_stages' => ['Por hacer', 'Revisión final']]);
+        $token = $this->token();
+        $store = new FileStore('header_reminders.json');
+
+        $this->assertFalse($this->tool('crear_recordatorio', [
+            'texto' => 'Revisar entregables', 'proyecto_id' => 'p1', 'columna' => 'Revisión final',
+        ], $token)['error']);
+
+        $item = $store->all()[0]['payload']['items'][0];
+        $key = $store->all()[0]['id'];
+        $this->assertSame('list', $item['link']['type']);
+        $this->assertSame('Revisión final', $item['link']['id']);
+        $this->assertStringContainsString('/proyectos?open_project=p1&open_list=Revisi%C3%B3n%20final', $this->tool('ver_recordatorios', [], $token)['text']);
+
+        $edit = ['recordatorio_id' => $item['id'], 'proyecto_id' => 'p1'];
+        $this->assertTrue($this->tool('editar_recordatorio', $edit + ['columna' => 'No existe'], $token)['error']);
+        $this->assertTrue($this->tool('editar_recordatorio', $edit + ['columna' => 'Por hacer', 'tarea_id' => 't1'], $token)['error']);
+        $this->assertSame($item['link'], $store->find($key)['payload']['items'][0]['link']);
+
+        $this->assertFalse($this->tool('editar_recordatorio', $edit + ['tarea_id' => 't1'], $token)['error']);
+        $this->assertSame('task', $store->find($key)['payload']['items'][0]['link']['type']);
+        $this->assertStringContainsString('open_task=t1', $this->tool('ver_recordatorios', [], $token)['text']);
+
+        $this->assertFalse($this->tool('editar_recordatorio', ['recordatorio_id' => $item['id'], 'proyecto_id' => ''], $token)['error']);
+        $this->assertNull($store->find($key)['payload']['items'][0]['link']);
+    }
+
     public function test_meetings_need_confirmation(): void
     {
         $token = $this->token();

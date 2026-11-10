@@ -3385,6 +3385,7 @@
     })();
     let openProjectFromQuery = urlParams.get('open_project') || '';
     let openTaskFromQuery = urlParams.get('open_task') || '';
+    let openListFromQuery = urlParams.get('open_list') || '';
     let openNewProjectFromQuery = urlParams.get('new_project') === '1';
     let openHeaderTimerFromQuery = urlParams.get('header_timer') === '1';
     let openPinnedTimerFromQuery = urlParams.get('open_timer') === '1';
@@ -3397,12 +3398,14 @@
       const nextUrl = new URL(window.location.href);
       const hasOpenProject = nextUrl.searchParams.has('open_project');
       const hasOpenTask = nextUrl.searchParams.has('open_task');
+      const hasOpenList = nextUrl.searchParams.has('open_list');
       const hasNewProject = nextUrl.searchParams.has('new_project');
       const hasOpenTimer = nextUrl.searchParams.has('open_timer');
       const hasHeaderTimer = nextUrl.searchParams.has('header_timer');
-      if (!hasOpenProject && !hasOpenTask && !hasNewProject && !hasOpenTimer && !hasHeaderTimer) return;
+      if (!hasOpenProject && !hasOpenTask && !hasOpenList && !hasNewProject && !hasOpenTimer && !hasHeaderTimer) return;
       nextUrl.searchParams.delete('open_project');
       nextUrl.searchParams.delete('open_task');
+      nextUrl.searchParams.delete('open_list');
       nextUrl.searchParams.delete('new_project');
       nextUrl.searchParams.delete('open_timer');
       nextUrl.searchParams.delete('header_timer');
@@ -4562,7 +4565,7 @@
     let boardStageEditingName = '';
     let boardAiWorking = null;
     const PROJECT_BOARD_RECENTS_KEY = 'infocus.projectBoardRecents.v1';
-    const DEFAULT_PROJECT_TASK_STAGES = ['Por hacer', 'En proceso', 'Revisión', 'Terminado'];
+    const DEFAULT_PROJECT_TASK_STAGES = @json(\App\Support\ProjectBoard::DEFAULT_STAGES);
     window.history.replaceState({
       view: pendingBoardSlug || currentBoardProjectId ? 'project-board' : 'project-boards',
       boardSlug: pendingBoardSlug || currentBoardProjectId || '',
@@ -5089,6 +5092,7 @@
       url.searchParams.delete('board');
       url.searchParams.delete('open_project');
       url.searchParams.delete('open_task');
+      url.searchParams.delete('open_list');
       url.searchParams.delete('new_project');
       const state = { view: slug ? 'project-board' : 'project-boards', boardSlug: slug || '' };
       if (mode === 'replace') window.history.replaceState(state, '', url);
@@ -13595,20 +13599,35 @@
         const exists = projectIdToOpen && projects.some((p) => String(p.id) === String(projectIdToOpen));
         if (exists) {
           const taskIdToOpen = String(openTaskFromQuery || '');
+          const listToOpen = openListFromQuery;
           openProjectFromQuery = '';
           openTaskFromQuery = '';
+          openListFromQuery = '';
           clearOpenProjectQueryParam();
           setTimeout(() => {
-            if (!taskIdToOpen) {
+            const openBoard = !taskIdToOpen || currentTaskView === 'kanban';
+            if (openBoard) {
+              setProjectView('kanban');
               openProjectBoard(projectIdToOpen, { replaceUrl: true });
-              return;
             }
-            const targetProject = projects.find((p) => String(p.id) === String(projectIdToOpen));
-            const hasTask = (targetProject?.tareas || []).some((t) => String(t.id || '') === String(taskIdToOpen));
-            if (hasTask) {
-              openProjectTask(projectIdToOpen, taskIdToOpen);
-            } else {
-              openProject(projectIdToOpen);
+            if (listToOpen) {
+              requestAnimationFrame(() => {
+                const column = document.querySelector(`#projectBoardColumns [data-board-column-stage="${CSS.escape(listToOpen)}"]`);
+                if (column) {
+                  column.tabIndex = -1;
+                  column.focus({ preventScroll: true });
+                  column.scrollIntoView({ block: 'nearest', inline: 'center' });
+                }
+              });
+            }
+            if (taskIdToOpen) {
+              const targetProject = projects.find((p) => String(p.id) === projectIdToOpen);
+              const task = (targetProject?.tareas || []).find((t) => String(t.id || '') === taskIdToOpen);
+              if (task) {
+                openProjectTask(targetProject.id, task.id);
+              } else if (!openBoard) {
+                openProject(projectIdToOpen);
+              }
             }
           }, 120);
         }

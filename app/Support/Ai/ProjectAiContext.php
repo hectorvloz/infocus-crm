@@ -2,6 +2,7 @@
 
 namespace App\Support\Ai;
 
+use App\Support\ProjectBoard;
 use Illuminate\Support\Str;
 
 class ProjectAiContext
@@ -22,7 +23,7 @@ class ProjectAiContext
         }
 
         // Ordenadas como en el tablero (columna y posición) para que "la primera tarea de X" sea exacta.
-        $stages = array_values(array_filter((array) ($project['task_stages'] ?? []), 'is_string'));
+        $stages = ProjectBoard::stages($project);
         usort($tasks, function ($a, $b) use ($stages) {
             $sa = array_search((string) ($a['board_stage'] ?? 'Por hacer'), $stages, true);
             $sb = array_search((string) ($b['board_stage'] ?? 'Por hacer'), $stages, true);
@@ -38,7 +39,7 @@ class ProjectAiContext
             'Estado: ' . $this->text($project['etapa'] ?? 'Sin estado', 80),
             'Prioridad: ' . $this->text($project['prioridad'] ?? 'Sin prioridad', 80),
             'Vencimiento: ' . $this->text($project['vencimiento'] ?? 'Sin fecha', 40),
-            'Columnas: ' . $this->text(implode(', ', (array) ($project['task_stages'] ?? [])), 500),
+            'Columnas: ' . $this->text(implode(', ', $stages), 500),
             'Descripción del proyecto: ' . $this->text($project['descripcion'] ?? '', 2800),
         ];
 

@@ -1685,6 +1685,16 @@
       }
     }
 
+    .reminder-row-edit {
+      display: none;
+    }
+    .reminder-row:has([data-reminder-text]:focus, .reminder-row-edit :focus) .reminder-row-edit {
+      display: flex;
+    }
+    .reminder-row:has([data-reminder-text]:focus, .reminder-row-edit :focus) .reminder-row-view {
+      display: none;
+    }
+
     #remindersPanel {
       border: 8px solid transparent;
       background:
@@ -2100,7 +2110,7 @@
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-[#f6fdb5]">
           <div>
             <h3 class="text-2xl font-extrabold text-slate-900">Recordatorios</h3>
-            <p class="text-xs text-slate-500">Usa # para vincular proyectos o tareas</p>
+            <p class="text-xs text-slate-500">Vincula proyectos, tareas o listas desde cada recordatorio</p>
           </div>
           <button id="remindersCloseBtn" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 leading-none">✕</button>
         </div>
@@ -2137,7 +2147,6 @@
               <div class="reminder-text-frame relative mt-[4px]">
                 <input id="reminderNewText" type="text" class="relative z-10 w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 pr-9 text-base font-medium leading-6 text-slate-800 outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Nuevo recordatorio">
                 <button id="reminderAddBtn" type="button" class="absolute right-1.5 top-1/2 z-20 -translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#f2fda2] text-slate-900 text-sm font-extrabold leading-none hover:bg-[#e5f27c]">+</button>
-                <div id="reminderLinkDropdown" class="hidden absolute left-0 right-0 top-[calc(100%+0.4rem)] rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-[70] max-h-64 overflow-y-auto"></div>
               </div>
               <div class="mt-2 flex flex-wrap items-center gap-1.5">
                 <div class="relative">
@@ -2153,10 +2162,20 @@
                   </div>
                 </div>
                 <input id="reminderNewDate" type="text" placeholder="Fecha" readonly class="h-7 w-28 rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500 outline-none placeholder:text-slate-500 focus:border-[#f2fda2]">
-                <div id="reminderComposerLinkPreview" class="hidden"></div>
+                <div id="reminderComposerLinkPreview" class="hidden min-w-0 max-w-full"></div>
+                <button id="reminderComposerLinkBtn" type="button" data-reminder-link-picker aria-controls="reminderLinkDropdown" aria-expanded="false" class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Vincular</button>
               </div>
             </div>
           </div>
+        </div>
+        <div id="reminderLinkDropdown" role="region" aria-labelledby="reminderLinkHeading" class="hidden absolute inset-x-3 bottom-3 z-[90] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+          <div class="flex items-center justify-between gap-2 px-2 pb-1">
+            <h4 id="reminderLinkHeading" class="text-sm font-extrabold text-slate-800">Vincular recordatorio</h4>
+            <button id="reminderLinkClose" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100" aria-label="Cerrar selector">✕</button>
+          </div>
+          <input id="reminderLinkSearch" type="search" aria-label="Buscar proyecto, tarea o lista" placeholder="Buscar proyecto, tarea o lista" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-base text-slate-800">
+          <div id="reminderLinkResults" class="mt-1 max-h-[min(14rem,35dvh)] overflow-y-auto custom-scroll"></div>
+          <button id="reminderLinkRemove" type="button" class="hidden mt-1 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100">Quitar vínculo</button>
         </div>
       </aside>
       <main class="flex-1 overflow-y-auto custom-scroll {{ $isSocialMediaStandalone ? 'px-4 md:px-8 py-3 md:py-4 pb-8' : 'px-4 md:px-8 py-2 pb-24 md:pb-6' }}">
@@ -2586,6 +2605,10 @@
       const reminderAddSectionBtn = document.getElementById('reminderAddSectionBtn');
       const reminderLinkDropdown = document.getElementById('reminderLinkDropdown');
       const reminderComposerLinkPreview = document.getElementById('reminderComposerLinkPreview');
+      const reminderComposerLinkBtn = document.getElementById('reminderComposerLinkBtn');
+      const reminderLinkSearch = document.getElementById('reminderLinkSearch');
+      const reminderLinkResults = document.getElementById('reminderLinkResults');
+      const reminderLinkRemove = document.getElementById('reminderLinkRemove');
       const remindersScrollArea = remindersList?.parentElement;
 
       const profileBtn = document.getElementById('headerProfileBtn');
@@ -2614,7 +2637,10 @@
       let reminderCategoriesData = [];
       let reminderSections = [];
       let reminders = [];
+      const reminderLinkTypes = { project: 'Proyecto', task: 'Tarea', list: 'Lista' };
+      const defaultProjectStages = @json(\App\Support\ProjectBoard::DEFAULT_STAGES);
       let reminderLinkOptions = [];
+      let reminderLinkOptionsRequest = null;
       let activeReminderLinkTarget = null;
       let reminderPendingLink = null;
       let activeReminderCategoryId = 'default-cat';
@@ -2625,6 +2651,7 @@
       let reminderDatePickerOpen = false;
       let reminderRemoteLoaded = false;
       let reminderRemoteSaveTimer = null;
+      let reminderRemoteSaveRequest = Promise.resolve();
       let pendingReminderCategoryPromotionId = '';
       const ALL_REMINDERS_CATEGORY_ID = '__all__';
 
@@ -2735,7 +2762,7 @@
         renderRemindersCounter();
       }
 
-      async function saveRemindersRemoteNow() {
+      async function saveRemindersRemoteNow(payload = currentRemindersPayload()) {
         if (!reminderRemoteLoaded) return;
         try {
           await fetch('/api/header/reminders', {
@@ -2745,7 +2772,7 @@
               'X-CSRF-TOKEN': window.csrfToken,
               'X-Requested-With': 'XMLHttpRequest',
             },
-            body: JSON.stringify({ payload: currentRemindersPayload() }),
+            body: JSON.stringify({ payload }),
           });
         } catch (error) {
           console.warn('No se pudieron sincronizar los recordatorios.', error);
@@ -2755,7 +2782,17 @@
       function queueSaveRemindersRemote() {
         if (!reminderRemoteLoaded) return;
         clearTimeout(reminderRemoteSaveTimer);
-        reminderRemoteSaveTimer = setTimeout(saveRemindersRemoteNow, 350);
+        reminderRemoteSaveTimer = setTimeout(flushReminderSave, 350);
+      }
+
+      function flushReminderSave() {
+        if (reminderRemoteSaveTimer !== null) {
+          clearTimeout(reminderRemoteSaveTimer);
+          reminderRemoteSaveTimer = null;
+          const payload = currentRemindersPayload();
+          reminderRemoteSaveRequest = reminderRemoteSaveRequest.then(() => saveRemindersRemoteNow(payload));
+        }
+        return reminderRemoteSaveRequest;
       }
 
       function saveReminders() {
@@ -3050,7 +3087,7 @@
       }
 
       function isReminderPopoverActive() {
-        if (reminderDatePickerOpen) return true;
+        if (reminderDatePickerOpen || activeReminderLinkTarget) return true;
         if (Date.now() < reminderPopoverBusyUntil) return true;
         if (reminderPriorityDropdown && !reminderPriorityDropdown.classList.contains('hidden')) return true;
         if (remindersList?.querySelector('[data-reminder-priority-menu]:not(.hidden)')) return true;
@@ -3090,27 +3127,28 @@
 
       function reminderLinkMarkup(link) {
         if (!link || !link.title) return '';
-        const tone = link.type === 'task' ? 'text-indigo-600 bg-indigo-50 border-indigo-100' : 'text-sky-700 bg-sky-50 border-sky-100';
-        const prefix = link.type === 'task' ? '#' : '#';
-        return `<a href="${escapeHtml(reminderLinkUrl(link))}" class="inline-flex max-w-full rounded-full border px-2 py-0.5 text-[11px] font-bold ${tone} hover:brightness-95" data-reminder-link-open><span class="truncate">${prefix}${escapeHtml(link.title)}</span></a>`;
+        const tone = link.type === 'task' ? 'text-indigo-700 bg-indigo-50 border-indigo-100' : 'text-sky-700 bg-sky-50 border-sky-100';
+        const label = escapeHtml(link.title);
+        const target = Object.hasOwn(reminderLinkTypes, link.type) ? reminderLinkTypes[link.type] : 'Proyecto';
+        return `<a href="${escapeHtml(reminderLinkUrl(link))}" title="${target}: ${label}" aria-label="Abrir ${target.toLowerCase()}: ${label}" class="inline-flex min-w-0 max-w-[min(100%,12rem)] items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${tone} hover:underline" data-reminder-link-open><span class="truncate">${label}</span></a>`;
       }
 
       function reminderLinkUrl(link) {
-        if (!link) return '/proyectos';
         const params = new URLSearchParams();
         if (link.type === 'task') {
-          params.set('view', 'tareas');
-          if (link.projectId) params.set('open_project', link.projectId);
-          if (link.id) params.set('open_task', link.id);
-        } else if (link.projectId || link.id) {
-          params.set('open_project', link.projectId || link.id);
+          params.set('view', 'kanban');
+          params.set('open_project', link.projectId || '');
+          params.set('open_task', link.id || link.taskId || '');
+        } else {
+          params.set('open_project', link.projectId || link.id || '');
+          if (link.type === 'list') params.set('open_list', link.id || '');
         }
-        const query = params.toString();
-        return query ? `/proyectos?${query}` : '/proyectos';
+        return `/proyectos?${params}`;
       }
 
       function renderReminderComposerLinkPreview() {
         if (!reminderComposerLinkPreview) return;
+        reminderComposerLinkBtn.textContent = reminderPendingLink ? 'Cambiar vínculo' : 'Vincular';
         if (!reminderPendingLink) {
           reminderComposerLinkPreview.classList.add('hidden');
           reminderComposerLinkPreview.innerHTML = '';
@@ -3344,28 +3382,32 @@
                 && String(section.categoryId) === String(category.id)
               )))?.title
             : '';
-          const metaHtml = (categoryLabel || priority || date || item.link) ? `<div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold group-focus-within:hidden">
-                ${categoryLabel ? `<span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2 text-[10px] font-extrabold text-slate-500">${escapeHtml(categoryLabel)}</span>` : ''}
-                ${priority ? `<span class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${priorityClass(item.priority)}">${reminderPriorityIcon(item.priority)}${priority}</span>` : ''}
-                ${date ? `<span class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500">${date}</span>` : ''}
-                ${item.link ? reminderLinkMarkup(item.link) : ''}
-              </div>` : '';
+          const linkButtonLabel = item.link ? 'Cambiar vínculo' : 'Vincular recordatorio';
           return `<div class="reminder-row group relative flex items-start gap-2.5 rounded-2xl py-0.5 transition-colors" draggable="true" data-reminder-id="${escapeHtml(item.id)}" data-reminder-section-id="${escapeHtml(sectionId)}">
             <button type="button" data-reminder-toggle="${escapeHtml(item.id)}" class="relative mt-[6px] inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-visible rounded-full border-2 ${item.done ? 'border-[#f2fda2] bg-[#f2fda2] text-slate-900' : 'border-slate-300 bg-white text-transparent'}">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6"/></svg>
             </button>
-            <div class="min-w-0 flex-1">
+            <div class="flex min-w-0 flex-1 flex-col">
               <div class="reminder-text-frame relative">
                 <textarea data-reminder-text="${escapeHtml(item.id)}" rows="1" class="relative z-10 block w-full rounded-none border-0 bg-transparent px-1.5 pt-1 pb-0 text-base font-medium leading-6 ${item.done ? 'text-slate-400 line-through' : 'text-slate-800'} outline-none ring-0 focus:bg-transparent focus:outline-none focus:ring-0 focus:shadow-none" placeholder="Recordatorio">${escapeHtml(item.text || '')}</textarea>
               </div>
-              ${metaHtml}
-              <div class="mt-2 hidden group-focus-within:flex flex-nowrap items-center gap-1.5">
+              <div class="reminder-row-edit order-2 mt-1.5 flex-wrap items-center gap-1.5">
                 <div class="relative">
                   ${reminderPriorityButtonHtml(item.priority, `data-reminder-priority-edit="${escapeHtml(item.id)}"`)}
                   ${reminderPriorityMenuHtml(item.priority, `data-reminder-priority-set="${escapeHtml(item.id)}"`, item.id)}
                 </div>
                 <input data-reminder-date="${escapeHtml(item.id)}" type="text" value="${escapeHtml(item.dueDate || '')}" readonly placeholder="Fecha" class="h-7 w-28 rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500 outline-none placeholder:text-slate-500 focus:border-[#f2fda2]">
-                ${item.link ? reminderLinkMarkup(item.link) : ''}
+              </div>
+              <div class="order-1 mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                <div class="flex min-w-0 max-w-full items-center gap-1.5">
+                  ${item.link ? reminderLinkMarkup(item.link) : ''}
+                  <button type="button" data-reminder-link-picker aria-controls="reminderLinkDropdown" aria-expanded="false" title="${linkButtonLabel}" aria-label="${linkButtonLabel}" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100">
+                    <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 13a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.7 1.7m2.4 4.6a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.7-1.7"/></svg>
+                  </button>
+                </div>
+                ${categoryLabel ? `<span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2 text-[10px] font-extrabold text-slate-500">${escapeHtml(categoryLabel)}</span>` : ''}
+                ${priority ? `<span class="reminder-row-view inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${priorityClass(item.priority)}">${reminderPriorityIcon(item.priority)}${priority}</span>` : ''}
+                ${date ? `<span class="reminder-row-view inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500">${date}</span>` : ''}
               </div>
             </div>
             <button type="button" data-reminder-delete="${escapeHtml(item.id)}" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 text-sm font-bold">×</button>
@@ -3444,6 +3486,7 @@
           ? (reminderAllViewMode === 'priority' ? prioritySectionsHtml() : clientSectionsHtml())
           : categorySections.map((section) => sectionHtml(section, categorySections)).join('');
 
+        if (activeReminderLinkTarget?.reminderId) hideReminderLinkDropdown();
         remindersList.innerHTML = sectionsHtml;
         bindReminderRows();
       }
@@ -3458,7 +3501,7 @@
         const reminder = {
           id: uid('rem'),
           sectionId: targetSectionId,
-          text: linkedItem ? (clean.replace(/#\S*$/, '').trim() || clean) : clean,
+          text: clean,
           priority: normalizeReminderPriority(priority),
           dueDate: safeDate,
           link: linkedItem,
@@ -3998,36 +4041,48 @@
         });
       }
 
-      async function loadReminderLinkOptions() {
-        if (reminderLinkOptions.length) return;
-        try {
-          const response = await fetch('/api/proyectos', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-          const json = await response.json().catch(() => ({}));
-          const rows = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : []);
-          reminderLinkOptions = rows.filter((project) => !project?.archived).flatMap((project) => {
-            const projectId = String(project?.id || '');
-            const projectTitle = String(project?.titulo || project?.nombre || 'Proyecto sin nombre');
-            const tasks = Array.isArray(project?.tareas) ? project.tareas : [];
-            return [
-              { type: 'project', id: projectId, title: projectTitle, subtitle: 'Proyecto', projectId },
-              ...tasks.map((task) => ({
-                type: 'task',
-                id: String(task?.id || task?.uid || task?.title || task?.texto || Math.random()),
-                title: String(task?.title || task?.texto || task?.nombre || 'Tarea sin nombre'),
-                subtitle: projectTitle,
-                projectId,
-              })),
-            ];
+      function loadReminderLinkOptions() {
+        if (reminderLinkOptionsRequest) return reminderLinkOptionsRequest;
+        reminderLinkOptionsRequest = fetch('/api/proyectos', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(async (response) => {
+            if (!response.ok) throw new Error('No se pudieron cargar los proyectos.');
+            const json = await response.json();
+            const rows = Array.isArray(json) ? json : (json.data || []);
+            reminderLinkOptions = rows.filter((project) => project?.id && !project.archived).flatMap((project) => {
+              const projectId = String(project.id);
+              const projectTitle = String(project.titulo || project.nombre || 'Proyecto sin nombre');
+              const tasks = Array.isArray(project.tareas) ? project.tareas : [];
+              const stages = (Array.isArray(project.task_stages) ? project.task_stages : []).map((stage) => String(stage || '').trim()).filter(Boolean);
+              return [
+                { type: 'project', id: projectId, title: projectTitle, subtitle: '', projectId },
+                ...(stages.length ? stages : defaultProjectStages).map((stage) => ({
+                  type: 'list', id: stage, title: stage, subtitle: projectTitle, projectId,
+                })),
+                ...tasks.filter((task) => task?.id || task?.uid).map((task) => ({
+                  type: 'task',
+                  id: String(task.id || task.uid),
+                  title: String(task.title || task.texto || task.nombre || 'Tarea sin nombre'),
+                  subtitle: projectTitle,
+                  projectId,
+                })),
+              ];
+            });
+            return true;
+          })
+          .catch(() => {
+            reminderLinkOptionsRequest = null;
+            reminderLinkOptions = [];
+            return false;
           });
-        } catch (_) {
-          reminderLinkOptions = [];
-        }
+        return reminderLinkOptionsRequest;
       }
 
-      function hideReminderLinkDropdown() {
-        reminderLinkDropdown?.classList.add('hidden');
-        if (reminderLinkDropdown) reminderLinkDropdown.innerHTML = '';
+      function hideReminderLinkDropdown(restoreFocus = false) {
+        const target = activeReminderLinkTarget;
         activeReminderLinkTarget = null;
+        reminderLinkDropdown?.classList.add('hidden');
+        target?.trigger?.setAttribute('aria-expanded', 'false');
+        if (restoreFocus && target) (target.trigger || target.input).focus({ preventScroll: true });
       }
 
       function hideReminderPriorityDropdown() {
@@ -4048,71 +4103,80 @@
         });
       }
 
-      function currentHashQuery(value) {
-        const match = String(value || '').match(/#([^\s#]*)$/);
-        return match ? match[1].toLowerCase() : null;
-      }
-
-      async function maybeShowReminderLinkDropdown(input, reminderId = null) {
-        const query = currentHashQuery(input.value);
-        if (query === null || !reminderLinkDropdown) {
+      function maybeShowReminderLinkDropdown(input, reminderId = null) {
+        const match = input.value.match(/#([^\s#]*)$/);
+        if (!match) {
           hideReminderLinkDropdown();
           return;
         }
-        await loadReminderLinkOptions();
-        activeReminderLinkTarget = { input, reminderId };
-        const filtered = reminderLinkOptions
-          .filter((item) => item.title.toLowerCase().includes(query) || item.subtitle.toLowerCase().includes(query))
-          .slice(0, 8);
-        if (input === reminderNewText) {
-          input.parentElement?.appendChild(reminderLinkDropdown);
-          reminderLinkDropdown.style.position = '';
-          reminderLinkDropdown.style.left = '';
-          reminderLinkDropdown.style.right = '';
-          reminderLinkDropdown.style.top = '';
-          reminderLinkDropdown.style.width = '';
-        } else {
-          document.body.appendChild(reminderLinkDropdown);
-          const rect = input.getBoundingClientRect();
-          reminderLinkDropdown.style.position = 'fixed';
-          reminderLinkDropdown.style.left = `${Math.max(12, rect.left)}px`;
-          reminderLinkDropdown.style.right = 'auto';
-          reminderLinkDropdown.style.top = `${Math.min(window.innerHeight - 260, rect.bottom + 6)}px`;
-          reminderLinkDropdown.style.width = `${Math.min(320, Math.max(240, rect.width))}px`;
-        }
-        if (!filtered.length) {
-          reminderLinkDropdown.innerHTML = '<div class="px-3 py-3 text-xs font-semibold text-slate-400">No encontré proyectos o tareas.</div>';
-        } else {
-          reminderLinkDropdown.innerHTML = filtered.map((item, index) => `
-            <button type="button" data-reminder-link-index="${index}" class="w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50">
-              <div class="text-sm font-extrabold text-slate-800 truncate">#${escapeHtml(item.title)}</div>
-              <div class="text-[11px] font-semibold text-slate-400 truncate">${escapeHtml(item.subtitle)}</div>
-            </button>
-          `).join('');
-          reminderLinkDropdown.querySelectorAll('[data-reminder-link-index]').forEach((btn) => {
-            btn.addEventListener('click', () => {
-              const item = filtered[Number(btn.getAttribute('data-reminder-link-index') || 0)];
-              applyReminderLink(item);
-            });
-          });
-        }
+        openReminderLinkPicker({ input, reminderId, hashMatch: match[0] }, match[1]);
+      }
+
+      async function openReminderLinkPicker(target, query = '') {
+        hideReminderLinkDropdown();
+        hideReminderPriorityDropdown();
+        hideReminderRowPriorityDropdowns();
+        closeReminderDatePickers();
+        activeReminderLinkTarget = target;
+        target.trigger?.setAttribute('aria-expanded', 'true');
+        reminderLinkSearch.value = query;
+        const currentLink = target.reminderId
+          ? reminders.find((item) => item.id === target.reminderId)?.link
+          : reminderPendingLink;
+        reminderLinkRemove.classList.toggle('hidden', !currentLink);
+        reminderLinkResults.innerHTML = '<p role="status" class="px-3 py-2 text-xs text-slate-600">Cargando destinos…</p>';
         reminderLinkDropdown.classList.remove('hidden');
+        if (target.trigger) reminderLinkSearch.focus({ preventScroll: true });
+
+        const loaded = await loadReminderLinkOptions();
+        if (activeReminderLinkTarget !== target) return;
+        if (loaded) {
+          renderReminderLinkChoices();
+        } else {
+          reminderLinkResults.innerHTML = '<p role="status" class="px-3 py-2 text-xs text-slate-600">No pudimos cargar los destinos. <button type="button" class="font-bold underline">Reintentar</button></p>';
+          reminderLinkResults.querySelector('button').addEventListener('click', () => openReminderLinkPicker(target, reminderLinkSearch.value));
+        }
+      }
+
+      function renderReminderLinkChoices() {
+        const terms = reminderSearchText(reminderLinkSearch.value).split(' ').filter(Boolean);
+        const matches = reminderLinkOptions.filter((item) => {
+          const label = reminderSearchText(`${item.title} ${item.subtitle} ${reminderLinkTypes[item.type]}`);
+          return terms.every((term) => label.includes(term));
+        });
+        reminderLinkResults.innerHTML = matches.slice(0, 30).map((item, index) => `
+          <button type="button" data-reminder-link-index="${index}" class="w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50 focus-visible:bg-slate-100">
+            <span class="block truncate text-sm font-bold text-slate-800">${escapeHtml(item.title)}</span>
+            <span class="block truncate text-xs text-slate-600">${reminderLinkTypes[item.type]}${item.subtitle ? ' · ' + escapeHtml(item.subtitle) : ''}</span>
+          </button>
+        `).join('') || '<p role="status" class="px-3 py-2 text-xs text-slate-600">No encontramos proyectos, tareas ni listas.</p>';
+        if (matches.length > 30) {
+          reminderLinkResults.insertAdjacentHTML('beforeend', '<p class="px-3 py-2 text-xs text-slate-600">Escribe un nombre para filtrar más resultados.</p>');
+        }
+        reminderLinkResults.querySelectorAll('[data-reminder-link-index]').forEach((button) => {
+          button.addEventListener('click', () => applyReminderLink(matches[Number(button.dataset.reminderLinkIndex)]));
+        });
+        reminderLinkResults.scrollTop = 0;
       }
 
       function applyReminderLink(link) {
-        if (!activeReminderLinkTarget || !link) return;
-        const { input, reminderId } = activeReminderLinkTarget;
-        const nextText = String(input.value || '').replace(/#([^\s#]*)$/, '').trim();
+        if (!activeReminderLinkTarget) return;
+        const { input, reminderId, trigger, hashMatch } = activeReminderLinkTarget;
+        const nextText = hashMatch && input.value.endsWith(hashMatch)
+          ? input.value.slice(0, -hashMatch.length).trimEnd()
+          : input.value;
         input.value = nextText;
+        hideReminderLinkDropdown();
         if (reminderId) {
           reminders = reminders.map((item) => item.id === reminderId ? { ...item, text: nextText || item.text, link, updatedAt: Date.now() } : item);
           saveReminders();
+          const row = remindersList.querySelector(`[data-reminder-id="${CSS.escape(reminderId)}"]`);
+          row?.querySelector(trigger ? '[data-reminder-link-picker]' : '[data-reminder-text]')?.focus({ preventScroll: true });
         } else {
           reminderPendingLink = link;
           renderReminderComposerLinkPreview();
-          reminderNewText?.focus();
+          input.focus({ preventScroll: true });
         }
-        hideReminderLinkDropdown();
       }
 
       function notificationModule(item) {
@@ -4545,6 +4609,8 @@
         remindersPanel?.classList.remove('translate-x-[calc(100%+2rem)]');
         profileMenu.classList.add('hidden');
         document.body.classList.remove('header-profile-menu-open');
+        reminderLinkOptionsRequest = null;
+        reminderLinkOptions = [];
         renderReminders();
       }
 
@@ -4669,9 +4735,6 @@
           event.preventDefault();
           addReminder(reminderNewText.value, reminderNewPriority?.value || '', reminderNewDate?.value || '');
         }
-        if (event.key === 'Escape') {
-          hideReminderLinkDropdown();
-        }
       });
       reminderAddSectionBtn?.addEventListener('click', () => {
         const categoryId = isAllRemindersCategoryId(activeReminderCategoryId)
@@ -4734,7 +4797,21 @@
       });
 
       remindersPanel?.addEventListener('click', (event) => {
+        event.stopPropagation();
         const target = event.target;
+        const trigger = target?.closest?.('[data-reminder-link-picker]');
+        if (trigger) {
+          const row = trigger.closest('[data-reminder-id]');
+          const input = row ? row.querySelector('[data-reminder-text]') : reminderNewText;
+          openReminderLinkPicker({ input, reminderId: row?.dataset.reminderId || null, trigger });
+          return;
+        }
+        const link = target?.closest?.('[data-reminder-link-open]');
+        if (link && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          flushReminderSave().then(() => window.location.assign(link.href));
+          return;
+        }
         const insidePriority = target?.closest?.('#reminderPriorityBtn, #reminderPriorityDropdown, [data-reminder-priority-edit], [data-reminder-priority-menu]');
         const insideAllView = target?.closest?.('#reminderAllViewBtn, #reminderAllViewDropdown');
         const insideLink = target?.closest?.('#reminderLinkDropdown, [data-reminder-text], #reminderNewText');
@@ -4762,11 +4839,21 @@
           }
           setTimeout(() => settleReminderComposerOnExit({ force: true }), 0);
         }
-        event.stopPropagation();
       });
 
       reminderLinkDropdown?.addEventListener('click', (event) => {
         event.stopPropagation();
+      });
+      reminderLinkSearch?.addEventListener('input', () => {
+        if (reminderLinkOptions.length) renderReminderLinkChoices();
+      });
+      reminderLinkRemove?.addEventListener('click', () => applyReminderLink(null));
+      document.getElementById('reminderLinkClose')?.addEventListener('click', () => hideReminderLinkDropdown(true));
+      remindersPanel?.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' && activeReminderLinkTarget?.input === event.target) {
+          event.preventDefault();
+          reminderLinkSearch.focus({ preventScroll: true });
+        }
       });
 
       reminderPriorityDropdown?.addEventListener('click', (event) => {
@@ -4805,6 +4892,11 @@
         const key = String(event.key || '').toLowerCase();
 
         if (key === 'escape') {
+          if (activeReminderLinkTarget) {
+            event.preventDefault();
+            hideReminderLinkDropdown(true);
+            return;
+          }
           const closeTopModal = () => {
             const dialogs = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).filter((el) => !el.classList.contains('hidden'));
             const topDialog = dialogs[dialogs.length - 1];

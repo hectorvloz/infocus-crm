@@ -12,7 +12,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('ver_recordatorios')]
-#[Description('Muestra tus recordatorios de Infocus agrupados por categoría y lista (ej. Espadas, Variado), con su recordatorio_id, fecha y prioridad. También lista las categorías y listas existentes.')]
+#[Description('Muestra tus recordatorios de Infocus agrupados por categoría y lista (ej. Espadas, Variado), con su recordatorio_id, fecha, prioridad y enlaces a proyectos, tareas o columnas. También lista las categorías y listas existentes.')]
 #[IsReadOnly]
 class VerRecordatorios extends InfocusTool
 {
@@ -45,7 +45,8 @@ class VerRecordatorios extends InfocusTool
                 $lines[] = sprintf('- [%s] %s%s%s%s (recordatorio_id: %s)', !empty($i['done']) ? 'x' : ' ', $i['text'] ?? '',
                     !empty($i['dueDate']) ? ' · ' . $i['dueDate'] . ($i['dueDate'] < $today && empty($i['done']) ? ' (vencido)' : '') : '',
                     !empty($i['priority']) ? " · {$i['priority']}" : '',
-                    !empty($i['link']['title']) ? " · vinculado a {$i['link']['title']}" : '', $i['id'] ?? '-');
+                    !empty($i['link']['title']) ? ' · vinculado a ' . $this->external($i['link']['title']) . ' (' . Reminders::linkUrl($i['link']) . ')' : '',
+                    $i['id'] ?? '-');
             }
         }
         $structure = collect($payload['categories'] ?? [])->map(function ($c) use ($payload) {
