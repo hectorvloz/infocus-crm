@@ -112,6 +112,7 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/api/proyectos/eliminar', [ProyectosController::class, 'eliminar'])->name('api.proyectos.eliminar');
     Route::post('/api/proyectos/ia-apoyo', [ProyectosController::class, 'proyectoIaApoyo'])->name('api.proyectos.ia-apoyo');
     Route::get('/api/proyectos/{id}', [ProyectosController::class, 'show'])->name('api.proyectos.show');
+    Route::get('/api/proyectos/{id}/adjuntos', [ProyectosController::class, 'adjuntos'])->name('api.proyectos.adjuntos');
     Route::get('/api/proyectos/responsables/search', [ProyectosController::class, 'responsables'])->name('api.proyectos.responsables.search');
     Route::post('/api/proyectos/tareas/agregar', [ProyectosController::class, 'tareaAgregar'])->name('api.proyectos.tareas.agregar');
     Route::post('/api/proyectos/tareas/toggle', [ProyectosController::class, 'tareaToggle'])->name('api.proyectos.tareas.toggle');

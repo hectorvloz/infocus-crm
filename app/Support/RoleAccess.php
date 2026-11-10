@@ -76,6 +76,7 @@ class RoleAccess
         'proyectos.board' => 'proyectos.read',
         'api.proyectos.index' => 'proyectos.read',
         'api.proyectos.show' => 'proyectos.read',
+        'api.proyectos.adjuntos' => 'proyectos.read',
         'api.proyectos.archivados' => 'proyectos.read',
         'api.proyectos.responsables.search' => 'proyectos.read',
         'api.proyectos.active-timer' => 'proyectos.read',

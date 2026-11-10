@@ -834,8 +834,16 @@
     }
 
     .project-file-preview-modal {
-      z-index: 2147483647 !important;
-      isolation: isolate;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      margin: 0;
+      border: 0;
+    }
+
+    .project-file-preview-modal::backdrop {
+      background: transparent;
     }
 
     .project-file-preview-dialog {
@@ -959,6 +967,19 @@
     .project-board-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 0 0 1px #cbd5e1, 0 18px 42px rgba(15, 23, 42, .14);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .project-board-archive {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .project-board-tile:hover .project-board-archive,
+      .project-board-archive:focus-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
     }
 
     .project-board-context-menu {
@@ -2066,8 +2087,9 @@
       </div>
 
       <div class="ml-auto flex items-center gap-3">
-        <button id="openArchivedProjectsBtn" type="button" onclick="openArchivedProjectsModal()" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50" title="Papelera de proyectos archivados" aria-label="Papelera de proyectos archivados">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12m-9 0V5a1 1 0 011-1h4a1 1 0 011 1v2m-8 0 1 12a2 2 0 002 2h4a2 2 0 002-2l1-12"/></svg>
+        <button id="openArchivedProjectsBtn" type="button" onclick="openArchivedProjectsModal()" class="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-sm font-extrabold text-slate-700 shadow-sm hover:bg-slate-50">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8Zm-1-5h18v5H3zM10 12h4"/></svg>
+          Archivados
         </button>
 
         <button id="addProjectBtn" onclick="openNewProjectModal()" class="primary-add-btn">
@@ -2189,14 +2211,14 @@
         <div class="relative mx-auto w-[min(96vw,1200px)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-2xl">
           <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4">
             <div>
-              <div id="archived-projects-title" class="text-xl font-extrabold text-slate-900">Papelera de proyectos</div>
-              <div class="mt-1 text-xs text-slate-500">Consulta proyectos archivados, su fecha de creación, estado de avance y elimínalos permanentemente.</div>
+              <div id="archived-projects-title" class="text-xl font-extrabold text-slate-900">Archivados</div>
+              <div class="mt-1 text-xs text-slate-500">Restaura un proyecto o elimínalo definitivamente.</div>
             </div>
             <div class="flex items-center gap-2">
               <button id="deleteAllArchivedBtn" type="button" onclick="deleteAllArchivedProjects()" class="hidden inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 transition-colors hover:bg-rose-100">
                 Eliminar todos
               </button>
-              <button type="button" onclick="closeArchivedProjectsModal()" class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600" aria-label="Cerrar papelera de proyectos">
+              <button type="button" onclick="closeArchivedProjectsModal()" class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600" aria-label="Cerrar archivados">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
@@ -2251,7 +2273,7 @@
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4Z"/></svg>
             Detalles
           </button>
-          <button type="button" onclick="openBoardTaskTrash()" class="project-board-action-btn relative" title="Papelera de tareas">
+          <button type="button" onclick="openBoardTaskTrash()" class="project-board-action-btn relative" title="Papelera de tarjetas" aria-label="Papelera de tarjetas">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>
             <span class="hidden sm:inline">Papelera</span>
             <span id="boardTaskTrashCount" class="hidden min-w-5 rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">0</span>
@@ -2266,7 +2288,7 @@
     </div>
   </div>
 
-  <div id="projectFilePreviewModal" class="project-file-preview-modal fixed inset-0 hidden items-center justify-center bg-black/50 p-3 sm:p-5" aria-modal="true" aria-labelledby="projectFilePreviewTitle" aria-describedby="projectFilePreviewSubtitle" role="dialog">
+  <dialog id="projectFilePreviewModal" class="project-file-preview-modal fixed inset-0 hidden items-center justify-center bg-black/50 p-3 sm:p-5" aria-modal="true" aria-labelledby="projectFilePreviewTitle" aria-describedby="projectFilePreviewSubtitle" role="dialog">
     <div class="project-file-preview-dialog max-h-[92vh] overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col">
       <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
         <div class="min-w-0">
@@ -2274,7 +2296,7 @@
           <div id="projectFilePreviewSubtitle" class="mt-1 text-xs font-semibold text-slate-500" aria-live="polite">Usa trackpad o rueda sobre la vista para acercar y alejar.</div>
         </div>
         <div class="flex items-center gap-2">
-          <a id="projectFilePreviewDownload" href="#" target="_blank" class="w-10 h-10 rounded-full border border-emerald-200 bg-white flex items-center justify-center text-emerald-600 hover:bg-emerald-50" title="Descargar">
+          <a id="projectFilePreviewDownload" href="#" onclick="downloadProjectFile(event, this)" class="w-10 h-10 rounded-full border border-emerald-200 bg-white flex items-center justify-center text-emerald-600 hover:bg-emerald-50" title="Descargar">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
           </a>
           <button id="projectFilePreviewClose" type="button" onclick="event.stopPropagation();closeProjectFilePreview()" class="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-50" title="Cerrar" aria-label="Cerrar vista previa">
@@ -2299,7 +2321,7 @@
               <div id="projectFilePreviewExt" class="mx-auto mb-4 inline-flex rounded-xl px-5 py-3 text-xl font-black text-white bg-slate-500">FILE</div>
               <div class="text-lg font-black text-slate-900">Vista previa no disponible</div>
               <div class="mt-1 text-sm text-slate-500">Este formato se puede descargar directamente.</div>
-              <a id="projectFilePreviewUnsupportedDownload" href="#" target="_blank" class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-lime-300 px-5 py-3 font-bold text-slate-900 hover:bg-lime-200">
+              <a id="projectFilePreviewUnsupportedDownload" href="#" onclick="downloadProjectFile(event, this)" class="mt-5 inline-flex items-center gap-2 rounded-2xl bg-lime-300 px-5 py-3 font-bold text-slate-900 hover:bg-lime-200">
                 Descargar archivo
               </a>
             </div>
@@ -2308,7 +2330,7 @@
       </div>
       <div id="projectFilePreviewFooter" class="border-t border-slate-100 px-5 py-3 text-sm font-bold text-slate-700 truncate"></div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Project Detail Modal -->
   <div id="projectModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -2335,9 +2357,6 @@
                 </div>
              </div>
              <div class="ml-3 flex shrink-0 items-center gap-1.5">
-               <button id="modalArchiveProjectBtn" type="button" onclick="archiveProject()" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-600" title="Archivar proyecto" aria-label="Archivar proyecto">
-                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-8 0h10"/></svg>
-               </button>
                <button onclick="closeProjectModal({ force: true })" class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/50 hover:text-slate-600" title="Cerrar" aria-label="Cerrar">
                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                </button>
@@ -4947,22 +4966,27 @@
         const taskCount = Array.isArray(project.tareas) ? project.tareas.length : 0;
         const client = escapeHtml(project.cliente || 'Sin cliente');
         const due = formatBoardDate(project.vencimiento);
-        return `<button type="button" onclick="openProjectBoard('${safeId}')" data-project-id="${escapeHtml(project.id || '')}" class="project-board-card text-left" style="--board-from:${from};--board-to:${to};">
-          <div class="${coverClass}">${coverMarkup}</div>
-          <div class="project-board-footer">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <div class="truncate text-sm font-black leading-tight sm:text-base">${escapeHtml(project.titulo || 'Tablero sin titulo')}</div>
-                <div class="mt-0.5 truncate text-[11px] font-semibold text-slate-500">${client}</div>
+        return `<div class="project-board-tile relative min-w-0">
+          <button type="button" onclick="openProjectBoard('${safeId}')" data-project-id="${escapeHtml(project.id || '')}" class="project-board-card w-full text-left" style="--board-from:${from};--board-to:${to};">
+            <div class="${coverClass}">${coverMarkup}</div>
+            <div class="project-board-footer">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-black leading-tight sm:text-base">${escapeHtml(project.titulo || 'Tablero sin titulo')}</div>
+                  <div class="mt-0.5 truncate text-[11px] font-semibold text-slate-500">${client}</div>
+                </div>
+                <span class="rounded-full bg-lime-200 px-1.5 py-0.5 text-[11px] font-black leading-none text-slate-950">${stats.pct}%</span>
               </div>
-              <span class="rounded-full bg-lime-200 px-1.5 py-0.5 text-[11px] font-black leading-none text-slate-950">${stats.pct}%</span>
+              <div class="mt-2.5 flex items-center justify-between gap-3 text-[11px] font-bold text-slate-600">
+                <span>${taskCount} tarjeta${taskCount === 1 ? '' : 's'}</span>
+                <span class="truncate text-right">${escapeHtml(due)}</span>
+              </div>
             </div>
-            <div class="mt-2.5 flex items-center justify-between gap-3 text-[11px] font-bold text-slate-600">
-              <span>${taskCount} tarjeta${taskCount === 1 ? '' : 's'}</span>
-              <span class="truncate text-right">${escapeHtml(due)}</span>
-            </div>
-          </div>
-        </button>`;
+          </button>
+          <button type="button" onclick="archiveProjectById(${escapeHtml(JSON.stringify(String(project.id)))})" class="project-board-archive absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/75 text-slate-800 hover:bg-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-800" title="Archivar" aria-label="Archivar ${escapeHtml(project.titulo || 'proyecto')}">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8Zm-1-5h18v5H3zM10 12h4"/></svg>
+          </button>
+        </div>`;
       }).join('');
     }
 
@@ -6944,8 +6968,8 @@
               <button type="button" onclick="restoreProject('${safeId}')" class="inline-grid place-content-center w-9 h-9 rounded-full border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-1 shadow-sm" title="Restaurar">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               </button>
-              <button type="button" onclick="permanentlyDeleteProject('${safeId}')" class="inline-grid place-content-center w-9 h-9 rounded-full border border-rose-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-all focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-1 shadow-sm" title="Eliminar permanente">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <button type="button" onclick="permanentlyDeleteProject('${safeId}')" class="inline-flex h-9 items-center whitespace-nowrap rounded-full border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50">
+                Eliminar definitivamente
               </button>
             </div>
           </td>
@@ -7035,7 +7059,8 @@
           },
           body: JSON.stringify({
             id: projectId,
-            archived: false
+            archived: false,
+            archived_at: null
           })
         });
 
@@ -7050,7 +7075,7 @@
       }
     }
 
-    async function archiveProjectById(projectId, options = {}) {
+    async function archiveProjectById(projectId) {
       if (!projectId) return;
       const confirmed = confirm('¿Estás seguro de que quieres archivar este proyecto? Puedes restaurarlo desde la pestaña "Archivados".');
       if (!confirmed) return;
@@ -7070,10 +7095,7 @@
         });
 
         if (response.ok) {
-          if (options?.closeProjectModal) {
-            closeProjectModal();
-            return;
-          }
+          if (String(currentBoardProjectId) === String(projectId)) closeProjectBoard({ replaceUrl: true });
           await loadData();
         } else {
           alert('Error al archivar el proyecto');
@@ -7084,14 +7106,11 @@
       }
     }
 
-    async function archiveProject() {
-      if (!currentProjectId) return;
-      await archiveProjectById(currentProjectId, { closeProjectModal: true });
-    }
-
     async function permanentlyDeleteProject(projectId) {
       if (!projectId) return;
-      const confirmed = confirm('Esta acción eliminará el proyecto permanentemente. ¿Deseas continuar?');
+      const project = archivedProjects.find((item) => String(item.id) === String(projectId));
+      const name = project?.titulo || 'este proyecto';
+      const confirmed = confirm(`¿Eliminar definitivamente «${name}»? Esta acción no se puede deshacer.`);
       if (!confirmed) return;
 
       try {
@@ -7553,7 +7572,6 @@
       const noteComposer = document.getElementById('projectNoteComposer');
       const notesTabBtn = document.querySelector('[data-project-tab="notes"]');
       const sidebar = document.getElementById('projectModalSidebar');
-      const archiveBtn = document.getElementById('modalArchiveProjectBtn');
       const prioritySelector = document.getElementById('modalPrioritySelector');
       const responsablesInput = document.getElementById('newResponsibleInput');
       const dueDateInput = document.getElementById('modalDueDate');
@@ -7574,7 +7592,6 @@
       if (noteComposer && projectModalReadOnly) noteComposer.classList.add('hidden');
       if (notesTabBtn) notesTabBtn.classList.toggle('hidden', projectModalReadOnly);
       if (sidebar) sidebar.classList.toggle('hidden', projectModalReadOnly);
-      if (archiveBtn) archiveBtn.classList.toggle('hidden', projectModalReadOnly);
       if (prioritySelector) prioritySelector.classList.toggle('pointer-events-none', projectModalReadOnly);
       if (prioritySelector) prioritySelector.classList.toggle('opacity-70', projectModalReadOnly);
       if (responsablesInput) responsablesInput.disabled = projectModalReadOnly;
@@ -10541,6 +10558,9 @@
               <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               Restaurar
             </button>
+            <button type="button" onclick="permanentlyDeleteProject(${escapeHtml(JSON.stringify(String(p.id)))})" class="ml-1 inline-flex h-8 items-center rounded-lg border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50">
+              Eliminar definitivamente
+            </button>
           </td>
         </tr>`;
       }).join('');
@@ -12802,10 +12822,8 @@
         : -1;
       projectFilePreviewReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-      // Reinsert it as the last body child on every open so it wins against
-      // detail modals and any other top-level stacking context.
-      document.body.appendChild(modal);
       renderProjectFilePreview({title, url, type, downloadUrl, extLabel, extColor});
+      if (!modal.open) modal.showModal();
       requestAnimationFrame(() => document.getElementById('projectFilePreviewClose')?.focus({preventScroll: true}));
     }
 
@@ -12891,6 +12909,7 @@
       const frame = document.getElementById('projectFilePreviewFrame');
       const image = document.getElementById('projectFilePreviewImage');
       if (!modal) return;
+      modal.close();
       modal.classList.add('hidden');
       modal.classList.remove('flex');
       if (frame) frame.removeAttribute('src');
@@ -12922,14 +12941,69 @@
         : previewUrl;
     }
 
-    function renderTaskFiles(files) {
+    const projectAttachmentRequests = new WeakMap();
+
+    async function loadAvailableProjectFiles(container, files, taskId = null) {
+      projectAttachmentRequests.get(container)?.abort();
+      container.replaceChildren();
+      if (!Array.isArray(files) || !files.length || !currentProjectId) return [];
+
+      const controller = new AbortController();
+      projectAttachmentRequests.set(container, controller);
+      const query = taskId ? `?tarea_id=${encodeURIComponent(taskId)}` : '';
+      try {
+        const res = await fetch(`/api/proyectos/${encodeURIComponent(currentProjectId)}/adjuntos${query}`, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) throw new Error('attachment_list_failed');
+        const data = await res.json();
+        return controller.signal.aborted ? null : data.data;
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          container.innerHTML = '<p role="status" class="py-2 text-sm text-slate-600">No se pudieron cargar los adjuntos.</p>';
+        }
+        return null;
+      }
+    }
+
+    async function downloadProjectFile(event, link) {
+      event.stopPropagation();
+      event.preventDefault();
+      if (link.getAttribute('aria-busy') === 'true') return;
+      const url = link.href;
+      link.setAttribute('aria-busy', 'true');
+      try {
+        const res = await fetch(url, { method: 'HEAD', cache: 'no-store', redirect: 'manual' });
+        if (res.status === 404) {
+          const preview = document.getElementById('projectFilePreviewModal');
+          if (preview.open && document.getElementById('projectFilePreviewDownload')?.href === url) {
+            closeProjectFilePreview();
+          }
+          document.querySelectorAll('.project-file-card[data-download-url]').forEach((card) => {
+            if (new URL(card.dataset.downloadUrl, location.origin).href === url) card.remove();
+          });
+          window.showNotification?.('El archivo ya no está disponible.', 'warning');
+          return;
+        }
+        if (!res.ok && res.type !== 'opaqueredirect') throw new Error('attachment_download_failed');
+        window.location.assign(url);
+      } catch (error) {
+        if (link.closest('dialog')?.open) {
+          document.getElementById('projectFilePreviewSubtitle').textContent = 'No se pudo descargar el archivo. Intenta de nuevo.';
+        } else {
+          window.showNotification?.('No se pudo descargar el archivo. Intenta de nuevo.', 'error');
+        }
+      } finally {
+        link.removeAttribute('aria-busy');
+      }
+    }
+
+    async function renderTaskFiles(files) {
       const container = document.getElementById('taskFilesList');
       if (!container) return;
-      const items = Array.isArray(files) ? files : [];
-      if (!items.length) {
-        container.innerHTML = '';
-        return;
-      }
+      const items = await loadAvailableProjectFiles(container, files, currentTaskId);
+      if (!items?.length) return;
 
       const project = projects.find(x => String(x?.id || '') === String(currentProjectId || '')) || {};
       container.innerHTML = items.map((file) => {
@@ -12961,7 +13035,7 @@
             data-ext-label="${escapeHtml(tone.label)}"
             data-ext-color="${escapeHtml(tone.color)}"
             onclick="openProjectFilePreviewFromCard(this)"
-            onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openProjectFilePreviewFromCard(this); }">
+            onkeydown="if(event.target === this && (event.key === 'Enter' || event.key === ' ')){ event.preventDefault(); openProjectFilePreviewFromCard(this); }">
             <div class="project-file-preview" title="${safeName}">${figure}</div>
             <div class="min-w-0">
               <div class="project-file-title" title="${safeName}">${safeName}</div>
@@ -12971,7 +13045,7 @@
               <a href="${folderUrl}" class="project-file-action" title="Abrir carpeta en Documentos" target="_blank" onclick="event.stopPropagation()">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 17L17 7M9 7h8v8"/></svg>
               </a>
-              <a href="${downloadUrl}" class="project-file-action" title="Descargar" target="_blank" onclick="event.stopPropagation()">
+              <a href="${escapeHtml(downloadUrl)}" class="project-file-action" title="Descargar" aria-label="Descargar ${safeName}" onclick="downloadProjectFile(event, this)">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
               </a>
               <button type="button" onclick="event.stopPropagation(); removeTaskFile('${id}')" class="project-file-action danger" title="Eliminar adjunto"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 6h18M8 6V4h8v2m-1 5v6M9 11v6m-2 4h10a2 2 0 002-2V6H5v13a2 2 0 002 2z"/></svg></button>
@@ -13064,15 +13138,12 @@
       }
     }
 
-    function renderModalFiles(files) {
+    async function renderModalFiles(files) {
         const container = document.getElementById('modalFilesList');
         if (!container) return;
+        const items = await loadAvailableProjectFiles(container, files);
+        if (!items?.length) return;
         const canDelete = !projectModalReadOnly;
-        const items = Array.isArray(files) ? files : [];
-        if (!items.length) {
-          container.innerHTML = '';
-          return;
-        }
 
         container.innerHTML = items.map(f => {
           const project = projects.find(x => String(x?.id || '') === String(currentProjectId || '')) || {};
@@ -13104,7 +13175,7 @@
               data-ext-label="${escapeHtml(tone.label)}"
               data-ext-color="${escapeHtml(tone.color)}"
               onclick="openProjectFilePreviewFromCard(this)"
-              onkeydown="if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); openProjectFilePreviewFromCard(this); }">
+              onkeydown="if(event.target === this && (event.key === 'Enter' || event.key === ' ')){ event.preventDefault(); openProjectFilePreviewFromCard(this); }">
               <div class="project-file-preview" title="${safeName}">
                 ${figure}
               </div>
@@ -13116,7 +13187,7 @@
                 <a href="${folderUrl}" class="project-file-action" title="Abrir carpeta en Documentos" target="_blank" onclick="event.stopPropagation()">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 17L17 7M9 7h8v8"/></svg>
                 </a>
-                <a href="${downloadUrl}" class="project-file-action" title="Descargar" target="_blank" onclick="event.stopPropagation()">
+                <a href="${escapeHtml(downloadUrl)}" class="project-file-action" title="Descargar" aria-label="Descargar ${safeName}" onclick="downloadProjectFile(event, this)">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
                 </a>
                 ${(canDelete && id) ? `<button type="button" onclick="event.stopPropagation();removeModalFile('${id}')" class="project-file-action danger" title="Eliminar adjunto"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 6h18M8 6V4h8v2m-1 5v6M9 11v6m-2 4h10a2 2 0 002-2V6H5v13a2 2 0 002 2z"/></svg></button>` : ''}
@@ -13673,9 +13744,16 @@
       }
     });
 
+    // El diálogo nativo gestiona sus clics exteriores. No cierres el modal de fondo.
+    document.getElementById('projectFilePreviewModal')?.addEventListener('pointerdown', (event) => event.stopPropagation());
     document.getElementById('projectFilePreviewModal')?.addEventListener('click', function(event) {
       event.stopPropagation();
       if (event.target === this) closeProjectFilePreview();
+    });
+
+    document.getElementById('projectFilePreviewModal')?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeProjectFilePreview();
     });
 
     const projectPreviewShell = document.getElementById('projectFilePreviewShell');

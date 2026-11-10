@@ -68,24 +68,8 @@ class SecurityHardeningTest extends TestCase
     {
         $view = file_get_contents(resource_path('views/proyectos/index.blade.php'));
 
-        $this->assertStringContainsString(
-            '.project-file-preview-modal {'.PHP_EOL.'      z-index: 2147483647 !important;',
-            $view
-        );
-        $this->assertStringContainsString(
-            'document.body.appendChild(modal);',
-            $view
-        );
-        $previewFunction = substr(
-            $view,
-            strpos($view, 'function openProjectFilePreview({'),
-            strpos($view, 'function closeProjectFilePreview()', strpos($view, 'function openProjectFilePreview({'))
-                - strpos($view, 'function openProjectFilePreview({')
-        );
-        $this->assertStringNotContainsString(
-            'if (modal.parentElement !== document.body) {'.PHP_EOL.'        document.body.appendChild(modal);',
-            $previewFunction
-        );
+        $this->assertStringContainsString('<dialog id="projectFilePreviewModal"', $view);
+        $this->assertStringContainsString('modal.showModal();', $view);
         $this->assertStringContainsString('id="projectFilePreviewPrevious"', $view);
         $this->assertStringContainsString('id="projectFilePreviewNext"', $view);
         $this->assertStringContainsString('function showProjectFileGalleryItem(', $view);
@@ -154,6 +138,49 @@ class SecurityHardeningTest extends TestCase
         $this->get(route('documentos.preview', $document['id']))
             ->assertOk()
             ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    public function test_project_and_task_attachment_lists_omit_missing_files_and_refresh_download_links(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $docs = new FileStore('documentos.json');
+        $docs->create(['id' => 'present', 'path' => 'documentos/logo.ai', 'original_name' => 'logo.ai']);
+        $docs->create(['id' => 'missing', 'path' => 'documentos/missing.ai']);
+        Storage::disk('public')->put('documentos/logo.ai', '%!PS-Adobe-3.0');
+        $files = [
+            ['id' => 'present', 'name' => 'logo.ai', 'download_url' => 'https://old.example.test/documentos/present/download'],
+            ['id' => 'missing', 'name' => 'missing.ai'],
+            ['id' => 'no-record', 'name' => 'no-record.ai'],
+        ];
+        (new FileStore('proyectos.json'))->create(['id' => 'attachment-fixture', 'files' => $files,
+            'tareas' => [['id' => 't1', 'files' => $files]]]);
+
+        $this->actingAs($admin);
+        foreach ([[], ['tarea_id' => 't1']] as $query) {
+            $this->getJson(route('api.proyectos.adjuntos', ['id' => 'attachment-fixture'] + $query))
+                ->assertOk()->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.download_url', '/documentos/present/download');
+        }
+        $this->call('HEAD', route('documentos.download', 'present'))->assertNoContent();
+        Storage::disk('public')->assertExists('documentos/logo.ai');
+        $this->get(route('documentos.download', 'present'))->assertDownload('logo.ai');
+        Storage::disk('local')->assertExists('documentos/logo.ai');
+        $this->call('HEAD', route('documentos.download', 'missing'))->assertNotFound();
+        $this->assertCount(3, (new FileStore('proyectos.json'))->find('attachment-fixture')['files']);
+    }
+
+    public function test_only_archived_projects_can_be_permanently_deleted(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        $projects = new FileStore('proyectos.json');
+        $projects->create(['id' => 'archive-fixture', 'archived' => false]);
+        $body = ['id' => 'archive-fixture'];
+
+        $this->postJson(route('api.proyectos.eliminar'), $body)->assertStatus(409);
+        $this->postJson(route('api.proyectos.actualizar'), $body + ['archived' => true])->assertOk();
+        $this->getJson(route('api.proyectos.archivados'))->assertJsonFragment(['id' => 'archive-fixture']);
+        $this->postJson(route('api.proyectos.eliminar'), $body)->assertOk();
+        $this->assertNull($projects->find('archive-fixture'));
     }
 
     public function test_legacy_public_document_is_moved_to_private_storage_when_opened(): void

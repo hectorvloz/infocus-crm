@@ -591,10 +591,10 @@ class ProyectosController extends Controller
         $filePayload = [
             'id' => $doc['id'],
             'name' => $originalName,
-            'url' => route('documentos.download', ['id' => $doc['id']]),
-            'download_url' => route('documentos.download', ['id' => $doc['id']]),
-            'preview_url' => route('documentos.preview', ['id' => $doc['id']]),
-            'thumbnail_url' => $isImage ? route('documentos.thumbnail', ['id' => $doc['id']]) : null,
+            'url' => route('documentos.download', ['id' => $doc['id']], false),
+            'download_url' => route('documentos.download', ['id' => $doc['id']], false),
+            'preview_url' => route('documentos.preview', ['id' => $doc['id']], false),
+            'thumbnail_url' => $isImage ? route('documentos.thumbnail', ['id' => $doc['id']], false) : null,
             'date' => now()->toDateTimeString(),
             'folder' => $projectFolderName,
             'size' => $file->getSize(),
@@ -767,6 +767,50 @@ class ProyectosController extends Controller
         $item = $this->store->find($id);
         abort_if(!$item, 404);
         return response()->json(['data'=>$item]);
+    }
+
+    public function adjuntos(Request $request, string $id)
+    {
+        $data = $request->validate(['tarea_id' => 'nullable|string|max:100']);
+        $project = $this->store->find($id);
+        abort_if(!$project, 404);
+
+        $source = $project;
+        if (!empty($data['tarea_id'])) {
+            $source = collect($project['tareas'] ?? [])->firstWhere('id', $data['tarea_id']);
+            abort_if(!$source, 404);
+        }
+
+        $files = $source['files'] ?? [];
+        $documents = $files ? collect($this->documents->all())->keyBy('id') : collect();
+        $available = [];
+        foreach ($files as $file) {
+            $document = $documents->get($file['id'] ?? '');
+            if (!$document) {
+                continue;
+            }
+
+            $storage = $document['storage'] ?? 'local';
+            $path = (string) ($document['path'] ?? '');
+            $exists = $storage === 'drive'
+                ? !empty($document['drive_url'])
+                : $path !== '' && DocumentStorage::disk($path, false);
+            if (!$exists) {
+                continue;
+            }
+
+            $params = ['id' => $document['id']];
+            $file['download_url'] = route('documentos.download', $params, false);
+            if ($storage === 'local') {
+                $file['preview_url'] = route('documentos.preview', $params, false);
+                if (str_starts_with((string) ($document['mime'] ?? $file['mime'] ?? ''), 'image/')) {
+                    $file['thumbnail_url'] = route('documentos.thumbnail', $params, false);
+                }
+            }
+            $available[] = $file;
+        }
+
+        return response()->json(['data' => $available], headers: ['Cache-Control' => 'no-store']);
     }
 
     public function responsables(Request $request)
@@ -949,6 +993,7 @@ class ProyectosController extends Controller
 
         $project = $this->store->find($data['id']);
         abort_if(!$project, 404);
+        abort_unless(!empty($project['archived']), 409, 'Archiva el proyecto antes de eliminarlo.');
 
         $this->store->delete($data['id']);
 

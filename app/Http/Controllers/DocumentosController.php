@@ -544,7 +544,7 @@ class DocumentosController extends Controller
         return redirect()->route('documentos.index', $redirectQuery)->with('success', 'Documento subido correctamente.');
     }
 
-    public function download(string $id)
+    public function download(Request $request, string $id)
     {
         $doc = $this->documents->find($id);
         abort_if(!$doc, 404);
@@ -556,8 +556,12 @@ class DocumentosController extends Controller
         }
 
         $path = $doc['path'] ?? '';
-        $disk = $path !== '' ? DocumentStorage::disk($path) : null;
+        $checking = $request->isMethod('HEAD');
+        $disk = $path !== '' ? DocumentStorage::disk($path, !$checking) : null;
         abort_if(!$disk, 404);
+        if ($checking) {
+            return response()->noContent();
+        }
 
         return $disk->download($path, $doc['original_name'] ?? basename($path), [
             'X-Content-Type-Options' => 'nosniff',
