@@ -11,7 +11,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 
 #[Name('subir_adjunto')]
-#[Description('Sube a Infocus un archivo que el usuario te compartió (PDF, imagen, Word, Excel, CSV o texto; máximo 10 MB) para enviarlo en un correo (preparar_correo con adjuntos) o usarlo como comprobante (registrar_gasto con comprobante_adjunto_id). Devuelve un id ADJ... que dura 7 días.')]
+#[Description('Sube a Infocus un archivo que el usuario te compartió (PDF, imagen, Word, Excel, CSV o texto; máximo 10 MB) para enviarlo en un correo (preparar_correo con adjuntos), usarlo como comprobante (registrar_gasto con comprobante_adjunto_id) o como portada de proyecto (gestionar_portada_proyecto con acción adjunto). Devuelve un id ADJ... que dura 7 días.')]
 class SubirAdjunto extends InfocusTool
 {
     public function schema(JsonSchema $schema): array
@@ -46,6 +46,6 @@ class SubirAdjunto extends InfocusTool
             return Response::error('No se aceptó el archivo: revisa el tipo y que pese menos de 10 MB.');
         }
 
-        return Response::text('Adjunto guardado: ' . AiAttachments::describe($file) . '. Úsalo con preparar_correo (adjuntos) o registrar_gasto (comprobante_adjunto_id). Vence en ' . AiAttachments::RETENTION_DAYS . ' días.');
+        return Response::text('Adjunto guardado: ' . AiAttachments::describe($file) . '. Úsalo con preparar_correo (adjuntos), registrar_gasto (comprobante_adjunto_id) o gestionar_portada_proyecto (acción adjunto para imágenes). Vence en ' . AiAttachments::RETENTION_DAYS . ' días.');
     }
 }

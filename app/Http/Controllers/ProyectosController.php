@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Repositories\FileStore;
 use App\Support\DocumentThumbnail;
 use App\Support\DocumentStorage;
+use App\Support\ProjectCovers;
 use App\Repositories\TimelineStore;
 use App\Support\Ai\AiService;
 use App\Support\Ai\AiSupportConversationStore;
@@ -461,7 +462,7 @@ class ProyectosController extends Controller
         ]);
     }
 
-    public function uploadArchivo(Request $request)
+    public function uploadArchivo(Request $request, ?string $coverAttachmentId = null)
     {
         $request->validate([
             'id' => 'required|string',
@@ -623,8 +624,13 @@ class ProyectosController extends Controller
         }
 
         $files = $project['files'] ?? [];
+        $changes = [];
+        if ($coverAttachmentId !== null) {
+            $filePayload['cover_attachment_id'] = $coverAttachmentId;
+            $changes['cover_image'] = ProjectCovers::documentPreview($doc['id']);
+        }
         $files[] = $filePayload;
-        $updated = $this->store->update($request->id, ['files' => $files]);
+        $updated = $this->store->update($request->id, ['files' => $files] + $changes);
         return response()->json(['ok' => true, 'item' => $updated]);
     }
 

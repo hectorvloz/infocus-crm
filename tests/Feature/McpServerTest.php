@@ -386,6 +386,79 @@ class McpServerTest extends TestCase
         ]);
     }
 
+    public function test_project_cover_gallery_color_and_reset_are_available_in_mcp(): void
+    {
+        $this->project();
+        $token = $this->token();
+        $store = new FileStore('proyectos.json');
+        $args = ['proyecto_id' => 'p1'];
+
+        $catalog = $this->tool('listar_portadas_proyecto', $args, $this->token('lectura'));
+        $this->assertFalse($catalog['error'], $catalog['text']);
+        $this->assertStringContainsString('Índigo profundo', $catalog['text']);
+        $this->assertTrue($this->tool('gestionar_portada_proyecto', $args + ['accion' => 'galeria', 'valor' => 'Atardecer'], $this->token('lectura'))['error']);
+        $this->assertTrue($this->tool('gestionar_portada_proyecto', $args + ['accion' => 'galeria', 'valor' => 'https://example.test/image.png'], $token)['error']);
+        $this->assertFalse($this->tool('gestionar_portada_proyecto', $args + ['accion' => 'galeria', 'valor' => 'indigo profundo'], $token)['error']);
+        $this->assertSame('/images/project-covers/gen-indigo-profundo.webp', $store->find('p1')['cover_image']);
+
+        $this->assertTrue($this->tool('gestionar_portada_proyecto', $args + ['accion' => 'color', 'valor' => 'red; background: url(example.test)'], $token)['error']);
+        $this->assertFalse($this->tool('gestionar_portada_proyecto', $args + ['accion' => 'color', 'valor' => '#0C4A6E'], $token)['error']);
+        $this->assertSame('#0c4a6e|#0c4a6e', $store->find('p1')['cover_color']);
+        $this->assertNull($store->find('p1')['cover_image']);
+
+        $change = collect((new FileStore('mcp_history.json'))->all())->last();
+        $this->assertFalse($this->tool('restaurar_cambio', ['cambio_id' => $change['id']], $token)['error']);
+        $this->assertSame('/images/project-covers/gen-indigo-profundo.webp', $store->find('p1')['cover_image']);
+        $this->assertFalse($this->tool('gestionar_portada_proyecto', $args + ['accion' => 'predeterminada'], $token)['error']);
+        $this->assertNull($store->find('p1')['cover_image']);
+        $this->assertNull($store->find('p1')['cover_color']);
+    }
+
+    public function test_project_cover_upload_checks_the_attachment_and_keeps_a_permanent_project_file(): void
+    {
+        Storage::set('local', Storage::fake('mcp-project-covers'));
+        $this->project();
+        foreach (['ai_attachments.json', 'documentos.json', 'document_folders.json'] as $file) {
+            Storage::disk('local')->put($file, '[]');
+        }
+        $token = $this->token();
+        $args = ['proyecto_id' => 'p1', 'accion' => 'adjunto'];
+        $projects = new FileStore('proyectos.json');
+        $png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK0sAAAAASUVORK5CYII=';
+
+        $invalid = $this->tool('subir_adjunto', [
+            'nombre' => 'falso.png', 'tipo' => 'image/png', 'contenido_base64' => base64_encode('<svg></svg>'),
+        ], $token);
+        preg_match('/ADJ[A-Z0-9]{8}/', $invalid['text'], $invalidId);
+        $this->assertTrue($this->tool('gestionar_portada_proyecto', $args + ['valor' => $invalidId[0]], $token)['error']);
+        $this->assertArrayNotHasKey('cover_image', $projects->find('p1'));
+
+        $upload = $this->tool('subir_adjunto', ['nombre' => 'Portada.png', 'tipo' => 'image/png', 'contenido_base64' => $png], $token);
+        preg_match('/ADJ[A-Z0-9]{8}/', $upload['text'], $attachmentId);
+        $other = User::factory()->create(['role' => 'admin']);
+        $this->assertTrue($this->tool('gestionar_portada_proyecto', $args + ['valor' => $attachmentId[0]], $this->token('completo', $other))['error']);
+        $apply = $this->tool('gestionar_portada_proyecto', $args + ['valor' => $attachmentId[0]], $token);
+        $this->assertFalse($apply['error'], $apply['text']);
+
+        $project = $projects->find('p1');
+        $fileId = $project['files'][0]['id'];
+        $this->assertSame(route('documentos.preview', ['id' => $fileId], false), $project['cover_image']);
+        $document = (new FileStore('documentos.json'))->find($fileId);
+        $this->assertSame(base64_decode($png), Storage::disk('local')->get($document['path']));
+
+        $this->assertFalse($this->tool('gestionar_portada_proyecto', $args + ['valor' => $attachmentId[0]], $token)['error']);
+        $this->assertCount(1, $projects->find('p1')['files']);
+        $this->assertStringContainsString($fileId, $this->tool('listar_portadas_proyecto', ['proyecto_id' => 'p1'], $token)['text']);
+
+        $temporary = (new FileStore('ai_attachments.json'))->find($attachmentId[0]);
+        Storage::disk('local')->delete($temporary['path']);
+        $this->actingAs($this->admin)->get($project['cover_image'])->assertOk()->assertHeader('Content-Type', 'image/png');
+
+        $this->assertFalse($this->tool('gestionar_portada_proyecto', ['proyecto_id' => 'p1', 'accion' => 'predeterminada'], $token)['error']);
+        $this->assertFalse($this->tool('gestionar_portada_proyecto', ['proyecto_id' => 'p1', 'accion' => 'archivo', 'valor' => $fileId], $token)['error']);
+        $this->assertSame($project['cover_image'], $projects->find('p1')['cover_image']);
+    }
+
     public function test_updates_project_and_task_and_adds_project_note(): void
     {
         $this->project();
