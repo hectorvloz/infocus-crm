@@ -2178,7 +2178,9 @@
                 </div>
                 <input id="reminderNewDate" type="text" placeholder="Fecha" readonly class="h-7 w-28 rounded-full border border-slate-200 bg-white px-2.5 py-0 text-[10px] font-extrabold leading-none text-slate-500 outline-none placeholder:text-slate-500 focus:border-[#f2fda2]">
                 <div id="reminderComposerLinkPreview" class="hidden min-w-0 max-w-full"></div>
-                <button id="reminderComposerLinkBtn" type="button" data-reminder-link-picker aria-controls="reminderLinkDropdown" aria-expanded="false" class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Vincular</button>
+                <button id="reminderComposerLinkBtn" type="button" data-reminder-link-picker aria-controls="reminderLinkDropdown" aria-expanded="false" title="Vincular recordatorio" aria-label="Vincular recordatorio" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100">
+                  <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 13a4 4 0 0 0 6 .4l3-3a4 4 0 0 0-5.7-5.7l-1.7 1.7m2.4 4.6a4 4 0 0 0-6-.4l-3 3a4 4 0 0 0 5.7 5.7l1.7-1.7"/></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -3175,7 +3177,9 @@
 
       function renderReminderComposerLinkPreview() {
         if (!reminderComposerLinkPreview) return;
-        reminderComposerLinkBtn.textContent = reminderPendingLink ? 'Cambiar vínculo' : 'Vincular';
+        const label = reminderPendingLink ? 'Cambiar vínculo' : 'Vincular recordatorio';
+        reminderComposerLinkBtn?.setAttribute('title', label);
+        reminderComposerLinkBtn?.setAttribute('aria-label', label);
         if (!reminderPendingLink) {
           reminderComposerLinkPreview.classList.add('hidden');
           reminderComposerLinkPreview.innerHTML = '';
@@ -4887,6 +4891,13 @@
       });
 
       profileMenu.addEventListener('click', (event) => {
+        event.stopPropagation();
+      });
+
+      remindersPanel?.addEventListener('pointerdown', (event) => {
+        if (!event.target?.closest?.('[data-reminder-link-picker]')) return;
+        // Mantiene la fila en edición hasta que el clic abra el selector.
+        event.preventDefault();
         event.stopPropagation();
       });
 
