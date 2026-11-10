@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 class Reminders
 {
     public const FILE = 'header_reminders.json';
+    public const ROOT_CATEGORY = 'reminder-root';
 
     public static function key(): string
     {
@@ -128,12 +129,27 @@ class Reminders
         return (string) ($payload['sections'][0]['id'] ?? 'default');
     }
 
+    public static function rootSection(array &$payload): string
+    {
+        if (!collect($payload['categories'])->contains('id', self::ROOT_CATEGORY)) {
+            array_unshift($payload['categories'], ['id' => self::ROOT_CATEGORY, 'title' => 'Sin lista', 'collapsed' => false]);
+        }
+        $root = collect($payload['sections'])->first(fn ($section) => $section['categoryId'] === self::ROOT_CATEGORY
+            && trim((string) ($section['title'] ?? '')) === '');
+        if (!$root) {
+            $root = ['id' => (string) Str::ulid(), 'categoryId' => self::ROOT_CATEGORY, 'title' => '', 'collapsed' => false];
+            array_unshift($payload['sections'], $root);
+        }
+
+        return $root['id'];
+    }
+
     /** "Categoría › Lista" de un recordatorio. */
     public static function placeOf(array $payload, array $item): string
     {
         $section = collect($payload['sections'] ?? [])->firstWhere('id', $item['sectionId'] ?? null);
         $cat = $section ? collect($payload['categories'] ?? [])->firstWhere('id', $section['categoryId'] ?? null) : null;
-        if (!$section) {
+        if (!$section || ($section['categoryId'] === self::ROOT_CATEGORY && trim((string) $section['title']) === '')) {
             return 'Sin lista';
         }
         $catTitle = (string) ($cat['title'] ?? '');

@@ -827,6 +827,41 @@ class McpServerTest extends TestCase
         $this->assertTrue($this->tool('organizar_recordatorios', ['accion' => 'crear_categoria', 'nombre' => 'espadas'], $token)['error']);
     }
 
+    public function test_mcp_reorders_and_removes_reminder_lists_with_explicit_content_handling(): void
+    {
+        $token = $this->token();
+        foreach ([
+            ['Primera', 'Uno', 'Conservar uno'],
+            ['Primera', 'Dos', 'Conservar dos'],
+            ['Segunda', 'Uno', 'Borrar uno'],
+            ['Segunda', 'Dos', 'Borrar dos'],
+        ] as [$category, $list, $text]) {
+            $this->assertFalse($this->tool('crear_recordatorio', ['texto' => $text, 'categoria' => $category, 'lista' => $list], $token)['error']);
+        }
+        $current = fn () => (new FileStore('header_reminders.json'))->all()[0]['payload'];
+        $organize = fn (array $args) => $this->tool('organizar_recordatorios', $args, $token);
+
+        $this->assertFalse($organize(['accion' => 'reordenar_categoria', 'nombre' => 'Segunda', 'posicion' => 1])['error']);
+        $this->assertSame(['Segunda', 'Primera'], array_column($current()['categories'], 'title'));
+        $this->assertFalse($organize(['accion' => 'reordenar_lista', 'nombre' => 'Dos', 'categoria' => 'Primera', 'posicion' => 1])['error']);
+        $this->assertSame(['Dos', 'Uno'], array_column(array_slice($current()['sections'], 0, 2), 'title'));
+
+        $remove = ['accion' => 'eliminar_lista', 'nombre' => 'Uno', 'categoria' => 'Primera'];
+        $this->assertTrue($organize($remove)['error']);
+        $this->assertFalse($organize($remove + ['contenido' => 'mover_a_raiz'])['error']);
+        $this->assertFalse($organize(['accion' => 'eliminar_categoria', 'nombre' => 'Primera', 'contenido' => 'mover_a_raiz'])['error']);
+        $this->assertFalse($organize(['accion' => 'eliminar_categoria', 'nombre' => 'Segunda', 'contenido' => 'eliminar'])['error']);
+        $payload = $current();
+        $this->assertSame(['Sin lista'], array_column($payload['categories'], 'title'));
+        $this->assertCount(1, $payload['sections']);
+        $this->assertSame(['Conservar dos', 'Conservar uno'], array_column($payload['items'], 'text'));
+        $this->assertSame(array_fill(0, 2, $payload['sections'][0]['id']), array_column($payload['items'], 'sectionId'));
+
+        $change = collect((new FileStore('mcp_history.json'))->all())->last();
+        $this->assertFalse($this->tool('restaurar_cambio', ['cambio_id' => $change['id']], $token)['error']);
+        $this->assertCount(4, $current()['items']);
+    }
+
     public function test_lists_tasks_across_projects(): void
     {
         Storage::disk('local')->put('proyectos.json', json_encode([
