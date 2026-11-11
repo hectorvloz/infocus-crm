@@ -8,12 +8,17 @@
   </div>
   <div class="flex items-center gap-2 flex-wrap">
     <label class="sr-only" for="leadsTagFilter">Filtrar por etiqueta</label>
-    <select id="leadsTagFilter" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50" @if(empty($etiquetas)) disabled title="Agrega etiquetas a los leads para filtrar por nicho" @endif>
+    <div class="w-48 shrink-0">
+    <select id="leadsTagFilter" class="text-sm" @if(empty($etiquetas)) disabled title="Agrega etiquetas a los leads para filtrar por nicho" @endif>
       <option value="">{{ empty($etiquetas) ? 'Sin etiquetas aún' : 'Todas las etiquetas' }}</option>
       @foreach($etiquetas ?? [] as $etiqueta)
         <option value="{{ $etiqueta }}">{{ $etiqueta }}</option>
       @endforeach
     </select>
+    </div>
+    <style>
+      #leadsTagFilter + .app-select-trigger { min-height: 2.15rem; padding: 0.35rem 0.85rem; border-radius: 9999px; border-color: #e2e8f0; box-shadow: none; }
+    </style>
     <a href="{{ route('leads.import.form') }}" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50">Importar CSV</a>
     <a href="{{ route('leads.export') }}" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50">Exportar CSV</a>
     <a href="{{ route('leads.create') }}" class="primary-add-btn">
@@ -302,6 +307,17 @@
   const tagKey = (t) => String(t || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const leadTags = (lead) => (Array.isArray(lead.etiquetas) ? lead.etiquetas : []).map((t) => String(t).trim()).filter(Boolean);
   const selectedTag = () => tagKey(tagFilter?.value || '');
+  // Color fijo por etiqueta: la misma etiqueta siempre sale del mismo color.
+  const TAG_COLORS = [
+    ['#e0e7ff', '#3730a3'], ['#dcfce7', '#166534'], ['#fef3c7', '#92400e'], ['#fce7f3', '#9d174d'],
+    ['#cffafe', '#155e75'], ['#ffedd5', '#9a3412'], ['#ede9fe', '#5b21b6'], ['#fee2e2', '#991b1b'],
+  ];
+  const tagStyle = (tag) => {
+    let h = 0;
+    for (const ch of tagKey(tag)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const [bg, fg] = TAG_COLORS[h % TAG_COLORS.length];
+    return `background:${bg};color:${fg}`;
+  };
   const matchesTag = (lead) => !selectedTag() || leadTags(lead).some((t) => tagKey(t) === selectedTag());
   if (tagFilter) {
     const fromUrl = new URLSearchParams(location.search).get('etiqueta');
@@ -390,7 +406,7 @@
           <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">${escapeHtml(lead.origen || 'Sin origen')}</span>
         </div>
         <div class="text-sm text-slate-500 mt-0.5">${escapeHtml(lead.telefono || 'Sin telefono')}</div>
-        ${leadTags(lead).length ? `<div class="mt-2 flex flex-wrap gap-1">${leadTags(lead).map((t) => `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+        ${leadTags(lead).length ? `<div class="mt-2 flex flex-wrap gap-1">${leadTags(lead).map((t) => `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="${tagStyle(t)}">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="text-xs text-slate-500 mt-2 line-clamp-2">${escapeHtml(previewNote(lead))}</div>
         <div class="mt-3 flex items-center justify-between">
           <span class="text-xs font-bold text-slate-700">${fmtMoney(lead.presupuesto_estimado ?? lead.valor)}</span>
@@ -517,7 +533,7 @@
     renderAssignees(lead);
     const tagsHost = document.getElementById('drawerTags');
     tagsHost.innerHTML = leadTags(lead).length
-      ? leadTags(lead).map((t) => `<span class="px-2.5 py-1 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-700">${escapeHtml(t)}</span>`).join('')
+      ? leadTags(lead).map((t) => `<span class="px-2.5 py-1 rounded-full text-xs font-bold" style="${tagStyle(t)}">${escapeHtml(t)}</span>`).join('')
       : '<span class="text-xs text-slate-400">Sin etiquetas</span>';
 
     document.getElementById('agendaTitle').value = `Seguimiento ${lead.nombre || ''}`.trim();
