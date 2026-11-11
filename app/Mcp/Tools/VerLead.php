@@ -32,6 +32,7 @@ class VerLead extends InfocusTool
             "Lead: {$l['nombre']} (id: {$l['id']})",
             'Correo: ' . ($l['email'] ?? '-') . ' · Teléfono: ' . ($l['telefono'] ?? '-'),
             'Etapa: ' . ($l['etapa'] ?? '-') . ' · Origen: ' . ($l['origen'] ?? '-') . ' · Valor estimado: ' . ($l['valor'] ?? '-'),
+            'Etiquetas: ' . (implode(', ', \App\Support\LeadTags::of($l)) ?: 'ninguna'),
             "\nNotas:",
         ];
         $notas = collect($l['notas_lista'] ?? [])->take(-10);

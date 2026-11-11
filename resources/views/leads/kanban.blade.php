@@ -6,7 +6,14 @@
     <div class="text-2xl font-extrabold">Leads</div>
     <div class="text-sm text-slate-500 mt-1">Kanban comercial para gestionar oportunidades, llamadas y reuniones.</div>
   </div>
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2 flex-wrap">
+    <label class="sr-only" for="leadsTagFilter">Filtrar por etiqueta</label>
+    <select id="leadsTagFilter" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50" @if(empty($etiquetas)) disabled title="Agrega etiquetas a los leads para filtrar por nicho" @endif>
+      <option value="">{{ empty($etiquetas) ? 'Sin etiquetas aún' : 'Todas las etiquetas' }}</option>
+      @foreach($etiquetas ?? [] as $etiqueta)
+        <option value="{{ $etiqueta }}">{{ $etiqueta }}</option>
+      @endforeach
+    </select>
     <a href="{{ route('leads.import.form') }}" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50">Importar CSV</a>
     <a href="{{ route('leads.export') }}" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50">Exportar CSV</a>
     <a href="{{ route('leads.create') }}" class="primary-add-btn">
@@ -91,6 +98,10 @@
         <div class="mt-3 border-t border-slate-200 pt-3">
           <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Encargados</div>
           <div id="drawerAssignees" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="mt-3 border-t border-slate-200 pt-3">
+          <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Etiquetas</div>
+          <div id="drawerTags" class="flex flex-wrap gap-2"></div>
         </div>
       </section>
 
@@ -287,6 +298,24 @@
   };
 
   const leads = JSON.parse(document.getElementById('leadsData').textContent || '[]');
+  const tagFilter = document.getElementById('leadsTagFilter');
+  const tagKey = (t) => String(t || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const leadTags = (lead) => (Array.isArray(lead.etiquetas) ? lead.etiquetas : []).map((t) => String(t).trim()).filter(Boolean);
+  const selectedTag = () => tagKey(tagFilter?.value || '');
+  const matchesTag = (lead) => !selectedTag() || leadTags(lead).some((t) => tagKey(t) === selectedTag());
+  if (tagFilter) {
+    const fromUrl = new URLSearchParams(location.search).get('etiqueta');
+    if (fromUrl) {
+      const option = [...tagFilter.options].find((o) => tagKey(o.value) === tagKey(fromUrl));
+      if (option) tagFilter.value = option.value;
+    }
+    tagFilter.addEventListener('change', () => {
+      const url = new URL(location.href);
+      if (tagFilter.value) url.searchParams.set('etiqueta', tagFilter.value); else url.searchParams.delete('etiqueta');
+      history.replaceState(null, '', url);
+      renderBoard();
+    });
+  }
   const board = document.getElementById('leadsBoard');
   const scroller = document.getElementById('leadsKanban');
   const drawer = document.getElementById('leadDetailDrawer');
@@ -332,6 +361,7 @@
     leads.forEach((lead) => {
       const stage = normalizeStage(lead.etapa || 'Posible cliente');
       lead.etapa = stage;
+      if (!matchesTag(lead)) return;
       const zone = board.querySelector(`[data-stage="${stage}"]`);
       if (!zone) return;
       zone.insertAdjacentHTML('beforeend', leadCard(lead));
@@ -360,6 +390,7 @@
           <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">${escapeHtml(lead.origen || 'Sin origen')}</span>
         </div>
         <div class="text-sm text-slate-500 mt-0.5">${escapeHtml(lead.telefono || 'Sin telefono')}</div>
+        ${leadTags(lead).length ? `<div class="mt-2 flex flex-wrap gap-1">${leadTags(lead).map((t) => `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="text-xs text-slate-500 mt-2 line-clamp-2">${escapeHtml(previewNote(lead))}</div>
         <div class="mt-3 flex items-center justify-between">
           <span class="text-xs font-bold text-slate-700">${fmtMoney(lead.presupuesto_estimado ?? lead.valor)}</span>
@@ -484,6 +515,10 @@
     document.getElementById('drawerValue').textContent = fmtMoney(lead.presupuesto_estimado ?? lead.valor);
     document.getElementById('drawerReminder').textContent = lead.recordatorio ? new Date(lead.recordatorio).toLocaleString('es-CO') : '-';
     renderAssignees(lead);
+    const tagsHost = document.getElementById('drawerTags');
+    tagsHost.innerHTML = leadTags(lead).length
+      ? leadTags(lead).map((t) => `<span class="px-2.5 py-1 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-700">${escapeHtml(t)}</span>`).join('')
+      : '<span class="text-xs text-slate-400">Sin etiquetas</span>';
 
     document.getElementById('agendaTitle').value = `Seguimiento ${lead.nombre || ''}`.trim();
     document.getElementById('agendaDescription').value = '';

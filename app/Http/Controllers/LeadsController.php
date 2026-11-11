@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\LeadTags;
+
 use App\Repositories\FileStore;
 use App\Mail\GenericMail;
 use Carbon\Carbon;
@@ -68,6 +70,7 @@ class LeadsController extends Controller
         return view('leads.kanban', [
             'leads' => $leads,
             'assignableUsers' => $this->assignableUsers(),
+            'etiquetas' => LeadTags::all($leads),
         ]);
     }
 
@@ -75,6 +78,7 @@ class LeadsController extends Controller
     {
         return view('leads.create', [
             'assignableUsers' => $this->assignableUsers(),
+            'etiquetas' => LeadTags::all($this->store->all()),
         ]);
     }
 
@@ -92,6 +96,7 @@ class LeadsController extends Controller
             'recordatorio' => 'nullable|string',
             'encargados' => 'nullable|array',
             'encargados.*' => 'nullable|string|max:160',
+            'etiquetas' => 'nullable|string|max:1000',
         ]);
         $budget = $data['presupuesto_estimado'] ?? $data['valor'] ?? null;
         $data['presupuesto_estimado'] = $budget;
@@ -103,6 +108,7 @@ class LeadsController extends Controller
             ->unique()
             ->values()
             ->all();
+        $data['etiquetas'] = LeadTags::normalize($data['etiquetas'] ?? '');
         $this->store->create($data);
         return redirect()->route('leads.index')->with('success', 'Lead creado correctamente.');
     }
@@ -114,6 +120,7 @@ class LeadsController extends Controller
         return view('leads.edit', [
             'lead' => $lead,
             'assignableUsers' => $this->assignableUsers(),
+            'etiquetas' => LeadTags::all($this->store->all()),
         ]);
     }
 
@@ -131,6 +138,7 @@ class LeadsController extends Controller
             'recordatorio' => 'nullable|string',
             'encargados' => 'nullable|array',
             'encargados.*' => 'nullable|string|max:160',
+            'etiquetas' => 'nullable|string|max:1000',
         ]);
         $budget = $data['presupuesto_estimado'] ?? $data['valor'] ?? null;
         $data['presupuesto_estimado'] = $budget;
@@ -142,6 +150,7 @@ class LeadsController extends Controller
             ->unique()
             ->values()
             ->all();
+        $data['etiquetas'] = LeadTags::normalize($data['etiquetas'] ?? '');
         $this->store->update($id, $data);
         return redirect()->route('leads.index');
     }

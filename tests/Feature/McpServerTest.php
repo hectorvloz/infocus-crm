@@ -242,6 +242,32 @@ class McpServerTest extends TestCase
         $this->assertTrue($log->contains(fn ($l) => $l['tool'] === 'crear_lead' && $l['connection'] === 'token:Pruebas'));
     }
 
+    public function test_leads_can_be_tagged_and_filtered_by_tag(): void
+    {
+        $token = $this->token();
+        $creado = $this->tool('crear_lead', ['nombre' => 'Rent a Car Gómez', 'telefono' => '+573114236259', 'etiquetas' => ['RentaCar', ' rentacar ', 'Pereira']], $token);
+        $this->assertFalse($creado['error']);
+        $this->assertStringContainsString('Etiquetas: RentaCar, Pereira', $creado['text']);
+        $this->tool('crear_lead', ['nombre' => 'Inmobiliaria Sur', 'etiquetas' => ['Inmobiliarias']], $token);
+
+        $lead = collect((new FileStore('leads.json'))->all())->firstWhere('nombre', 'Rent a Car Gómez');
+        $this->assertSame(['RentaCar', 'Pereira'], $lead['etiquetas']);
+
+        $filtrado = $this->tool('listar_leads', ['etiqueta' => 'RENTACAR'], $token)['text'];
+        $this->assertStringContainsString('Rent a Car Gómez', $filtrado);
+        $this->assertStringNotContainsString('Inmobiliaria Sur', $filtrado);
+        $this->assertStringContainsString('etiquetas: RentaCar, Pereira', $filtrado);
+        $this->assertStringContainsString('Etiquetas existentes: Inmobiliarias, Pereira, RentaCar', $filtrado);
+
+        $actualizado = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agregar_etiquetas' => ['Llamar en diciembre'], 'quitar_etiquetas' => ['pereira']], $token);
+        $this->assertFalse($actualizado['error']);
+        $this->assertSame(['RentaCar', 'Llamar en diciembre'], (new FileStore('leads.json'))->find($lead['id'])['etiquetas']);
+        $this->assertStringContainsString('Etiquetas: RentaCar, Llamar en diciembre', $this->tool('ver_lead', ['lead_id' => $lead['id']], $token)['text']);
+
+        $soloLectura = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agregar_etiquetas' => ['Otra']], $this->token('lectura'));
+        $this->assertTrue($soloLectura['error']);
+    }
+
     public function test_invoice_is_created_as_draft_with_next_number(): void
     {
         (new FileStore('settings.json'))->create(['id' => 'settings', 'base_currency' => 'COP']);

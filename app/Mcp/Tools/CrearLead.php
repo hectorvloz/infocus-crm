@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Support\McpContext;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use App\Support\LeadTags;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -24,6 +25,7 @@ class CrearLead extends InfocusTool
             'etapa' => $schema->string()->enum(ListarLeads::ETAPAS)->description('Por defecto: Posible cliente.'),
             'valor' => $schema->number()->description('Valor estimado del negocio.'),
             'nota' => $schema->string(),
+            'etiquetas' => $schema->array()->items($schema->string())->description('Nichos del lead, ej. ["RentaCar"]. Reutiliza las etiquetas que ya existen (ver listar_leads).'),
         ];
     }
 
@@ -34,6 +36,7 @@ class CrearLead extends InfocusTool
             'nombre' => 'required|string|max:120', 'email' => 'nullable|email|max:160', 'telefono' => 'nullable|string|max:40',
             'origen' => 'nullable|string|max:80', 'etapa' => 'nullable|in:' . implode(',', ListarLeads::ETAPAS),
             'valor' => 'nullable|numeric|min:0', 'nota' => 'nullable|string|max:4000',
+            'etiquetas' => 'nullable|array|max:' . LeadTags::MAX_POR_LEAD, 'etiquetas.*' => 'string|max:' . LeadTags::MAX_LARGO,
         ]);
         $store = $this->store('leads.json');
         if (!empty($d['email'])) {
@@ -47,9 +50,11 @@ class CrearLead extends InfocusTool
             'nombre' => $d['nombre'], 'email' => $d['email'] ?? null, 'telefono' => $d['telefono'] ?? null,
             'etapa' => $d['etapa'] ?? 'Posible cliente', 'origen' => $d['origen'] ?? 'MCP',
             'valor' => $d['valor'] ?? null, 'presupuesto_estimado' => $d['valor'] ?? null,
-            'encargados' => [], 'agenda' => [], 'notas' => $d['nota'] ?? '', 'notas_lista' => $nota,
+            'encargados' => [], 'etiquetas' => LeadTags::normalize($d['etiquetas'] ?? []), 'agenda' => [], 'notas' => $d['nota'] ?? '', 'notas_lista' => $nota,
         ]);
 
-        return Response::text("Lead creado: {$lead['nombre']} (id: {$lead['id']}) en la etapa {$lead['etapa']}.");
+        $tags = LeadTags::of($lead);
+
+        return Response::text("Lead creado: {$lead['nombre']} (id: {$lead['id']}) en la etapa {$lead['etapa']}." . ($tags ? ' Etiquetas: ' . implode(', ', $tags) . '.' : ''));
     }
 }
