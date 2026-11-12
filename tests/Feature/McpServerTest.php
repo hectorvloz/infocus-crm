@@ -286,6 +286,11 @@ class McpServerTest extends TestCase
         $this->assertSame('llamada', $guardado['agenda'][0]['tipo']);
         $this->assertStringContainsString("{$fecha} · Asesoría gratuita con Héctor · programado", $this->tool('ver_lead', ['lead_id' => $lead['id']], $token)['text']);
 
+        (new FileStore('settings.json'))->create(['id' => 'settings', 'google_meet_fallback_url' => 'https://meet.google.com/abc-defg-hij']);
+        $meet = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => $fecha, 'agendar_tipo' => 'reunion_meet'], $token);
+        $this->assertStringContainsString('reunión por Meet https://meet.google.com/abc-defg-hij', $meet['text']);
+        $this->assertSame('https://meet.google.com/abc-defg-hij', (new FileStore('leads.json'))->find($lead['id'])['agenda'][1]['meet_link']);
+
         $pasada = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => '2020-01-01 10:00'], $token);
         $this->assertTrue($pasada['error']);
         $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => $fecha], $this->token('lectura'))['error']);

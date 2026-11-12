@@ -28,6 +28,7 @@ class ActualizarLead extends InfocusTool
             'agendar_titulo' => $schema->string()->description('Título de la actividad, ej. "Asesoría gratuita con Héctor".'),
             'agendar_tipo' => $schema->string()->enum(['llamada', 'reunion_meet'])->description('llamada (por defecto) o reunion_meet.'),
             'agendar_duracion_min' => $schema->integer()->description('Duración en minutos (por defecto 30).'),
+            'agendar_meet_url' => $schema->string()->description('Enlace de Google Meet, si la reunión es por Meet. Si no lo das se usa el enlace por defecto de Integraciones.'),
         ];
     }
 
@@ -39,6 +40,7 @@ class ActualizarLead extends InfocusTool
             'quitar_etiquetas' => 'nullable|array', 'quitar_etiquetas.*' => 'string|max:' . LeadTags::MAX_LARGO,
             'agendar_fecha' => 'nullable|date_format:Y-m-d H:i', 'agendar_titulo' => 'nullable|string|max:150',
             'agendar_tipo' => 'nullable|in:llamada,reunion_meet', 'agendar_duracion_min' => 'nullable|integer|min:5|max:480',
+            'agendar_meet_url' => 'nullable|url|max:500',
         ]);
         $tocaEtiquetas = !empty($d['agregar_etiquetas']) || !empty($d['quitar_etiquetas']);
         $agenda = !empty($d['agendar_fecha']);
@@ -85,12 +87,16 @@ class ActualizarLead extends InfocusTool
                 'creado_en' => now()->toISOString(),
                 'creado_por' => $autor,
                 'creado_por_iniciales' => Str::upper(Str::of($autor)->split('/\s+/')->filter()->take(2)->map(fn ($p) => Str::substr($p, 0, 1))->implode('')),
-                'google_event_id' => null, 'meet_link' => null, 'meet_error' => null,
+                'google_event_id' => null,
+                'meet_link' => ($d['agendar_tipo'] ?? '') === 'reunion_meet'
+                    ? (($d['agendar_meet_url'] ?? null) ?: (($this->store('settings.json')->find('settings') ?: [])['google_meet_fallback_url'] ?? null) ?: null)
+                    : null,
+                'meet_error' => null,
             ]]);
             $changes['recordatorio'] = $cuando->format('Y-m-d H:i');
         }
         $this->tracked('leads.json', $lead['id'], "Actualizó el lead {$lead['nombre']}", fn () => $store->update($lead['id'], $changes));
 
-        return Response::text("Lead {$lead['nombre']} actualizado" . (!empty($d['etapa']) ? " · etapa: {$d['etapa']}" : '') . (!empty($d['nota']) ? ' · nota agregada' : '') . ($tocaEtiquetas ? ' · etiquetas: ' . (implode(', ', $changes['etiquetas']) ?: 'ninguna') : '') . ($cuando ? ' · agendado: ' . $cuando->format('Y-m-d H:i') . ' (hora de Colombia)' : '') . '.');
+        return Response::text("Lead {$lead['nombre']} actualizado" . (!empty($d['etapa']) ? " · etapa: {$d['etapa']}" : '') . (!empty($d['nota']) ? ' · nota agregada' : '') . ($tocaEtiquetas ? ' · etiquetas: ' . (implode(', ', $changes['etiquetas']) ?: 'ninguna') : '') . ($cuando ? ' · agendado: ' . $cuando->format('Y-m-d H:i') . ' (hora de Colombia), ' . (($d['agendar_tipo'] ?? 'llamada') === 'reunion_meet' ? 'reunión por Meet' . (end($changes['agenda'])['meet_link'] ? ' ' . end($changes['agenda'])['meet_link'] : ' sin enlace todavía') : 'llamada') : '') . '.');
     }
 }
