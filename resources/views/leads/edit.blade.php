@@ -20,7 +20,7 @@
       <div>
         <label class="text-sm font-medium">Etapa</label>
         <select name="etapa" class="w-full rounded-lg border p-2.5" required>
-          @foreach(['Posible cliente','Contactado','Volver a llamar','Cliente'] as $opt)
+          @foreach(\App\Support\LeadStages::ETAPAS as $opt)
             <option @selected(($lead['etapa'] ?? '')===$opt)>{{ $opt }}</option>
           @endforeach
         </select>

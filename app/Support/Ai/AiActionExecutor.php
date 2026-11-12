@@ -3290,7 +3290,7 @@ class AiActionExecutor
 
     // ----- Leads -----
 
-    private const LEAD_STAGES = ['Posible cliente', 'Contactado', 'Volver a llamar', 'Cliente'];
+    private const LEAD_STAGES = \App\Support\LeadStages::ETAPAS;
 
     private function leadStage(string $value): ?string
     {

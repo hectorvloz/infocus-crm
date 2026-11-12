@@ -68,4 +68,38 @@ class LeadTagsTest extends TestCase
         $this->assertStringContainsString('name="etiquetas"', $edit);
         $this->assertStringContainsString('data-etiqueta="RentaCar"', $edit);
     }
+
+    public function test_leads_can_be_archived_restored_and_purged_from_the_trash(): void
+    {
+        $store = new FileStore('leads.json');
+        $lead = $store->create(['nombre' => 'Gallo Rent A Car', 'etapa' => 'Posible cliente']);
+
+        $this->asAdmin()->postJson(route('api.leads.archivar', ['id' => $lead['id']]))->assertOk();
+        $this->assertNotEmpty($store->find($lead['id'])['archivado_en']);
+
+        $html = $this->asAdmin()->get(route('leads.index'))->assertOk()->getContent();
+        $this->assertStringContainsString('Papelera de leads', $html);
+        $this->assertStringContainsString('"leadsArchivedData"', $html);
+        $this->assertStringNotContainsString('"nombre":"Gallo Rent A Car","etapa"', explode('id="leadsArchivedData"', $html)[0]);
+
+        $this->asAdmin()->postJson(route('api.leads.restaurar', ['id' => $lead['id']]))->assertOk();
+        $this->assertNull($store->find($lead['id'])['archivado_en']);
+
+        $this->asAdmin()->deleteJson(route('leads.destroy', ['id' => $lead['id']]))->assertOk();
+        $this->assertNull($store->find($lead['id']));
+    }
+
+    public function test_not_interested_is_a_red_column_and_a_valid_stage(): void
+    {
+        $store = new FileStore('leads.json');
+        $lead = $store->create(['nombre' => 'TU RENT A CAR', 'etapa' => 'Contactado']);
+
+        $this->asAdmin()->postJson(route('api.leads.mover'), ['id' => $lead['id'], 'etapa' => 'No interesado'])->assertOk();
+        $this->assertSame('No interesado', $store->find($lead['id'])['etapa']);
+        $this->assertSame('No interesado', \App\Support\LeadStages::normalize('Perdido'));
+
+        $html = $this->asAdmin()->get(route('leads.index'))->assertOk()->getContent();
+        $this->assertStringContainsString('"No interesado"', $html);
+        $this->assertStringContainsString('Zona roja', $html);
+    }
 }

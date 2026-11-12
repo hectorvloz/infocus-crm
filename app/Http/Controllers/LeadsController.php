@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\LeadStages;
 use App\Support\LeadTags;
 
 use App\Repositories\FileStore;
@@ -50,25 +51,24 @@ class LeadsController extends Controller
 
     protected function normalizeStage(string $etapa): string
     {
-        $map = [
-            'Nuevo' => 'Posible cliente',
-            'Calificado' => 'Posible cliente',
-            'Propuesta' => 'Contactado',
-            'Llamar' => 'Volver a llamar',
-            'Seguimiento' => 'Volver a llamar',
-            'Ganado' => 'Cliente',
-            'Perdido' => 'Posible cliente',
-        ];
-        $allowed = ['Posible cliente','Contactado','Volver a llamar','Cliente'];
-        if (in_array($etapa, $allowed)) return $etapa;
-        return $map[$etapa] ?? 'Posible cliente';
+        return LeadStages::normalize($etapa);
     }
 
     public function index()
     {
-        $leads = $this->store->all();
+        $todos = $this->store->all();
+        $leads = LeadStages::active($todos);
+        $archivados = collect($todos)->filter(fn ($l) => LeadStages::archived($l))
+            ->sortByDesc('archivado_en')
+            ->map(fn ($l) => [
+                'id' => $l['id'], 'nombre' => $l['nombre'] ?? 'Lead', 'telefono' => $l['telefono'] ?? '',
+                'etapa' => LeadStages::normalize($l['etapa'] ?? ''), 'archivado_en' => $l['archivado_en'],
+                'etiquetas' => LeadTags::of($l),
+            ])->values()->all();
         return view('leads.kanban', [
             'leads' => $leads,
+            'leadsArchivados' => $archivados,
+            'etapas' => LeadStages::ETAPAS,
             'assignableUsers' => $this->assignableUsers(),
             'etiquetas' => LeadTags::all($leads),
         ]);
@@ -155,10 +155,32 @@ class LeadsController extends Controller
         return redirect()->route('leads.index');
     }
 
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
         $this->store->delete($id);
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
         return redirect()->route('leads.index');
+    }
+
+    /** Manda el lead a la papelera: sale del tablero pero se puede restaurar. */
+    public function archivar(string $id)
+    {
+        $lead = $this->store->find($id);
+        abort_if(!$lead, 404);
+        $updated = $this->store->update($id, ['archivado_en' => now()->toISOString()]);
+
+        return response()->json(['ok' => true, 'item' => $updated]);
+    }
+
+    public function restaurar(string $id)
+    {
+        $lead = $this->store->find($id);
+        abort_if(!$lead, 404);
+        $updated = $this->store->update($id, ['archivado_en' => null]);
+
+        return response()->json(['ok' => true, 'item' => $updated]);
     }
 
     public function mover(Request $request)

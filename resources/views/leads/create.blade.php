@@ -20,10 +20,9 @@
       <div>
         <label class="text-sm font-medium">Etapa</label>
         <select name="etapa" class="w-full rounded-lg border p-2.5" required>
-          <option>Posible cliente</option>
-          <option>Contactado</option>
-          <option>Volver a llamar</option>
-          <option>Cliente</option>
+          @foreach(\App\Support\LeadStages::ETAPAS as $opt)
+            <option>{{ $opt }}</option>
+          @endforeach
         </select>
       </div>
       <div>

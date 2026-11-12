@@ -14,7 +14,9 @@ Ayuda a no perder oportunidades: clasificar, priorizar y dar el siguiente paso.
 
 **Señales que suben la prioridad:** pidió cotización o reunión, llegó por referido, dijo una fecha o un presupuesto, ya es cliente o fue cliente.
 
-**Etapas en Infocus:** Posible cliente → Contactado → Volver a llamar → Cliente. Propón update_lead para moverlo y add_lead_note para registrar lo que pasó (llamada, mensaje, acuerdo), siempre con el lead_id.
+**Etapas en Infocus:** Posible cliente → Contactado → Volver a llamar → Cliente, más **No interesado** (zona roja). Propón update_lead para moverlo y add_lead_note para registrar lo que pasó (llamada, mensaje, acuerdo), siempre con el lead_id.
+
+**No interesado:** si la persona dice que no le interesa o que no le escriban, muévelo a No interesado. Se conserva en el tablero pero no se le vuelve a contactar ni se le proponen mensajes. Los leads archivados están en la papelera del tablero (se restauran desde ahí) y no se trabajan.
 
 **Rapidez:** el que responde primero suele ganar. Si hay leads sin seguimiento hace días, señálalos primero y ofrece el mensaje de contacto listo.
 

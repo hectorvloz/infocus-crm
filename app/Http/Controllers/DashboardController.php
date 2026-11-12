@@ -342,24 +342,9 @@ class DashboardController extends Controller
         // Sales dashboard (focused data for sellers)
         $isSellerRole = in_array($currentRole, ['employee', 'vendedor'], true);
 
-        $normalizeLeadStage = function (string $stage): string {
-            $map = [
-                'Nuevo' => 'Posible cliente',
-                'Calificado' => 'Posible cliente',
-                'Propuesta' => 'Contactado',
-                'Llamar' => 'Volver a llamar',
-                'Seguimiento' => 'Volver a llamar',
-                'Ganado' => 'Cliente',
-                'Perdido' => 'Posible cliente',
-            ];
-            $allowed = ['Posible cliente', 'Contactado', 'Volver a llamar', 'Cliente'];
-            if (in_array($stage, $allowed, true)) {
-                return $stage;
-            }
-            return $map[$stage] ?? 'Posible cliente';
-        };
+        $normalizeLeadStage = fn (string $stage): string => \App\Support\LeadStages::normalize($stage);
 
-        $leads = collect($leadsStore->all() ?: [])->map(function ($lead) use ($normalizeLeadStage) {
+        $leads = collect(\App\Support\LeadStages::active($leadsStore->all() ?: []))->map(function ($lead) use ($normalizeLeadStage) {
             $lead['etapa'] = $normalizeLeadStage((string) ($lead['etapa'] ?? 'Posible cliente'));
             return $lead;
         });
@@ -382,6 +367,7 @@ class DashboardController extends Controller
             'Contactado' => 0,
             'Volver a llamar' => 0,
             'Cliente' => 0,
+            'No interesado' => 0,
         ];
 
         foreach ($leads as $lead) {

@@ -712,7 +712,7 @@
                       <a href="{{ route('leads.index') }}" class="text-xs font-bold text-slate-600 hover:text-slate-900">Ver Kanban &rarr;</a>
                   </div>
                   <div class="space-y-3">
-                      @foreach(['Posible cliente','Contactado','Volver a llamar','Cliente'] as $stage)
+                      @foreach(\App\Support\LeadStages::ETAPAS as $stage)
                           @php
                               $count = (int) ($stageCounts[$stage] ?? 0);
                               $width = (int) round(($count / $maxStageCount) * 100);
@@ -723,7 +723,7 @@
                                   <span>{{ $count }}</span>
                               </div>
                               <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                                  <div class="h-full rounded-full bg-slate-900" style="width: {{ $width }}%"></div>
+                                  <div class="h-full rounded-full {{ $stage === \App\Support\LeadStages::NO_INTERESADO ? 'bg-rose-500' : 'bg-slate-900' }}" style="width: {{ $width }}%"></div>
                               </div>
                           </div>
                       @endforeach

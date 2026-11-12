@@ -306,6 +306,30 @@ class McpServerTest extends TestCase
         $this->assertTrue($this->tool('enviarme_correo', ['asunto' => 'x', 'mensaje' => 'y'], $this->token('lectura'))['error']);
     }
 
+    public function test_leads_can_be_marked_not_interested_and_archived_via_mcp(): void
+    {
+        $token = $this->token();
+        $this->tool('crear_lead', ['nombre' => 'TU RENT A CAR', 'telefono' => '+573136066771'], $token);
+        $this->tool('crear_lead', ['nombre' => 'Quillami'], $token);
+        $lead = collect((new FileStore('leads.json'))->all())->firstWhere('nombre', 'TU RENT A CAR');
+
+        $res = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'etapa' => 'No interesado'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertStringContainsString('No interesado', $this->tool('listar_leads', ['etapa' => 'No interesado'], $token)['text']);
+
+        $archivado = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'archivar' => true], $token);
+        $this->assertStringContainsString('papelera', $archivado['text']);
+        $this->assertStringNotContainsString('TU RENT A CAR', $this->tool('listar_leads', [], $token)['text']);
+        $papelera = $this->tool('listar_leads', ['archivados' => true], $token)['text'];
+        $this->assertStringContainsString('TU RENT A CAR', $papelera);
+        $this->assertStringNotContainsString('Quillami', $papelera);
+        $this->assertStringContainsString('En la papelera desde', $this->tool('ver_lead', ['lead_id' => $lead['id']], $token)['text']);
+
+        $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'restaurar' => true], $token);
+        $this->assertStringContainsString('TU RENT A CAR', $this->tool('listar_leads', [], $token)['text']);
+        $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'archivar' => true], $this->token('lectura'))['error']);
+    }
+
     public function test_invoice_is_created_as_draft_with_next_number(): void
     {
         (new FileStore('settings.json'))->create(['id' => 'settings', 'base_currency' => 'COP']);

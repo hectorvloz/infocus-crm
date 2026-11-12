@@ -775,7 +775,7 @@ class AiService
             return 'Leads: el usuario actual no tiene permiso para consultar leads desde la IA.';
         }
         $normalized = Str::lower(Str::ascii($message));
-        $leads = collect((new FileStore('leads.json'))->all())->filter('is_array');
+        $leads = collect(\App\Support\LeadStages::active((new FileStore('leads.json'))->all()));
         $mentioned = $leads->filter(function ($lead) use ($normalized) {
             $name = Str::lower(Str::ascii(trim((string) ($lead['nombre'] ?? ''))));
             $first = Str::before($name, ' ');
@@ -796,7 +796,7 @@ class AiService
                 . ($notes !== '' ? ' | Últimas notas: ' . $notes : '');
         })->implode("\n");
 
-        return "Leads (etapas válidas: Posible cliente, Contactado, Volver a llamar, Cliente):\n{$lines}";
+        return "Leads (etapas válidas: " . implode(', ', \App\Support\LeadStages::ETAPAS) . ". \"No interesado\" es la zona roja: no se les vuelve a contactar. Los archivados están en la papelera y no aparecen aquí):\n{$lines}";
     }
 
     private function currentProjectContext(array $context, string $message = ''): string
@@ -1354,7 +1354,7 @@ Acciones de proyectos y tareas: siempre incluye AI_ACTIONS_JSON con estos campos
 - create_project: solo si piden explícitamente un proyecto o tablero NUEVO y no existe ninguno con ese nombre en el contexto. fields: name, client, description, priority, start_date, due_date, columns: ["…"], tasks: [{title, column, description, subtasks: ["…"]}].
 Toma project_id y task_id del contexto, donde aparecen como "project_id:" y "task_id:". Si el usuario habla de "la primera tarea de En proceso", usa el orden [columna #posición] del contexto. Si pide tareas para un proyecto que ya existe, nunca propongas crear otro proyecto. Si no puedes identificar el proyecto o la tarea con seguridad, pregunta cuál es en vez de proponer la acción.
 Acciones de leads (incluye siempre AI_ACTIONS_JSON con estos campos; toma lead_id del contexto):
-- update_lead: cambiar etapa u otros datos de un lead existente. fields: lead_id y solo lo que cambia: stage (Posible cliente, Contactado, Volver a llamar o Cliente), name, email, phone, budget (número), origin, reminder (AAAA-MM-DD HH:MM), note (nota de seguimiento opcional).
+- update_lead: cambiar etapa u otros datos de un lead existente. fields: lead_id y solo lo que cambia: stage (Posible cliente, Contactado, Volver a llamar, Cliente o No interesado; usa No interesado si la persona dijo que no le interesa), name, email, phone, budget (número), origin, reminder (AAAA-MM-DD HH:MM), note (nota de seguimiento opcional).
 - add_lead_note: nota de seguimiento de una llamada, reunión o mensaje. fields: lead_id, note.
 - create_lead: solo si no existe ya un lead con ese nombre o correo. fields: name, email, phone, origin, stage, budget, note.
 Si el usuario tiene un lead abierto en pantalla y dice "este lead", "muévelo", "anota que…", usa ese lead_id.

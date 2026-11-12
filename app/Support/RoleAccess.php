@@ -122,6 +122,8 @@ class RoleAccess
         'leads.edit' => 'leads.update',
         'leads.update' => 'leads.update',
         'api.leads.mover' => 'leads.update',
+        'api.leads.archivar' => 'leads.update',
+        'api.leads.restaurar' => 'leads.update',
         'api.leads.tiempo.manual' => 'leads.update',
         'api.leads.timer.iniciar' => 'timer.leads',
         'api.leads.timer.pausar' => 'timer.leads',

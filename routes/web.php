@@ -157,6 +157,8 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/leads/{id}', [LeadsController::class, 'update'])->name('leads.update');
     Route::delete('/leads/{id}', [LeadsController::class, 'destroy'])->name('leads.destroy');
     Route::post('/api/leads/mover', [LeadsController::class, 'mover'])->name('api.leads.mover');
+    Route::post('/api/leads/{id}/archivar', [LeadsController::class, 'archivar'])->name('api.leads.archivar');
+    Route::post('/api/leads/{id}/restaurar', [LeadsController::class, 'restaurar'])->name('api.leads.restaurar');
     Route::get('/api/leads/{id}', [LeadsController::class, 'showJson'])->name('api.leads.show');
     Route::post('/api/leads/notas/agregar', [LeadsController::class, 'notaAgregar'])->name('api.leads.notas.agregar');
     Route::post('/api/leads/email/enviar', [LeadsController::class, 'emailEnviar'])->name('api.leads.email.enviar');

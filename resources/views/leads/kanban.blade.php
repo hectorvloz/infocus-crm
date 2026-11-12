@@ -19,6 +19,11 @@
     <style>
       #leadsTagFilter + .app-select-trigger { min-height: 2.15rem; padding: 0.35rem 0.85rem; border-radius: 9999px; border-color: #e2e8f0; box-shadow: none; }
     </style>
+    <button type="button" id="openLeadsTrashBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50" title="Papelera de leads">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      Papelera
+      <span id="leadsTrashCount" class="min-w-[1.25rem] px-1.5 rounded-full bg-slate-100 text-[11px] font-bold text-slate-600 {{ count($leadsArchivados ?? []) ? '' : 'hidden' }}">{{ count($leadsArchivados ?? []) }}</span>
+    </button>
     <a href="{{ route('leads.import.form') }}" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50">Importar CSV</a>
     <a href="{{ route('leads.export') }}" class="px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 hover:bg-slate-50">Exportar CSV</a>
     <a href="{{ route('leads.create') }}" class="primary-add-btn">
@@ -56,9 +61,9 @@
         </div>
         <div class="shrink-0 flex items-center gap-1">
           <a id="drawerEditLeadLink" href="{{ route('leads.edit', ['id' => '__LEAD__']) }}" onclick="event.preventDefault();event.stopPropagation();window.location.href=this.getAttribute('href');" class="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-700">Editar</a>
-          <form id="drawerDeleteLeadForm" action="{{ route('leads.destroy', ['id' => '__LEAD__']) }}" method="POST" onsubmit="event.stopPropagation(); return confirm('¿Eliminar este lead?');" class="inline">
+          <form id="drawerDeleteLeadForm" action="{{ route('leads.destroy', ['id' => '__LEAD__']) }}" method="POST" class="inline">
             @csrf @method('DELETE')
-            <button id="drawerDeleteLeadBtn" type="submit" class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar lead" aria-label="Eliminar lead">
+            <button id="drawerDeleteLeadBtn" type="submit" class="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Mover a la papelera" aria-label="Mover a la papelera">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             </button>
           </form>
@@ -291,15 +296,42 @@
   </div>
 </div>
 
+<div id="leadsTrashModal" class="fixed inset-0 z-[96] hidden" aria-modal="true" role="dialog" aria-labelledby="leads-trash-title">
+  <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" data-close-leads-trash></div>
+  <div class="fixed inset-0 z-10 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-6">
+      <div class="relative mx-auto w-[min(94vw,760px)] overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4">
+          <div>
+            <div id="leads-trash-title" class="text-xl font-extrabold text-slate-900">Papelera de leads</div>
+            <div id="leadsTrashSubtitle" class="mt-1 text-xs text-slate-500">Leads archivados.</div>
+          </div>
+          <button type="button" data-close-leads-trash class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-600" aria-label="Cerrar papelera de leads">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div id="leadsTrashList" class="max-h-[62vh] overflow-y-auto divide-y divide-slate-100"></div>
+        <div id="leadsTrashEmpty" class="hidden px-6 py-12 text-center">
+          <div class="text-sm font-semibold text-slate-600">No hay leads archivados</div>
+          <div class="mt-1 text-xs text-slate-500">Cuando archives un lead desde el tablero aparecerá aquí.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script id="leadsData" type="application/json">@json($leads)</script>
+<script id="leadsArchivedData" type="application/json">@json($leadsArchivados ?? [])</script>
 <script>
 (() => {
-  const columns = ['Posible cliente','Contactado','Volver a llamar','Cliente'];
+  const columns = @json($etapas);
   const stageStyles = {
     'Posible cliente': {dot:'bg-blue-500', bg:'from-blue-50 to-white'},
     'Contactado': {dot:'bg-amber-500', bg:'from-amber-50 to-white'},
     'Volver a llamar': {dot:'bg-fuchsia-500', bg:'from-fuchsia-50 to-white'},
-    'Cliente': {dot:'bg-emerald-500', bg:'from-emerald-50 to-white'}
+    'Cliente': {dot:'bg-emerald-500', bg:'from-emerald-50 to-white'},
+    'No interesado': {dot:'bg-rose-500', bg:'from-rose-50 to-white', border:'border-rose-200', title:'text-rose-700', count:'bg-rose-100 text-rose-700',
+      hint:'Zona roja: no se les vuelve a contactar.'}
   };
 
   const leads = JSON.parse(document.getElementById('leadsData').textContent || '[]');
@@ -350,7 +382,7 @@
   const normalizeStage = (stage) => {
     const map = {
       'Nuevo':'Posible cliente','Calificado':'Posible cliente','Propuesta':'Contactado',
-      'Llamar':'Volver a llamar','Seguimiento':'Volver a llamar','Ganado':'Cliente','Perdido':'Posible cliente'
+      'Llamar':'Volver a llamar','Seguimiento':'Volver a llamar','Ganado':'Cliente','Perdido':'No interesado'
     };
     if (columns.includes(stage)) return stage;
     return map[stage] || 'Posible cliente';
@@ -360,13 +392,16 @@
     board.innerHTML = columns.map((stage) => {
       const s = stageStyles[stage] || stageStyles['Posible cliente'];
       return `
-        <section class="w-[310px] rounded-2xl border border-slate-200 bg-gradient-to-b ${s.bg} p-3">
-          <header class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full ${s.dot}"></span>
-              <h3 class="text-sm font-extrabold text-slate-800">${stage}</h3>
+        <section class="w-[310px] rounded-2xl border ${s.border || 'border-slate-200'} bg-gradient-to-b ${s.bg} p-3">
+          <header class="mb-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full ${s.dot}"></span>
+                <h3 class="text-sm font-extrabold ${s.title || 'text-slate-800'}">${stage}</h3>
+              </div>
+              <span data-count="${stage}" class="px-2 py-0.5 rounded-full text-xs font-bold ${s.count || 'bg-slate-100 text-slate-600'}">0</span>
             </div>
-            <span data-count="${stage}" class="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">0</span>
+            ${s.hint ? `<p class="mt-1 text-[11px] font-medium text-rose-600/80">${s.hint}</p>` : ''}
           </header>
           <div class="space-y-2 min-h-[280px]" data-stage="${stage}"></div>
         </section>
@@ -400,7 +435,7 @@
       ? assignees.map((name) => `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-900 text-white text-[10px] font-bold" title="${escapeHtml(name)}">${escapeHtml(getInitials(name))}</span>`).join('')
       : '<span class="text-[10px] text-slate-400">Sin encargado</span>';
     return `
-      <article class="lead-card rounded-2xl border border-slate-200 bg-white p-3 shadow-sm cursor-move" draggable="true" data-id="${lead.id}">
+      <article class="lead-card rounded-2xl border ${lead.etapa === 'No interesado' ? 'border-rose-200 border-l-4 border-l-rose-400 bg-white/90' : 'border-slate-200 bg-white'} p-3 shadow-sm cursor-move" draggable="true" data-id="${lead.id}">
         <div class="flex items-start justify-between gap-2">
           <button type="button" class="lead-open text-left text-base font-extrabold text-slate-900 hover:text-slate-700">${escapeHtml(lead.nombre || 'Lead')}</button>
           <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">${escapeHtml(lead.origen || 'Sin origen')}</span>
@@ -1096,9 +1131,83 @@
       event.preventDefault();
     }
   });
-  deleteLeadForm.addEventListener('submit', (event) => {
-    if (!activeLead || !activeLead.id) {
-      event.preventDefault();
+  // Papelera: el boton del panel archiva el lead; desde la papelera se restaura o se elimina del todo.
+  const archivedLeads = JSON.parse(document.getElementById('leadsArchivedData').textContent || '[]');
+  const trashModal = document.getElementById('leadsTrashModal');
+  const leadsApi = (id, action) => `/api/leads/${encodeURIComponent(id)}/${action}`;
+  const postJson = async (url, method = 'POST') => {
+    const res = await fetch(url, { method, headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json().catch(() => ({}));
+  };
+  function updateTrashCount() {
+    const badge = document.getElementById('leadsTrashCount');
+    badge.textContent = archivedLeads.length;
+    badge.classList.toggle('hidden', archivedLeads.length === 0);
+  }
+  function renderLeadsTrash() {
+    const list = document.getElementById('leadsTrashList');
+    const empty = document.getElementById('leadsTrashEmpty');
+    document.getElementById('leadsTrashSubtitle').textContent = `${archivedLeads.length} lead${archivedLeads.length === 1 ? '' : 's'} archivado${archivedLeads.length === 1 ? '' : 's'} · restáuralos para volver a verlos en el tablero.`;
+    empty.classList.toggle('hidden', archivedLeads.length > 0);
+    list.classList.toggle('hidden', archivedLeads.length === 0);
+    list.innerHTML = archivedLeads.map((lead) => {
+      const fecha = lead.archivado_en ? new Date(lead.archivado_en).toLocaleDateString('es-CO', { day:'numeric', month:'short', year:'numeric' }) : 'Sin fecha';
+      return `<div class="flex items-center justify-between gap-3 px-5 py-4">
+        <div class="min-w-0">
+          <div class="truncate text-sm font-extrabold text-slate-900">${escapeHtml(lead.nombre || 'Lead')}</div>
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+            <span>${escapeHtml(lead.etapa || 'Posible cliente')}</span>
+            ${lead.telefono ? `<span>${escapeHtml(lead.telefono)}</span>` : ''}
+            <span>Archivado ${escapeHtml(fecha)}</span>
+            ${(lead.etiquetas || []).map((t) => `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold" style="${tagStyle(t)}">${escapeHtml(t)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <button type="button" data-restore-lead="${escapeHtml(lead.id)}" class="rounded-lg border border-lime-200 bg-lime-50 px-3 py-2 text-xs font-extrabold text-slate-900 hover:bg-lime-100">Restaurar</button>
+          <button type="button" data-purge-lead="${escapeHtml(lead.id)}" class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-extrabold text-rose-600 hover:bg-rose-50">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const openTrash = () => { renderLeadsTrash(); trashModal.classList.remove('hidden'); };
+  const closeTrash = () => trashModal.classList.add('hidden');
+  document.getElementById('openLeadsTrashBtn').addEventListener('click', openTrash);
+  trashModal.querySelectorAll('[data-close-leads-trash]').forEach((el) => el.addEventListener('click', closeTrash));
+  trashModal.addEventListener('click', async (event) => {
+    const restoreId = event.target.closest('[data-restore-lead]')?.getAttribute('data-restore-lead');
+    const purgeId = event.target.closest('[data-purge-lead]')?.getAttribute('data-purge-lead');
+    if (!restoreId && !purgeId) return;
+    try {
+      if (restoreId) {
+        const data = await postJson(leadsApi(restoreId, 'restaurar'));
+        if (data.item) leads.push(data.item);
+      } else {
+        if (!confirm('¿Eliminar este lead para siempre? No se puede deshacer.')) return;
+        await postJson(`{{ route('leads.destroy', ['id' => '__LEAD__']) }}`.replace('__LEAD__', encodeURIComponent(purgeId)), 'DELETE');
+      }
+      const idx = archivedLeads.findIndex((l) => String(l.id) === String(restoreId || purgeId));
+      if (idx >= 0) archivedLeads.splice(idx, 1);
+      updateTrashCount(); renderLeadsTrash(); renderBoard();
+    } catch (err) {
+      alert('No se pudo completar la acción. Intenta de nuevo.');
+    }
+  });
+  deleteLeadForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!activeLead || !activeLead.id) return;
+    if (!confirm('¿Mover este lead a la papelera? Podrás restaurarlo cuando quieras.')) return;
+    try {
+      const data = await postJson(leadsApi(activeLead.id, 'archivar'));
+      const idx = leads.findIndex((l) => String(l.id) === String(activeLead.id));
+      const lead = idx >= 0 ? leads.splice(idx, 1)[0] : activeLead;
+      archivedLeads.unshift({ id: lead.id, nombre: lead.nombre, telefono: lead.telefono, etapa: lead.etapa, etiquetas: leadTags(lead), archivado_en: data.item?.archivado_en || new Date().toISOString() });
+      updateTrashCount();
+      closeDrawer();
+      renderBoard();
+    } catch (err) {
+      alert('No se pudo archivar el lead. Intenta de nuevo.');
     }
   });
   document.addEventListener('keydown', (event) => {
