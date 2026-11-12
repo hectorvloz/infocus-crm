@@ -13,7 +13,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 
 #[Name('actualizar_lead')]
-#[Description('Mueve un lead de etapa (incluida "No interesado", la zona roja), le agrega una nota de seguimiento, le agrega o quita etiquetas (nichos) y/o le agenda una llamada o reunión. Al agendar, si no indicas etapa, el lead pasa a "Volver a llamar".')]
+#[Description('Mueve un lead de etapa (incluida "No interesado", la zona roja), le agrega una nota de seguimiento, le agrega o quita etiquetas (nichos), completa su perfil (descripción, web y redes) y/o le agenda una llamada o reunión. Al agendar, si no indicas etapa, el lead pasa a "Volver a llamar".')]
 class ActualizarLead extends InfocusTool
 {
     public function schema(JsonSchema $schema): array
@@ -28,6 +28,12 @@ class ActualizarLead extends InfocusTool
             'agendar_titulo' => $schema->string()->description('Título de la actividad, ej. "Asesoría gratuita con Héctor".'),
             'agendar_tipo' => $schema->string()->enum(['llamada', 'reunion_meet'])->description('llamada (por defecto) o reunion_meet.'),
             'agendar_duracion_min' => $schema->integer()->description('Duración en minutos (por defecto 30).'),
+            'descripcion' => $schema->string()->description('Perfil del negocio: qué hace, tamaño, ciudad, cómo llegó y qué necesita (2 a 4 frases, solo hechos verificados).'),
+            'sitio_web' => $schema->string()->description('Web oficial (dominio o enlace).'),
+            'instagram' => $schema->string()->description('Instagram oficial (@usuario o enlace).'),
+            'facebook' => $schema->string()->description('Facebook oficial (usuario o enlace).'),
+            'tiktok' => $schema->string()->description('TikTok oficial (@usuario o enlace).'),
+            'linkedin' => $schema->string()->description('LinkedIn (enlace o usuario de la empresa).'),
             'archivar' => $schema->boolean()->description('true manda el lead a la papelera (sale del tablero, se puede restaurar). No lo borra.'),
             'restaurar' => $schema->boolean()->description('true saca el lead de la papelera y lo devuelve al tablero.'),
             'agendar_meet_url' => $schema->string()->description('Enlace de Google Meet, si la reunión es por Meet. Si no lo das se usa el enlace por defecto de Integraciones.'),
@@ -44,17 +50,19 @@ class ActualizarLead extends InfocusTool
             'agendar_tipo' => 'nullable|in:llamada,reunion_meet', 'agendar_duracion_min' => 'nullable|integer|min:5|max:480',
             'agendar_meet_url' => 'nullable|url|max:500',
             'archivar' => 'nullable|boolean', 'restaurar' => 'nullable|boolean',
+            ...\App\Support\LeadProfile::rules(),
         ]);
         $tocaEtiquetas = !empty($d['agregar_etiquetas']) || !empty($d['quitar_etiquetas']);
         $agenda = !empty($d['agendar_fecha']);
+        $perfil = \App\Support\LeadProfile::from(array_intersect_key($d, array_flip(\App\Support\LeadProfile::FIELDS)));
         $archivo = !empty($d['archivar']) ? 'archivar' : (!empty($d['restaurar']) ? 'restaurar' : null);
-        if (empty($d['etapa']) && empty($d['nota']) && !$tocaEtiquetas && !$agenda && !$archivo) {
-            return Response::error('Indica una etapa nueva, una nota, etiquetas, una fecha para agendar, archivar o restaurar.');
+        if (empty($d['etapa']) && empty($d['nota']) && !$tocaEtiquetas && !$agenda && !$archivo && !$perfil) {
+            return Response::error('Indica una etapa nueva, una nota, etiquetas, perfil (descripción o redes), una fecha para agendar, archivar o restaurar.');
         }
         if ($agenda && empty($d['etapa'])) {
             $d['etapa'] = 'Volver a llamar';
         }
-        $ctx->allow(!empty($d['etapa']) || $tocaEtiquetas || $archivo ? 'leads.update' : 'leads.create', write: true);
+        $ctx->allow(!empty($d['etapa']) || $tocaEtiquetas || $archivo || $perfil ? 'leads.update' : 'leads.create', write: true);
         $store = $this->store('leads.json');
         $lead = $store->find($d['lead_id']);
         abort_if(!$lead, 404);
@@ -72,6 +80,7 @@ class ActualizarLead extends InfocusTool
             $actuales = collect(LeadTags::of($lead))->reject(fn ($t) => in_array(LeadTags::key($t), $quitar, true))->all();
             $changes['etiquetas'] = LeadTags::normalize(array_merge($actuales, $d['agregar_etiquetas'] ?? []));
         }
+        $changes = array_merge($changes, $perfil);
         if ($archivo === 'archivar') {
             $changes['archivado_en'] = now()->toISOString();
         } elseif ($archivo === 'restaurar') {
@@ -106,6 +115,6 @@ class ActualizarLead extends InfocusTool
         }
         $this->tracked('leads.json', $lead['id'], "Actualizó el lead {$lead['nombre']}", fn () => $store->update($lead['id'], $changes));
 
-        return Response::text("Lead {$lead['nombre']} actualizado" . (!empty($d['etapa']) ? " · etapa: {$d['etapa']}" : '') . (!empty($d['nota']) ? ' · nota agregada' : '') . ($tocaEtiquetas ? ' · etiquetas: ' . (implode(', ', $changes['etiquetas']) ?: 'ninguna') : '') . ($archivo === 'archivar' ? ' · enviado a la papelera' : '') . ($archivo === 'restaurar' ? ' · restaurado al tablero' : '') . ($cuando ? ' · agendado: ' . $cuando->format('Y-m-d H:i') . ' (hora de Colombia), ' . (($d['agendar_tipo'] ?? 'llamada') === 'reunion_meet' ? 'reunión por Meet' . (end($changes['agenda'])['meet_link'] ? ' ' . end($changes['agenda'])['meet_link'] : ' sin enlace todavía') : 'llamada') : '') . '.');
+        return Response::text("Lead {$lead['nombre']} actualizado" . (!empty($d['etapa']) ? " · etapa: {$d['etapa']}" : '') . (!empty($d['nota']) ? ' · nota agregada' : '') . ($tocaEtiquetas ? ' · etiquetas: ' . (implode(', ', $changes['etiquetas']) ?: 'ninguna') : '') . ($perfil ? ' · perfil actualizado' : '') . ($archivo === 'archivar' ? ' · enviado a la papelera' : '') . ($archivo === 'restaurar' ? ' · restaurado al tablero' : '') . ($cuando ? ' · agendado: ' . $cuando->format('Y-m-d H:i') . ' (hora de Colombia), ' . (($d['agendar_tipo'] ?? 'llamada') === 'reunion_meet' ? 'reunión por Meet' . (end($changes['agenda'])['meet_link'] ? ' ' . end($changes['agenda'])['meet_link'] : ' sin enlace todavía') : 'llamada') : '') . '.');
     }
 }

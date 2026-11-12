@@ -330,6 +330,22 @@ class McpServerTest extends TestCase
         $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'archivar' => true], $this->token('lectura'))['error']);
     }
 
+    public function test_lead_profile_can_be_filled_via_mcp(): void
+    {
+        $token = $this->token();
+        $res = $this->tool('crear_lead', ['nombre' => 'Gallo Rent A Car', 'descripcion' => 'Alquiler de carros en Armenia.', 'instagram' => '@gallorentacar'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertStringContainsString('Perfil guardado', $res['text']);
+        $lead = collect((new FileStore('leads.json'))->all())->firstWhere('nombre', 'Gallo Rent A Car');
+
+        $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'sitio_web' => 'gallorentacar.com'], $token);
+        $ver = $this->tool('ver_lead', ['lead_id' => $lead['id']], $token)['text'];
+        $this->assertStringContainsString('Descripción: «Alquiler de carros en Armenia.»', $ver);
+        $this->assertStringContainsString('Instagram: https://instagram.com/gallorentacar', $ver);
+        $this->assertStringContainsString('Web: https://gallorentacar.com', $ver);
+        $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'facebook' => 'x'], $this->token('lectura'))['error']);
+    }
+
     public function test_invoice_is_created_as_draft_with_next_number(): void
     {
         (new FileStore('settings.json'))->create(['id' => 'settings', 'base_currency' => 'COP']);

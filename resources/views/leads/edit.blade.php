@@ -34,6 +34,7 @@
         <input name="origen" value="{{ $lead['origen'] ?? '' }}" class="w-full rounded-lg border p-2.5">
       </div>
       @include('leads._etiquetas')
+      @include('leads._perfil')
       <div class="md:col-span-2">
         <label class="text-sm font-medium">Encargados</label>
         @php $assigned = collect($lead['encargados'] ?? [])->map(fn($v) => (string) $v)->all(); @endphp

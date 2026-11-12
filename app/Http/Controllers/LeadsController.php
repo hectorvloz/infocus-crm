@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\LeadProfile;
 use App\Support\LeadStages;
 use App\Support\LeadTags;
 
@@ -97,6 +98,7 @@ class LeadsController extends Controller
             'encargados' => 'nullable|array',
             'encargados.*' => 'nullable|string|max:160',
             'etiquetas' => 'nullable|string|max:1000',
+            ...LeadProfile::rules(),
         ]);
         $budget = $data['presupuesto_estimado'] ?? $data['valor'] ?? null;
         $data['presupuesto_estimado'] = $budget;
@@ -109,6 +111,7 @@ class LeadsController extends Controller
             ->values()
             ->all();
         $data['etiquetas'] = LeadTags::normalize($data['etiquetas'] ?? '');
+        $data = array_merge($data, LeadProfile::from($data));
         $this->store->create($data);
         return redirect()->route('leads.index')->with('success', 'Lead creado correctamente.');
     }
@@ -139,6 +142,7 @@ class LeadsController extends Controller
             'encargados' => 'nullable|array',
             'encargados.*' => 'nullable|string|max:160',
             'etiquetas' => 'nullable|string|max:1000',
+            ...LeadProfile::rules(),
         ]);
         $budget = $data['presupuesto_estimado'] ?? $data['valor'] ?? null;
         $data['presupuesto_estimado'] = $budget;
@@ -151,6 +155,7 @@ class LeadsController extends Controller
             ->values()
             ->all();
         $data['etiquetas'] = LeadTags::normalize($data['etiquetas'] ?? '');
+        $data = array_merge($data, LeadProfile::from($data));
         $this->store->update($id, $data);
         return redirect()->route('leads.index');
     }

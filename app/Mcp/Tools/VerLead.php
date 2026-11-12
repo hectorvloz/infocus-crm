@@ -33,6 +33,7 @@ class VerLead extends InfocusTool
             'Correo: ' . ($l['email'] ?? '-') . ' · Teléfono: ' . ($l['telefono'] ?? '-'),
             'Etapa: ' . ($l['etapa'] ?? '-') . ' · Origen: ' . ($l['origen'] ?? '-') . ' · Valor estimado: ' . ($l['valor'] ?? '-'),
             'Etiquetas: ' . (implode(', ', \App\Support\LeadTags::of($l)) ?: 'ninguna'),
+            ...(\App\Support\LeadProfile::lines($l) ?: ['Perfil: sin descripción ni redes (complétalo con actualizar_lead)']),
             ...(\App\Support\LeadStages::archived($l) ? ['En la papelera desde ' . substr((string) $l['archivado_en'], 0, 10) . ' (archivado; restáuralo con actualizar_lead restaurar=true)'] : []),
             "\nNotas:",
         ];

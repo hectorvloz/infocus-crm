@@ -116,6 +116,15 @@
       </section>
 
       <section class="rounded-2xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-sm font-extrabold text-slate-900">Perfil del negocio</div>
+          <a id="drawerProfileEdit" href="#" class="text-xs font-bold text-slate-500 hover:text-slate-900">Completar</a>
+        </div>
+        <p id="drawerDescription" class="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line"></p>
+        <div id="drawerLinks" class="mt-3 flex flex-wrap gap-2"></div>
+      </section>
+
+      <section class="rounded-2xl border border-slate-200 p-4">
         <div class="flex items-center justify-between gap-3 mb-3">
           <div>
             <h3 class="text-base font-extrabold text-slate-900">Próxima reunión</h3>
@@ -566,6 +575,17 @@
     document.getElementById('drawerValue').textContent = fmtMoney(lead.presupuesto_estimado ?? lead.valor);
     document.getElementById('drawerReminder').textContent = lead.recordatorio ? new Date(lead.recordatorio).toLocaleString('es-CO') : '-';
     renderAssignees(lead);
+    const desc = document.getElementById('drawerDescription');
+    desc.textContent = lead.descripcion || 'Sin descripción todavía. Agrega qué hace el negocio, cómo llegó y qué necesita.';
+    desc.classList.toggle('text-slate-400', !lead.descripcion);
+    const redes = [['sitio_web','Web'],['instagram','Instagram'],['facebook','Facebook'],['tiktok','TikTok'],['linkedin','LinkedIn']];
+    const enlaces = redes.filter(([k]) => /^https?:\/\//i.test(lead[k] || ''));
+    document.getElementById('drawerLinks').innerHTML = enlaces.length
+      ? enlaces.map(([k, label]) => `<a href="${escapeHtml(lead[k])}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50">${escapeHtml(label)}<svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5h5v5M19 5l-8 8M10 5H5v14h14v-5"/></svg></a>`).join('')
+      : '<span class="text-xs text-slate-400">Sin web ni redes registradas.</span>';
+    const profileEdit = document.getElementById('drawerProfileEdit');
+    profileEdit.href = editLeadLink.href;
+    profileEdit.textContent = (lead.descripcion || enlaces.length) ? 'Editar' : 'Completar';
     const tagsHost = document.getElementById('drawerTags');
     tagsHost.innerHTML = leadTags(lead).length
       ? leadTags(lead).map((t) => `<span class="px-2.5 py-1 rounded-full text-xs font-bold" style="${tagStyle(t)}">${escapeHtml(t)}</span>`).join('')

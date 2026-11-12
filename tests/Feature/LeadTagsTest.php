@@ -102,4 +102,24 @@ class LeadTagsTest extends TestCase
         $this->assertStringContainsString('"No interesado"', $html);
         $this->assertStringContainsString('Zona roja', $html);
     }
+
+    public function test_lead_profile_is_saved_with_normalized_links(): void
+    {
+        $this->assertSame('https://instagram.com/rentacarpinares', \App\Support\LeadProfile::link('@rentacarpinares', 'https://instagram.com/'));
+        $this->assertSame('https://rentacarpinares.com', \App\Support\LeadProfile::link('rentacarpinares.com', null));
+        $this->assertSame('https://facebook.com/pinares', \App\Support\LeadProfile::link('https://facebook.com/pinares', 'https://facebook.com/'));
+
+        $this->asAdmin()->post(route('leads.store'), [
+            'nombre' => 'Renta Car Pinares', 'etapa' => 'Posible cliente',
+            'descripcion' => 'Alquiler de carros en Pereira. Llegó por Instagram.',
+            'sitio_web' => 'rentacarpinares.com', 'instagram' => '@rentacarpinares', 'tiktok' => '',
+        ])->assertRedirect(route('leads.index'));
+        $lead = collect((new FileStore('leads.json'))->all())->firstWhere('nombre', 'Renta Car Pinares');
+        $this->assertSame('https://rentacarpinares.com', $lead['sitio_web']);
+        $this->assertSame('https://instagram.com/rentacarpinares', $lead['instagram']);
+        $this->assertNull($lead['tiktok']);
+
+        $this->asAdmin()->get(route('leads.edit', ['id' => $lead['id']]))->assertOk()->assertSee('Perfil del negocio')->assertSee('https://instagram.com/rentacarpinares');
+        $this->asAdmin()->get(route('leads.index'))->assertOk()->assertSee('drawerDescription', false);
+    }
 }
