@@ -26,7 +26,7 @@ class VerLead extends InfocusTool
         $ctx->allow('leads.read');
         $l = $this->store('leads.json')->find((string) $request->validate(['lead_id' => 'required|string'])['lead_id']);
         abort_if(!$l, 404);
-        $tz = config('app.timezone');
+        $tz = 'America/Bogota';
 
         $out = [
             "Lead: {$l['nombre']} (id: {$l['id']})",

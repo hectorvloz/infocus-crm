@@ -268,6 +268,29 @@ class McpServerTest extends TestCase
         $this->assertTrue($soloLectura['error']);
     }
 
+    public function test_confirmed_meeting_is_scheduled_on_the_lead(): void
+    {
+        $token = $this->token();
+        $this->tool('crear_lead', ['nombre' => 'Rentacar GEISCAR', 'telefono' => '+573108698763'], $token);
+        $lead = collect((new FileStore('leads.json'))->all())->firstWhere('nombre', 'Rentacar GEISCAR');
+        $fecha = now('America/Bogota')->addDays(3)->setTime(10, 30)->format('Y-m-d H:i');
+
+        $res = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => $fecha, 'agendar_titulo' => 'Asesoría gratuita con Héctor', 'nota' => 'Aceptó por WhatsApp.'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertStringContainsString("agendado: {$fecha}", $res['text']);
+
+        $guardado = (new FileStore('leads.json'))->find($lead['id']);
+        $this->assertSame('Volver a llamar', $guardado['etapa']);
+        $this->assertSame($fecha, $guardado['recordatorio']);
+        $this->assertSame('programado', $guardado['agenda'][0]['estado']);
+        $this->assertSame('llamada', $guardado['agenda'][0]['tipo']);
+        $this->assertStringContainsString("{$fecha} · Asesoría gratuita con Héctor · programado", $this->tool('ver_lead', ['lead_id' => $lead['id']], $token)['text']);
+
+        $pasada = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => '2020-01-01 10:00'], $token);
+        $this->assertTrue($pasada['error']);
+        $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => $fecha], $this->token('lectura'))['error']);
+    }
+
     public function test_invoice_is_created_as_draft_with_next_number(): void
     {
         (new FileStore('settings.json'))->create(['id' => 'settings', 'base_currency' => 'COP']);
