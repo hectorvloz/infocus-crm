@@ -296,6 +296,16 @@ class McpServerTest extends TestCase
         $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'agendar_fecha' => $fecha], $this->token('lectura'))['error']);
     }
 
+    public function test_owner_notice_is_emailed_only_to_the_token_owner(): void
+    {
+        $res = $this->tool('enviarme_correo', ['asunto' => 'Volver a llamar: GEISCAR', 'mensaje' => "Teléfono: +57 310 869 8763\nSin cita agendada."], $this->token());
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertStringContainsString($this->admin->email, $res['text']);
+        Mail::assertSent(\App\Mail\GenericMail::class, fn ($m) => $m->hasTo($this->admin->email) && count($m->to) === 1 && $m->subjectLine === 'Volver a llamar: GEISCAR');
+
+        $this->assertTrue($this->tool('enviarme_correo', ['asunto' => 'x', 'mensaje' => 'y'], $this->token('lectura'))['error']);
+    }
+
     public function test_invoice_is_created_as_draft_with_next_number(): void
     {
         (new FileStore('settings.json'))->create(['id' => 'settings', 'base_currency' => 'COP']);
