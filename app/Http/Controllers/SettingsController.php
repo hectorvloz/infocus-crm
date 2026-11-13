@@ -982,6 +982,7 @@ class SettingsController extends Controller
             'meta_app_secret' => 'nullable|string|max:1000',
             'meta_redirect_uri' => 'nullable|url|max:1000',
             'meta_graph_version' => 'nullable|string|max:40',
+            'meta_config_id' => 'nullable|string|max:255',
             'tiktok_client_key' => 'nullable|string|max:255',
             'tiktok_client_secret' => 'nullable|string|max:1000',
             'tiktok_redirect_uri' => 'nullable|url|max:1000',
@@ -996,7 +997,7 @@ class SettingsController extends Controller
             }
         }
 
-        foreach (['meta_app_id', 'meta_redirect_uri', 'meta_graph_version', 'tiktok_client_key', 'tiktok_redirect_uri'] as $field) {
+        foreach (['meta_app_id', 'meta_redirect_uri', 'meta_graph_version', 'meta_config_id', 'tiktok_client_key', 'tiktok_redirect_uri'] as $field) {
             $data[$field] = trim((string) ($data[$field] ?? ''));
         }
 

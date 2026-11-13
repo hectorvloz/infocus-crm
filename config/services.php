@@ -61,6 +61,7 @@ return [
         'app_secret' => env('META_APP_SECRET'),
         'redirect' => env('META_REDIRECT_URI'),
         'graph_version' => env('META_GRAPH_VERSION', 'v20.0'),
+        'config_id' => env('META_CONFIG_ID'),
     ],
 
     'tiktok' => [

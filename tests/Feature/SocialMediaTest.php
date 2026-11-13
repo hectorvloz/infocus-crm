@@ -81,6 +81,30 @@ class SocialMediaTest extends TestCase
         $response->assertSessionHas('error');
     }
 
+    public function test_meta_auth_url_uses_scopes_without_config_id(): void
+    {
+        config(['services.meta.app_id' => '123', 'services.meta.config_id' => null]);
+
+        $url = app(\App\Services\SocialMedia\MetaSocialMediaService::class)->authUrl('estado', 'https://crm.test/callback');
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        $this->assertArrayNotHasKey('config_id', $query);
+        $this->assertStringContainsString('ads_read', $query['scope']);
+        $this->assertSame('123', $query['client_id']);
+    }
+
+    public function test_meta_auth_url_uses_config_id_for_login_for_business(): void
+    {
+        config(['services.meta.app_id' => '123', 'services.meta.config_id' => '987654']);
+
+        $url = app(\App\Services\SocialMedia\MetaSocialMediaService::class)->authUrl('estado', 'https://crm.test/callback');
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        $this->assertSame('987654', $query['config_id']);
+        $this->assertArrayNotHasKey('scope', $query);
+        $this->assertSame('estado', $query['state']);
+    }
+
     public function test_sync_requires_active_meta_connection(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

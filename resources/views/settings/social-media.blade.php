@@ -59,6 +59,11 @@
           <label class="text-xs font-black uppercase tracking-wider text-slate-400">META_GRAPH_VERSION</label>
           <input name="meta_graph_version" value="{{ old('meta_graph_version', $settings['meta_graph_version'] ?? ($meta['graph_version'] ?? 'v20.0')) }}" class="mt-2 block w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold focus:border-[#ecfe88] focus:ring-[#ecfe88]" placeholder="v20.0">
         </div>
+        <div>
+          <label class="text-xs font-black uppercase tracking-wider text-slate-400">META_CONFIG_ID</label>
+          <input name="meta_config_id" value="{{ old('meta_config_id', $settings['meta_config_id'] ?? ($meta['config_id'] ?? '')) }}" class="mt-2 block w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold focus:border-[#ecfe88] focus:ring-[#ecfe88]" placeholder="ID de configuración (opcional)">
+          <p class="mt-1 text-xs font-semibold text-slate-400">Para apps tipo Empresa: Facebook Login for Business → Configuraciones. Si lo llenas, los permisos salen de esa configuración.</p>
+        </div>
       </div>
 
       <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
@@ -70,7 +75,7 @@
         <button class="inline-flex items-center justify-center rounded-full bg-[#ecfe88] px-5 py-3 text-sm font-black text-slate-950 shadow-sm transition hover:bg-[#d9ef60]">
           Guardar Social Media
         </button>
-        <a href="{{ route('social-media.meta.connect') }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
+        <a href="{{ route('social-media.index', ['tab' => 'cuentas']) }}" class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50">
           Conectar Meta
         </a>
       </div>

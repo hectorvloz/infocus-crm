@@ -27,6 +27,12 @@ class SocialMediaCredentials
         return self::plain('services.meta.graph_version', 'meta_graph_version') ?: 'v20.0';
     }
 
+    /** Configuration ID de "Facebook Login for Business" (apps tipo Empresa). */
+    public static function metaConfigId(): ?string
+    {
+        return self::plain('services.meta.config_id', 'meta_config_id');
+    }
+
     public static function tiktokClientKey(): ?string
     {
         return self::plain('services.tiktok.client_key', 'tiktok_client_key');
@@ -61,6 +67,7 @@ class SocialMediaCredentials
                 'app_secret_preview' => self::preview(self::metaAppSecret()),
                 'redirect_uri' => self::metaRedirectUri(),
                 'graph_version' => self::metaGraphVersion(),
+                'config_id' => self::metaConfigId(),
                 'source' => [
                     'app_id' => filled(config('services.meta.app_id')) ? '.env' : (filled(self::setting('meta_app_id')) ? 'Ajustes' : null),
                     'app_secret' => filled(config('services.meta.app_secret')) ? '.env' : (filled(self::setting('meta_app_secret')) ? 'Ajustes' : null),

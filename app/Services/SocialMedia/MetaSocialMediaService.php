@@ -41,13 +41,23 @@ class MetaSocialMediaService
             'instagram_content_publish',
         ];
 
-        return 'https://www.facebook.com/' . $this->graphVersion() . '/dialog/oauth?' . http_build_query([
+        $params = [
             'client_id'     => SocialMediaCredentials::metaAppId(),
             'redirect_uri'  => $redirectUri,
             'response_type' => 'code',
-            'scope'         => implode(',', $scopes),
             'state'         => $state,
-        ]);
+        ];
+
+        // Apps tipo Empresa usan Facebook Login for Business: los permisos
+        // salen de la configuración (config_id) y Meta ignora "scope".
+        $configId = SocialMediaCredentials::metaConfigId();
+        if (filled($configId)) {
+            $params['config_id'] = $configId;
+        } else {
+            $params['scope'] = implode(',', $scopes);
+        }
+
+        return 'https://www.facebook.com/' . $this->graphVersion() . '/dialog/oauth?' . http_build_query($params);
     }
 
     public function exchangeCode(string $code, string $redirectUri): array
