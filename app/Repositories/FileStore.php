@@ -8,6 +8,10 @@ use Illuminate\Support\Str;
 
 class FileStore
 {
+    private const BACKUP_MIN_INTERVAL = 1800;
+    private const BACKUP_KEEP = 20;
+    private const BACKUP_MAX_DAYS = 7;
+
     public function __construct(private string $file)
     {
         if (!Storage::exists($this->file)) {
@@ -143,9 +147,55 @@ class FileStore
         File::ensureDirectoryExists($backupDir);
 
         $base = basename($this->file, '.json');
+
+        // Primero limpia: si el disco se llenó con copias viejas, esto libera espacio antes de escribir.
+        $existing = $this->pruneBackups($this->backupsFor($backupDir, $base));
+
+        // Una copia cada 30 minutos por archivo basta como red de seguridad.
+        $latest = end($existing);
+        if ($latest !== false && (time() - (int) @filemtime($latest)) < self::BACKUP_MIN_INTERVAL) {
+            return;
+        }
+
         $backupPath = $backupDir . '/' . $base . '_' . date('Ymd_His') . '.json';
         if (!is_file($backupPath)) {
-            File::copy($path, $backupPath);
+            @copy($path, $backupPath);
         }
+    }
+
+    /** @return list<string> copias de este archivo, de la más vieja a la más nueva */
+    private function backupsFor(string $backupDir, string $base): array
+    {
+        $pattern = '/^' . preg_quote($base, '/') . '_\d{8}_\d{6}\.json$/';
+        $files = array_values(array_filter(
+            glob($backupDir . '/' . $base . '_*.json') ?: [],
+            fn (string $f) => preg_match($pattern, basename($f)) === 1
+        ));
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * Conserva las últimas BACKUP_KEEP copias que tengan menos de BACKUP_MAX_DAYS días
+     * y borra el resto. Devuelve las que quedan.
+     *
+     * @param  list<string>  $files
+     * @return list<string>
+     */
+    private function pruneBackups(array $files): array
+    {
+        $limit = time() - self::BACKUP_MAX_DAYS * 86400;
+        $total = count($files);
+        $kept = [];
+        foreach ($files as $i => $file) {
+            if ($total - $i <= self::BACKUP_KEEP && (int) @filemtime($file) >= $limit) {
+                $kept[] = $file;
+                continue;
+            }
+            @unlink($file);
+        }
+
+        return $kept;
     }
 }
