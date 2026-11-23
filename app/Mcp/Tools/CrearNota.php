@@ -11,7 +11,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 
 #[Name('crear_nota')]
-#[Description('Crea una nota en "Mis notas". El contenido puede ser texto (párrafos separados por línea en blanco) o HTML simple (h2, p, strong, em, ul, li).')]
+#[Description('Crea una nota en "Mis notas". El contenido admite formato: ## títulos, **negrita**, ==resaltado==, listas, casillas - [ ], --- separador y enlaces; organízalo con títulos y listas (ver_guia("formato")).')]
 class CrearNota extends InfocusTool
 {
     public const COLORS = ['yellow', 'blue', 'green', 'pink', 'purple', 'gray'];
@@ -38,7 +38,7 @@ class CrearNota extends InfocusTool
             $client = $this->store('clientes.json')->find($d['cliente_id']);
             abort_if(!$client, 404);
         }
-        $note = (new PersonalNotes())->create($d['titulo'], PrepararCorreo::toHtml($d['contenido']), $d['color'] ?? 'yellow', $client);
+        $note = (new PersonalNotes())->create($d['titulo'], \App\Support\RichTextFormat::toHtml($d['contenido']), $d['color'] ?? 'yellow', $client);
 
         return Response::text("Nota creada: \"{$note['title']}\" (nota_id: {$note['id']})" . ($client ? " · vinculada a {$client['empresa']}" : '') . '.');
     }

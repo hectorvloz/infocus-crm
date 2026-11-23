@@ -20,7 +20,7 @@ class ActualizarTarea extends InfocusTool
             'proyecto_id' => $schema->string()->required(),
             'tarea_id' => $schema->string()->required(),
             'titulo' => $schema->string(),
-            'descripcion' => $schema->string(),
+            'descripcion' => $schema->string()->description('Admite formato: ## Título, **negrita**, *cursiva*, ==resaltado==, ~~tachado~~, listas con - o 1., casillas - [ ] / - [x], > cita, --- separador y [texto](https://enlace). Organízalo con títulos y listas; ver_guia("formato").'),
             'vence' => $schema->string()->description('AAAA-MM-DD.'),
             'prioridad' => $schema->string()->enum(['Con calma', 'Atención', 'Urgente']),
             'columna' => $schema->string()->description('Columna del tablero, ej. Por hacer, En progreso, Hecho.'),
@@ -45,7 +45,7 @@ class ActualizarTarea extends InfocusTool
         abort_if(!$task, 404);
 
         $edits = array_filter([
-            'texto' => $d['titulo'] ?? null, 'descripcion' => $d['descripcion'] ?? null, 'due_date' => $d['vence'] ?? null,
+            'texto' => $d['titulo'] ?? null, 'descripcion' => isset($d['descripcion']) ? \App\Support\RichTextFormat::toHtml($d['descripcion']) : null, 'due_date' => $d['vence'] ?? null,
             'priority' => $d['prioridad'] ?? null, 'board_stage' => $d['columna'] ?? null,
         ], fn ($v) => $v !== null);
         if (!empty($d['responsables'])) {

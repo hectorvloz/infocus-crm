@@ -23,7 +23,7 @@ class CrearProyecto extends InfocusTool
         return [
             'titulo' => $schema->string()->required(),
             'cliente_id' => $schema->string()->description('Opcional. Usa buscar_clientes para obtenerlo.'),
-            'descripcion' => $schema->string()->description('Objetivo y alcance del proyecto (texto o HTML simple).'),
+            'descripcion' => $schema->string()->description('Objetivo y alcance del proyecto. Admite formato: ## Título, **negrita**, ==resaltado==, listas, casillas - [ ], --- separador y [texto](https://enlace); ver_guia("formato").'),
             'prioridad' => $schema->string()->enum(self::PRIORITIES),
             'inicio' => $schema->string()->description('AAAA-MM-DD. Por defecto hoy.'),
             'vencimiento' => $schema->string()->description('AAAA-MM-DD.'),
@@ -32,7 +32,7 @@ class CrearProyecto extends InfocusTool
             'tareas' => $schema->array()->items($schema->object([
                 'titulo' => $schema->string()->required(),
                 'columna' => $schema->string(),
-                'descripcion' => $schema->string(),
+                'descripcion' => $schema->string()->description('Admite formato: ## Título, **negrita**, ==resaltado==, listas, casillas - [ ], --- separador y [texto](https://enlace); ver_guia("formato").'),
                 'prioridad' => $schema->string()->enum(self::PRIORITIES),
                 'vence' => $schema->string(),
                 'subtareas' => $schema->array()->items($schema->string()),
@@ -66,7 +66,7 @@ class CrearProyecto extends InfocusTool
         $result = $this->callController(ProyectosController::class, 'crear', array_filter([
             'cliente_id' => $clientId !== '' ? $clientId : 'general',
             'titulo' => $d['titulo'],
-            'descripcion' => isset($d['descripcion']) ? SafeRichText::sanitize(PrepararCorreo::toHtml($d['descripcion'])) : null,
+            'descripcion' => isset($d['descripcion']) ? \App\Support\RichTextFormat::toHtml($d['descripcion']) : null,
             'prioridad' => $d['prioridad'] ?? 'Con calma',
             'inicio' => $d['inicio'] ?? now()->toDateString(),
             'vencimiento' => $d['vencimiento'] ?? null,
@@ -87,7 +87,7 @@ class CrearProyecto extends InfocusTool
             $tasks[] = [
                 'id' => (string) Str::ulid(),
                 'texto' => Str::limit(trim($t['titulo']), 180, ''),
-                'descripcion' => !empty($t['descripcion']) ? SafeRichText::sanitize(PrepararCorreo::toHtml($t['descripcion'])) : '',
+                'descripcion' => !empty($t['descripcion']) ? \App\Support\RichTextFormat::toHtml($t['descripcion']) : '',
                 'done' => false,
                 'start_date' => null,
                 'due_date' => $t['vence'] ?? null,

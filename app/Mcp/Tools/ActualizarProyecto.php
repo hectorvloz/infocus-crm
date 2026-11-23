@@ -20,7 +20,7 @@ class ActualizarProyecto extends InfocusTool
             'proyecto_id' => $schema->string()->required(),
             'titulo' => $schema->string(),
             'etapa' => $schema->string()->description('Etapa del tablero de proyectos (usa una existente).'),
-            'descripcion' => $schema->string(),
+            'descripcion' => $schema->string()->description('Admite formato: ## Título, **negrita**, *cursiva*, ==resaltado==, ~~tachado~~, listas con - o 1., casillas - [ ] / - [x], > cita, --- separador y [texto](https://enlace). Organízalo con títulos y listas; ver_guia("formato").'),
             'vencimiento' => $schema->string()->description('AAAA-MM-DD.'),
             'prioridad' => $schema->string()->enum(['Con calma', 'Atención', 'Urgente']),
             'progreso' => $schema->integer()->description('Avance de 0 a 100.'),
@@ -37,6 +37,9 @@ class ActualizarProyecto extends InfocusTool
             'prioridad' => 'nullable|in:Con calma,Atención,Urgente', 'progreso' => 'nullable|integer|min:0|max:100', 'valor' => 'nullable|numeric|min:0',
         ]);
         $changes = array_filter(collect($d)->except('proyecto_id')->all(), fn ($v) => $v !== null);
+        if (isset($changes['descripcion'])) {
+            $changes['descripcion'] = \App\Support\RichTextFormat::toHtml($changes['descripcion']);
+        }
         if (!$changes) {
             return Response::error('Indica al menos un campo para cambiar.');
         }

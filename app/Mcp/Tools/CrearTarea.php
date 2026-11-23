@@ -19,7 +19,7 @@ class CrearTarea extends InfocusTool
         return [
             'proyecto_id' => $schema->string()->required(),
             'titulo' => $schema->string()->required(),
-            'descripcion' => $schema->string(),
+            'descripcion' => $schema->string()->description('Admite formato: ## Título, **negrita**, *cursiva*, ==resaltado==, ~~tachado~~, listas con - o 1., casillas - [ ] / - [x], > cita, --- separador y [texto](https://enlace). Organízalo con títulos y listas; ver_guia("formato").'),
             'vence' => $schema->string()->description('Fecha AAAA-MM-DD.'),
             'prioridad' => $schema->string()->enum(['Con calma', 'Atención', 'Urgente']),
             'columna' => $schema->string()->description('Columna del tablero donde va la tarea (debe existir). Por defecto, la primera.'),
@@ -30,7 +30,7 @@ class CrearTarea extends InfocusTool
     {
         $ctx->allow('proyectos.create', write: true);
         $d = $request->validate([
-            'proyecto_id' => 'required|string', 'titulo' => 'required|string|max:255', 'descripcion' => 'nullable|string|max:4000',
+            'proyecto_id' => 'required|string', 'titulo' => 'required|string|max:255', 'descripcion' => 'nullable|string|max:20000',
             'vence' => 'nullable|date_format:Y-m-d', 'prioridad' => 'nullable|in:Con calma,Atención,Urgente',
             'columna' => 'nullable|string|max:60',
         ]);
@@ -45,7 +45,7 @@ class CrearTarea extends InfocusTool
             }
         }
         $result = $this->callController(ProyectosController::class, 'tareaAgregar', array_filter([
-            'id' => $d['proyecto_id'], 'texto' => $d['titulo'], 'descripcion' => $d['descripcion'] ?? null,
+            'id' => $d['proyecto_id'], 'texto' => $d['titulo'], 'descripcion' => isset($d['descripcion']) ? \App\Support\RichTextFormat::toHtml($d['descripcion']) : null,
             'due_date' => $d['vence'] ?? null, 'priority' => $d['prioridad'] ?? null, 'board_stage' => $columna,
         ]));
         if (empty($result['data']['ok'])) {

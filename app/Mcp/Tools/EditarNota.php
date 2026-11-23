@@ -43,7 +43,7 @@ class EditarNota extends InfocusTool
 
         $html = null;
         if (isset($d['contenido'])) {
-            $new = PrepararCorreo::toHtml($d['contenido']);
+            $new = \App\Support\RichTextFormat::toHtml($d['contenido']);
             $html = ($d['modo'] ?? 'agregar') === 'reemplazar' ? $new : ((string) ($note['html'] ?? '') . $new);
         }
         $this->tracked('mis_notas.json', $note['id'], 'Editó la nota "' . ($note['title'] ?? '') . '"', fn () => $notes->update($note, $d['titulo'] ?? null, $html));

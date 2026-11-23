@@ -603,6 +603,12 @@ class McpServerTest extends TestCase
         $this->assertMatchesRegularExpression('/tarea_id: [0-9A-Z]+/', $tarea['text']);
         $nueva = collect($store->find('p1')['tareas'])->firstWhere('texto', 'Videos de Semana 1 de Diciembre');
         $this->assertSame('Videos', $nueva['board_stage']);
+
+        $this->tool('actualizar_tarea', ['proyecto_id' => 'p1', 'tarea_id' => $nueva['id'], 'descripcion' => "## Video 1\n- [ ] Guion\n**Audio:** libre"], $token);
+        $desc = collect($store->find('p1')['tareas'])->firstWhere('id', $nueva['id'])['descripcion'];
+        $this->assertStringContainsString('<h2>Video 1</h2>', $desc);
+        $this->assertStringContainsString('note-checkbox', $desc);
+        $this->assertStringContainsString('<strong>Audio:</strong>', $desc);
         $this->assertTrue($this->tool('crear_tarea', ['proyecto_id' => 'p1', 'titulo' => 'X', 'columna' => 'No existe'], $token)['error']);
 
         $ren = $this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'renombrar', 'nombre' => 'Videos', 'nuevo_nombre' => 'Videos TikTok'], $token);
