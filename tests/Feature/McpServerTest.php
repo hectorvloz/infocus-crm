@@ -583,6 +583,39 @@ class McpServerTest extends TestCase
         $this->assertSame($project['cover_image'], $projects->find('p1')['cover_image']);
     }
 
+    public function test_board_columns_can_be_created_renamed_and_used_by_new_tasks(): void
+    {
+        $this->project();
+        $token = $this->token();
+        $store = new FileStore('proyectos.json');
+
+        $res = $this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'crear', 'nombre' => 'Videos'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertSame(['Por hacer', 'En proceso', 'Revisión', 'Terminado', 'Videos'], $store->find('p1')['task_stages']);
+        $this->assertStringContainsString('ya existe', $this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'crear', 'nombre' => 'videos'], $token)['text']);
+
+        $this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'crear', 'nombre' => 'Ideas', 'posicion' => 1], $token);
+        $this->assertSame('Ideas', $store->find('p1')['task_stages'][0]);
+
+        $tarea = $this->tool('crear_tarea', ['proyecto_id' => 'p1', 'titulo' => 'Videos de Semana 1 de Diciembre', 'columna' => 'VIDEOS'], $token);
+        $this->assertFalse($tarea['error'], $tarea['text']);
+        $this->assertStringContainsString('en la columna "Videos"', $tarea['text']);
+        $this->assertMatchesRegularExpression('/tarea_id: [0-9A-Z]+/', $tarea['text']);
+        $nueva = collect($store->find('p1')['tareas'])->firstWhere('texto', 'Videos de Semana 1 de Diciembre');
+        $this->assertSame('Videos', $nueva['board_stage']);
+        $this->assertTrue($this->tool('crear_tarea', ['proyecto_id' => 'p1', 'titulo' => 'X', 'columna' => 'No existe'], $token)['error']);
+
+        $ren = $this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'renombrar', 'nombre' => 'Videos', 'nuevo_nombre' => 'Videos TikTok'], $token);
+        $this->assertFalse($ren['error'], $ren['text']);
+        $p = $store->find('p1');
+        $this->assertContains('Videos TikTok', $p['task_stages']);
+        $this->assertNotContains('Videos', $p['task_stages']);
+        $this->assertSame('Videos TikTok', collect($p['tareas'])->firstWhere('id', $nueva['id'])['board_stage']);
+        $this->assertTrue($this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'renombrar', 'nombre' => 'Ideas', 'nuevo_nombre' => 'Por hacer'], $token)['error']);
+
+        $this->assertTrue($this->tool('gestionar_columnas', ['proyecto_id' => 'p1', 'accion' => 'crear', 'nombre' => 'Otra'], $this->token('lectura'))['error']);
+    }
+
     public function test_updates_project_and_task_and_adds_project_note(): void
     {
         $this->project();

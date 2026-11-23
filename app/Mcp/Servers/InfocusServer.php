@@ -76,6 +76,7 @@ class InfocusServer extends Server
         Tools\CrearTarea::class,
         Tools\CrearContratoBorrador::class,
         Tools\ActualizarProyecto::class,
+        Tools\GestionarColumnas::class,
         Tools\GestionarPortadaProyecto::class,
         Tools\ActualizarTarea::class,
         Tools\AgregarNotaProyecto::class,
