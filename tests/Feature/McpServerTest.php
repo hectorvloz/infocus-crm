@@ -268,6 +268,26 @@ class McpServerTest extends TestCase
         $this->assertTrue($soloLectura['error']);
     }
 
+    public function test_lead_phone_and_email_can_be_corrected(): void
+    {
+        $token = $this->token();
+        $this->tool('crear_lead', ['nombre' => 'Autos La 19', 'nota' => 'WhatsApp publicado: +57 317 467 5627'], $token);
+        $lead = collect((new FileStore('leads.json'))->all())->firstWhere('nombre', 'Autos La 19');
+        $this->assertNull($lead['telefono']);
+
+        $res = $this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'telefono' => '+57 317 467 5627', 'email' => 'ventas@autosla19.co'], $token);
+        $this->assertFalse($res['error'], $res['text']);
+        $this->assertStringContainsString('contacto: +57 317 467 5627, ventas@autosla19.co', $res['text']);
+        $guardado = (new FileStore('leads.json'))->find($lead['id']);
+        $this->assertSame('+57 317 467 5627', $guardado['telefono']);
+        $this->assertSame('ventas@autosla19.co', $guardado['email']);
+        $this->assertSame('Posible cliente', $guardado['etapa']);
+        $this->assertStringContainsString('Teléfono: +57 317 467 5627', $this->tool('ver_lead', ['lead_id' => $lead['id']], $token)['text']);
+
+        $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'email' => 'no-es-correo'], $token)['error']);
+        $this->assertTrue($this->tool('actualizar_lead', ['lead_id' => $lead['id'], 'telefono' => '+573000000000'], $this->token('lectura'))['error']);
+    }
+
     public function test_confirmed_meeting_is_scheduled_on_the_lead(): void
     {
         $token = $this->token();

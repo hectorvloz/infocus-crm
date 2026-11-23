@@ -20,7 +20,7 @@ class CrearLead extends InfocusTool
         return [
             'nombre' => $schema->string()->required(),
             'email' => $schema->string(),
-            'telefono' => $schema->string(),
+            'telefono' => $schema->string()->description('Teléfono o WhatsApp con indicativo, ej. +57 317 467 5627. Ponlo siempre aquí, no en la nota: el envío de WhatsApp solo lee este campo.'),
             'origen' => $schema->string()->description('Ej. Instagram, referido, feria.'),
             'etapa' => $schema->string()->enum(ListarLeads::ETAPAS)->description('Por defecto: Posible cliente.'),
             'valor' => $schema->number()->description('Valor estimado del negocio.'),
